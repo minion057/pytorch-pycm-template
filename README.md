@@ -35,6 +35,10 @@ PyTorch deep learning project made easy.
 ## Requirements
 * Python >= 3.5 (3.6 recommended)
 * PyTorch >= 0.4 (1.2 recommended)
+* pycm >= 4.0
+* numpy
+* pandas
+* sklearn (Optional for ROC curve)
 * tqdm (Optional for `test.py`)
 * tensorboard >= 1.14 (see [Tensorboard Visualization](#tensorboard-visualization))
 
@@ -45,8 +49,10 @@ PyTorch deep learning project made easy.
 * Checkpoint saving and resuming.
 * Abstract base classes for faster development:
   * `BaseTrainer` handles checkpoint saving/resuming, training process logging, and more.
-  * `BaseDataLoader` handles batch generation, data shuffling, and validation data splitting.
+  * `BaseRawDataLoader`: In the existing template, it's referred to as `BaseDataLoader` handles batch generation, data shuffling, and validation data splitting.
+  * `BaseSplitDatasetLoader`: It loads pre-split npz data based on the mode (training, validation, testing).
   * `BaseModel` provides basic model summary.
+  * `BaseMetrics` provides basic metric and confusion matrix tracker.
 
 ## Folder Structure
   ```
