@@ -52,7 +52,7 @@ PyTorch deep learning project made easy.
   * `BaseRawDataLoader`: In the existing template, it's referred to as `BaseDataLoader` handles batch generation, data shuffling, and validation data splitting.
   * `BaseSplitDatasetLoader`: It loads pre-split npz data based on the mode (training, validation, testing).
   * `BaseModel` provides basic model summary.
-  * `BaseMetrics` provides basic metric and confusion matrix tracker.
+  * `MetricTracker` and `ConfusionTracker` provides basic metric and confusion matrix tracker.
 
 ## Folder Structure
   ```
@@ -67,23 +67,28 @@ PyTorch deep learning project made easy.
   ├── new_project.py - initialize new project with template files
   │
   ├── base/ - abstract base classes
-  │   ├── base_data_loader.py
   │   ├── base_model.py
+  │   ├── base_raw_data_loader.py
+  │   ├── base_split_data_loader.py
+  │   ├── base_metric.py
   │   └── base_trainer.py
   │
   ├── data_loader/ - anything about data loading goes here
-  │   └── data_loaders.py
+  │   ├── mnist_data_loaders.py
+  │   └── npz_data_loaders.py
   │
   ├── data/ - default directory for storing input data
   │
   ├── model/ - models, losses, and metrics
   │   ├── model.py
+  │   ├── metric_curve_plot.py
   │   ├── metric.py
   │   └── loss.py
   │
   ├── saved/
   │   ├── models/ - trained models are saved here
-  │   └── log/ - default logdir for tensorboard and logging output
+  │   ├── log/ - default logdir for tensorboard and logging output
+  │   └── output/ - Optional. To save performance plot at last epoch and metrics result per epoch
   │
   ├── trainer/ - trainers
   │   └── trainer.py
@@ -135,9 +140,12 @@ Config files are in `.json` format:
   },
   "loss": "nll_loss",                  // loss
   "metrics": [
-    "accuracy", "top_k_acc"            // list of metrics to evaluate
-  ],                         
-  "lr_scheduler": {
+    "ACC", "TNR"                       // list of metrics to evaluate using pycm object
+  ],   
+  "curve_metrics":[
+    "ROC"                              // list of curve metrics to evaluate using scikit-learn
+  ],                      
+  "lr_scheduler": {                    // If you need a fixed learning rate, delete that part.
     "type": "StepLR",                  // learning rate scheduler
     "args":{
       "step_size": 50,          
@@ -151,9 +159,15 @@ Config files are in `.json` format:
     "verbosity": 2,                    // 0: quiet, 1: per epoch, 2: full
   
     "monitor": "min val_loss"          // mode and metric for model performance monitoring. set 'off' to disable.
-    "early_stop": 10	                 // number of epochs to wait before early stop. set 0 to disable.
+    "early_stop": 10	               // number of epochs to wait before early stop. set 0 to disable.
   
     "tensorboard": true,               // enable tensorboard visualization
+    "tensorboard_projector": {         // enable save projector at first epoch
+        "train":false,
+        "valid":true
+    },
+    "tensorboard_pred_plot": true,     // enable save prediction example plot per epoch (5 data)
+    "save_performance_plot": true      // enable output diretory
   }
 }
 ```
@@ -327,7 +341,7 @@ A copy of config file will be saved in the same folder.
   {
     'arch': arch,
     'epoch': epoch,
-    'state_dict': self.model.state_dict(),
+    'state_dict': self.model.module.state_dict() if isinstance(self.model, DP) or isinstance(self.model, DDP) else self.model.state_dict(),
     'optimizer': self.optimizer.state_dict(),
     'monitor_best': self.mnt_best,
     'config': self.config
@@ -366,16 +380,6 @@ Feel free to contribute any kind of function or enhancement, here the coding sty
 
 Code should pass the [Flake8](http://flake8.pycqa.org/en/latest/) check before committing.
 
-## TODOs
-
-- [ ] Multiple optimizers
-- [ ] Support more tensorboard functions
-- [x] Using fixed random seed
-- [x] Support pytorch native tensorboard
-- [x] `tensorboardX` logger support
-- [x] Configurable logging layout, checkpoint naming
-- [x] Iteration-based training (instead of epoch-based)
-- [x] Adding command line option for fine-tuning
 
 ## License
 This project is licensed under the MIT License. See  LICENSE for more details

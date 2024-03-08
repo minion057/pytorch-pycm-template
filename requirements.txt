@@ -3,3 +3,6 @@ torchvision
 numpy
 tqdm
 tensorboard>=1.14
+pandas
+pycm>=4.0
+scikit-learn
