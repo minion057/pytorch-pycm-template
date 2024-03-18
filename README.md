@@ -173,7 +173,7 @@ Code should pass the [Flake8](http://flake8.pycqa.org/en/latest/) check before c
 
 ## License
 ---
-This project is licensed under the MIT License. See  LICENSE for more details
+This project is licensed under the MIT License. See [`docs/LICENSE`](docs/LICENSE) for more details.
 <br>
 
 ## Acknowledgements
