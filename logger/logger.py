@@ -2,9 +2,9 @@ import logging
 import logging.config
 from pathlib import Path
 from utils import read_json
+import shutil
 
-
-def setup_logging(save_dir, log_config='logger/logger_config.json', default_level=logging.INFO):
+def setup_logging(save_dir, log_config='logger/logger_config.json', default_level=logging.INFO, test_mode=False, resume_epoch=None):
     """
     Setup logging configuration
     """
@@ -14,6 +14,15 @@ def setup_logging(save_dir, log_config='logger/logger_config.json', default_leve
         # modify logging paths based on run config
         for _, handler in config['handlers'].items():
             if 'filename' in handler:
+                log_file_path = (save_dir / handler['filename']) if not test_mode else (save_dir / f"{handler['filename']}.test")
+
+                if log_file_path.is_file():
+                    if test_mode: log_file_path.unlink()
+                    else:
+                        ori_log_file_path = Path(f'{log_file_path}.resume.{resume_epoch}')
+                        if not Path(ori_log_file_path).is_file(): shutil.copy(log_file_path, ori_log_file_path)
+                        else: shutil.copy(ori_log_file_path, log_file_path)
+                
                 handler['filename'] = str(save_dir / handler['filename'])
 
         logging.config.dictConfig(config)
