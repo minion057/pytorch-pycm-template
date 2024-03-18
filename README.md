@@ -112,7 +112,7 @@ Please check [here](docs/config.md) for examples and detailed explanations.
 Modify the configurations in `.json` config files, then run:
 
   ```
-  python train.py --config config.json
+  python train.py --config config/config.json
   ```
 <br>
 

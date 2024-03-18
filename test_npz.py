@@ -28,7 +28,7 @@ def main(config):
     # build model architecture, then print to console
     classes = test_data_loader.dataset.classes
     config['arch']['args']['num_classes'] = len(classes)
-    config['arch']['args']['H'], config['arch']['args']['W'] = data_loader.size
+    config['arch']['args']['in_channels'], config['arch']['args']['H'], config['arch']['args']['W'] = data_loader.size
     model = config.init_obj('arch', module_arch)
     
     # print the model infomation

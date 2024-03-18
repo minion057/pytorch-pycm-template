@@ -6,12 +6,15 @@ import collections
 import torch
 import numpy as np
 
+from torchinfo import summary
+from torchviz import make_dot
+import model.model as module_arch
+
 import data_loader.mnist_data_loaders as module_data
 import model.loss as module_loss
 import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
 
-import model.model as module_arch
 from parse_config import ConfigParser
 from trainer import Trainer
 from utils import prepare_device
@@ -39,14 +42,14 @@ def main(config):
         graph_path = config.output_dir / config['arch']['type']
         logger.debug(graph_path)
         modelviz = config.init_obj('arch', module_arch)
-        make_dot(modelviz(next(iter(train_data_loader))[0]), params=dict(list(modelviz.named_parameters())), show_attrs=True, show_saved=True).render(graph_path, format='png')
+        make_dot(modelviz(next(iter(valid_data_loader))[0]), params=dict(list(modelviz.named_parameters())), show_attrs=True, show_saved=True).render(graph_path, format='png')
         del modelviz
 
     # print the model infomation
     # 1. basic method
     # logger.info(model)
     # 2. to use the torchinfo library (from torchinfo import summary)
-    input_size = next(iter(train_data_loader))[0].shape
+    input_size = next(iter(valid_data_loader))[0].shape
     logger.info('\nInput_size: {}'.format(input_size))
     model_info = str(summary(model, input_size=input_size, verbose=0))
     logger.info('{}\n'.format(model_info))

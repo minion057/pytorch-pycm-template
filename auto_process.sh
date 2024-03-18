@@ -13,8 +13,8 @@ TEST_PATH="$WORKSPACE/$TEST_FILE"
 
 # CONFIG_FILE="config-$USE_TYPE.json"
 CONFIG_FILE=(
-    "config-$USE_TYPE-TestNet.json"
-    "config-$USE_TYPE-TestNet.json"
+    "config/config-$USE_TYPE-LeNet5.json"
+    "config/config-$USE_TYPE-TestNet.json"
 )
 USER=$(whoami)
 

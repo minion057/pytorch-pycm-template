@@ -4,7 +4,7 @@ from torch.utils.data.dataloader import default_collate
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-class BaseDataLoader(DataLoader):
+class BaseRawDataLoader(DataLoader):
     """
     Base class for all data loaders
     """

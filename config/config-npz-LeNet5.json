@@ -1,9 +1,9 @@
 {
-    "name": "NPZ_TestNet",
+    "name": "NPZ_LeNet5",
     "n_gpu": 2,
 
     "arch": {
-        "type": "TestNet",
+        "type": "LeNet5",
         "args": {
         },
         "visualization": true
@@ -11,7 +11,7 @@
     "data_loader": {
         "type": "NPZDataLoader",
         "args":{
-            "dataset_path": "data/example.npz",
+            "dataset_path": "data/1-fold-test0.2.npz",
             "mode":["train", "valid"],
             "batch_size": 32,
             "num_workers": 2
@@ -27,7 +27,7 @@
     },
     "loss": "bce_loss",
     "metrics": [
-        "ACC", "ACC_class"
+        "ACC", "ACC_class", "TPR", "TPR_class", "TNR", "TNR_class"
     ],
     "curve_metrics":[
         "ROC"

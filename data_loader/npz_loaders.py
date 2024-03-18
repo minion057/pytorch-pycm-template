@@ -66,8 +66,8 @@ class NPZDataLoader():
     def _check_dataloader_shape(self, dataloader):
         X, y = next(iter(dataloader.dataloader))
         if X.shape[1] != 3: raise Exception(f'Shape of batch is [N, C, H, W]. Please recheck.')
-        _, _, H, W = X.shape
-        return (H, W), dataloader.dataloader.dataset.classes
+        _, C, H, W = X.shape
+        return (C, H, W), dataloader.dataloader.dataset.classes
 
     
 

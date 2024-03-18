@@ -2,12 +2,12 @@ from torch import nn
 from base import BaseModel
 
 class TestNet(BaseModel):
-    def __init__(self, num_classes:int, H:int, W:int):
+    def __init__(self, num_classes:int, H:int, W:int, in_channels:int=3):
         super().__init__()
         if num_classes <= 0 or H <= 0 or W <= 0: raise ValueError('The number of classes (num_classes), height (H) and width (W) must be positive.')
         
         self.layer = nn.Sequential(
-            nn.Conv2d(in_channels=3,out_channels=32,kernel_size=3),
+            nn.Conv2d(in_channels=in_channels,out_channels=32,kernel_size=3),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),   
             

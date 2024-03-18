@@ -16,11 +16,11 @@
 
 ```javascript
 {
-    "name": "Mnist_LeNet",            // Name for the output file.
+    "name": "Mnist_LeNet5",           // Name for the output file.
     "n_gpu": 2,                       // number of GPUs to use for training.
 
     "arch": {
-        "type": "MnistModel",         // Name of the model class. It must be defined in model.py.
+        "type": "LeNet5",             // Name of the model class. It must be defined in model.py.
         "args": {},
         "visualization": true
     },

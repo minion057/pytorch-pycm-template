@@ -1,19 +1,19 @@
 {
-    "name": "Mnist_LeNet",
+    "name": "NPZ_TestNet",
     "n_gpu": 2,
 
     "arch": {
-        "type": "MnistModel",
-        "args": {},
+        "type": "TestNet",
+        "args": {
+        },
         "visualization": true
     },
     "data_loader": {
-        "type": "MnistDataLoader",
+        "type": "NPZDataLoader",
         "args":{
-            "data_dir": "data/",
-            "batch_size": 1024,
-            "shuffle": true,
-            "validation_split": 0.1,
+            "dataset_path": "data/1-fold-test0.2.npz",
+            "mode":["train", "valid"],
+            "batch_size": 32,
             "num_workers": 2
         }
     },
@@ -25,9 +25,9 @@
             "amsgrad": true
         }
     },
-    "loss": "nll_loss",
+    "loss": "bce_loss",
     "metrics": [
-        "ACC", "ACC_class"
+        "ACC", "ACC_class", "TPR", "TPR_class", "TNR", "TNR_class"
     ],
     "curve_metrics":[
         "ROC"
@@ -35,7 +35,7 @@
     "lr_scheduler": {
         "type": "StepLR",
         "args": {
-            "step_size": 2,
+            "step_size": 50,
             "gamma": 0.1
         }
     },
