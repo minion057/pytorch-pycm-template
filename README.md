@@ -54,6 +54,9 @@
   * `BaseTester` handles checkpoint resuming, test process logging, and more.
   * `BaseRawDataLoader` is the [`BaseDataLoader`](https://github.com/victoresque/pytorch-template/blob/master/base/base_data_loader.py) class of the [pytorch-template](https://github.com/victoresque/pytorch-template). It equally handles batch creation, data shuffling, and validation data segmentation.
   * `BaseSplitDatasetLoader` loads pre-split npz data based on the mode (training, validation, testing).
+      * The npz dataset used in the example was generated using the [npz repo](https://github.com/minion057/Image-to-NPZ_dataset-with-DA) from my repository.
+      * Although the repository provides data augmentation (DA) functionality, it is advised to perform DA in the data loader.
+      * Therefore, we will not apply DA and instead use the original data, splitting it into training, validation, and testing datasets.
   * `BaseModel` provides basic model summary.
   * `MetricTracker` and `ConfusionTracker` provides basic metric and confusion matrix tracker.  
 <br>
