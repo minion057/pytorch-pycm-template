@@ -1,8 +1,9 @@
+import torch
+import numpy as np
 from torchvision import datasets, transforms
-from base import BaseDataLoader
+from base import BaseRawDataLoader
 
-
-class MnistDataLoader(BaseDataLoader):
+class MnistDataLoader(BaseRawDataLoader):
     """
     MNIST data loading demo using BaseDataLoader
     """
@@ -13,4 +14,5 @@ class MnistDataLoader(BaseDataLoader):
         ])
         self.data_dir = data_dir
         self.dataset = datasets.MNIST(self.data_dir, train=training, download=True, transform=trsfm)
-        super().__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
+        classes = [0,1,2,3,4,5,6,7,8,9]
+        super().__init__(self.dataset, classes, batch_size, shuffle, validation_split, num_workers)
