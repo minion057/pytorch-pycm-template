@@ -10,6 +10,8 @@
 data/*
 # Output dir
 saved/*
+# Test dir
+experiment/*
 
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
