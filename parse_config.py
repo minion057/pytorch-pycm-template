@@ -6,10 +6,10 @@ from operator import getitem
 from datetime import datetime
 from logger import setup_logging
 from utils import read_json, write_json
-
+import shutil
 
 class ConfigParser:
-    def __init__(self, config, resume=None, modification=None, run_id=None):
+    def __init__(self, config, resume=None, modification=None, run_id=None, test_mode=False):
         """
         class to parse configuration json file. Handles hyperparameters for training, initializations of modules, checkpoint saving
         and logging module.
@@ -21,6 +21,8 @@ class ConfigParser:
         # load config file and apply modification
         self._config = _update_config(config, modification)
         self.resume = resume
+        resume_epoch = None if resume is None else Path(resume).name.split("-")[-1].split(".pth")[0] # best or int
+        if test_mode: resume_epoch = 'trained'
 
         # set save_dir where trained model and log will be saved.
         save_dir = Path(self.config['trainer']['save_dir'])
@@ -30,14 +32,22 @@ class ConfigParser:
             run_id = datetime.now().strftime(r'%m%d_%H%M%S')
         self._save_dir = save_dir / 'models' / exper_name / run_id
         self._log_dir = save_dir / 'log' / exper_name / run_id
+        self._output_dir = save_dir / 'output' / exper_name / run_id
 
         # make directory for saving checkpoints and log.
         exist_ok = run_id == ''
-        self.save_dir.mkdir(parents=True, exist_ok=exist_ok)
-        self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
-
-        # save updated config file to the checkpoint dir
-        write_json(self.config, self.save_dir / 'config.json')
+        if self.resume is None: #try:
+            self.checkpoint_dir.mkdir(parents=True, exist_ok=exist_ok)
+            self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
+            self.output_dir.mkdir(parents=True, exist_ok=exist_ok)
+            # save updated config file to the checkpoint dir
+            write_json(self.config, self._checkpoint_dir / 'config.json')
+        else: #except Exception  as e:
+            copy_dir_path = self.log_dir.parent / f'{self.log_dir.name}-{resume_epoch}'
+            if not copy_dir_path.is_dir(): shutil.copytree(self.log_dir, copy_dir_path)
+            elif resume_epoch == 'trained':
+                shutil.rmtree(self.log_dir)
+                shutil.copytree(copy_dir_path, self.log_dir)
 
         # configure logging module
         setup_logging(self.log_dir)
@@ -52,6 +62,7 @@ class ConfigParser:
         """
         Initialize this class from some cli arguments. Used in train, test.
         """
+        run_id=None
         for opt in options:
             args.add_argument(*opt.flags, default=None, type=opt.type)
         if not isinstance(args, tuple):
@@ -61,10 +72,11 @@ class ConfigParser:
             os.environ["CUDA_VISIBLE_DEVICES"] = args.device
         if args.resume is not None:
             resume = Path(args.resume)
+            if resume.suffix not in ['.pth', '.pt']: raise ValueError('This is not a model path to resume.')
             cfg_fname = resume.parent / 'config.json'
+            run_id = resume.parent.name
         else:
-            msg_no_cfg = "Configuration file need to be specified. Add '-c config.json', for example."
-            assert args.config is not None, msg_no_cfg
+            if args.config is None: raise ValueError('Configuration file need to be specified. Add \'-c config.json\', for example.')
             resume = None
             cfg_fname = Path(args.config)
         
@@ -75,7 +87,7 @@ class ConfigParser:
 
         # parse custom cli options into dictionary
         modification = {opt.target : getattr(args, _get_opt_name(opt.flags)) for opt in options}
-        return cls(config, resume, modification)
+        return cls(config, resume, modification, run_id, args.test)
 
     def init_obj(self, name, module, *args, **kwargs):
         """
@@ -88,7 +100,7 @@ class ConfigParser:
         """
         module_name = self[name]['type']
         module_args = dict(self[name]['args'])
-        assert all([k not in module_args for k in kwargs]), 'Overwriting kwargs given in config file is not allowed'
+        if not all([k not in module_args for k in kwargs]): raise ValueError('Overwriting kwargs given in config file is not allowed')
         module_args.update(kwargs)
         return getattr(module, module_name)(*args, **module_args)
 
@@ -103,7 +115,7 @@ class ConfigParser:
         """
         module_name = self[name]['type']
         module_args = dict(self[name]['args'])
-        assert all([k not in module_args for k in kwargs]), 'Overwriting kwargs given in config file is not allowed'
+        if not all([k not in module_args for k in kwargs]): raise ValueError('Overwriting kwargs given in config file is not allowed')
         module_args.update(kwargs)
         return partial(getattr(module, module_name), *args, **module_args)
 
@@ -112,8 +124,7 @@ class ConfigParser:
         return self.config[name]
 
     def get_logger(self, name, verbosity=2):
-        msg_verbosity = 'verbosity option {} is invalid. Valid options are {}.'.format(verbosity, self.log_levels.keys())
-        assert verbosity in self.log_levels, msg_verbosity
+        if verbosity not in self.log_levels: ValueError(f'verbosity option {verbosity} is invalid. Valid options are {self.log_levels.keys()}.')
         logger = logging.getLogger(name)
         logger.setLevel(self.log_levels[verbosity])
         return logger
@@ -124,13 +135,17 @@ class ConfigParser:
         return self._config
 
     @property
-    def save_dir(self):
-        return self._save_dir
+    def checkpoint_dir(self):
+        return self._checkpoint_dir
 
     @property
     def log_dir(self):
         return self._log_dir
 
+    @property
+    def output_dir(self):
+        return self._output_dir
+        
 # helper functions to update config dict with custom cli options
 def _update_config(config, modification):
     if modification is None:
