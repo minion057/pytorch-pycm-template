@@ -32,7 +32,7 @@ class TensorboardWriter():
 
         self.tb_writer_ftns = {
             'add_scalar', 'add_scalars', 'add_image', 'add_images', 'add_audio',
-            'add_text', 'add_histogram', 'add_pr_curve', 'add_embedding'
+            'add_text', 'add_histogram', 'add_pr_curve', 'add_embedding', 'add_figure'
         }
         self.tag_mode_exceptions = {'add_histogram', 'add_embedding'}
         self.timer = datetime.now()
@@ -62,7 +62,8 @@ class TensorboardWriter():
                     # add mode(train/valid) tag
                     if name not in self.tag_mode_exceptions:
                         tag = '{}/{}'.format(tag, self.mode)
-                    add_data(tag, data, self.step, *args, **kwargs)
+                    if name in ['add_embedding']: add_data(tag=f'{tag}_{self.mode}', mat=data, *args, **kwargs)
+                    else: add_data(tag, data, self.step, *args, **kwargs)
             return wrapper
         else:
             # default action for returning methods defined in this class, set_step() for instance.
