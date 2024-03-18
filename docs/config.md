@@ -1,11 +1,11 @@
-# Config file format
+# Config file
 
 > Config files are in `.json` format.   
 > The following example is based on the examples provided in the repository.   
 > Add addional configurations if you need.   
 
 > ### **INDEX**
-> - [Config file format](#config-file-format)
+> - [Config file](#config-file)
 >   * [`BaseRawDataLoader` Type](#baserawdataloader-type)
 >   * [`BaseSplitDatasetLoader` Type](#basesplitdatasetloader-type)
 > 

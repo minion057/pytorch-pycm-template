@@ -80,10 +80,10 @@ which is increased to 256 by command line options.
 
 2. **DataLoader Usage**     
 `DataLoader` is an iterator, to iterate through batches:
-  ```python
+      ```python
       for batch_idx, (x_batch, y_batch) in data_loader:
           pass
-  ```
+      ```
 <br>
 
 ### Trainer
