@@ -160,8 +160,8 @@ You can set up repetitive training and testing using a bash script. After modify
 ```bash
 bash auto_process.sh
 ```
-In the case of testing, it searches for the most recently modified best_model within the folder of the date when the training was executed and performs the test.
-
+In the case of testing, it searches for the most recently modified best_model within the folder of the date when the training was executed and performs the test.    
+Additionally, execute `parse_save_config` to obtain the path where the data is saved based on the contents of the config.     
 <br>
 
 ## Contribution
