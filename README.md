@@ -1,5 +1,5 @@
 # PyTorch Pycm Template Project
----
+
 > To easily create a PyTorch deep learning project, consider using this template.    
 > It's based on the [pytorch-template](https://github.com/victoresque/pytorch-template), so some parts aren't explained in detail.    
 > Unlike the original, it utilizes the pycm library for metrics computation.    
@@ -29,7 +29,7 @@
 <br>
 
 ## Requirements
----
+
 * Python >= 3.5 (3.6 recommended)
 * PyTorch >= 0.4 (2.0 recommended)
 * pycm >= 4.0
@@ -44,7 +44,7 @@
 <br>
 
 ## Features
----
+
 * Clear folder structure which is suitable for many deep learning projects.
 * `.json` config file support for convenient parameter tuning.
 * Customizable command line options for more convenient parameter tuning.
@@ -59,11 +59,11 @@
 <br>
 
 ## Folder Structure
----
+
 Please check [here](docs/folder_structure.md) for explanations.
 
 ## Usage
----
+
 This repository's code supports a total of 4 essential options and 2 additional options.   
 * Essential options:
     1. `-c`, `--config`: Set the path to the config file defining necessary components for the experiment environment such as data loaders and models.
@@ -105,7 +105,7 @@ When writing the main Python code, you can input and configure it in the followi
 <br>
 
 ### Config file
----
+
 Config files are in `.json` format.    
 Please check [here](docs/config.md) for examples and detailed explanations.
 
@@ -117,7 +117,7 @@ Modify the configurations in `.json` config files, then run:
 <br>
 
 ### Resuming from checkpoints
----
+
 You can resume from a previously saved checkpoint by:
 
   ```
@@ -126,7 +126,7 @@ You can resume from a previously saved checkpoint by:
 <br>
 
 ### Using Multiple GPU
----
+
 You can enable multi-GPU training by setting `n_gpu` argument of the config file to larger number.
 If configured to use smaller number of gpu than available, first n devices will be used by default.
 Specify indices of available GPUs by cuda environmental variable.
@@ -140,7 +140,7 @@ Specify indices of available GPUs by cuda environmental variable.
 <br>
 
 ### Testing with checkpoints
----
+
 You can resume from a previously saved checkpoint by:
 
   ```
@@ -149,13 +149,13 @@ You can resume from a previously saved checkpoint by:
 <br>
 
 ## Customization
----
+
 Please check [here](docs/customization.md) for explanations.   
 This description includes instructions for initial project setup, CLI options, data loaders, models, loss functions, metrics, logging, and tests.   
 <br>
 
 ## Automated Experimentation Process
----
+
 You can set up repetitive training and testing using a bash script. After modifying only the necessary information such as the config file name and the device to be used in `auto_process.sh`, you can execute it with the following command.
 ```bash
 bash auto_process.sh
@@ -165,19 +165,19 @@ In the case of testing, it searches for the most recently modified best_model wi
 <br>
 
 ## Contribution
----
+
 Feel free to contribute any kind of function or enhancement, here the coding style follows PEP8
 
 Code should pass the [Flake8](http://flake8.pycqa.org/en/latest/) check before committing.
 <br>
 
 ## License
----
+
 This project is licensed under the MIT License. See [`docs/LICENSE`](docs/LICENSE) for more details.
 <br>
 
 ## Acknowledgements
----
-This project is inspired by the project [Tensorflow-Project-Template](https://github.com/MrGemy95/Tensorflow-Project-Template) by [Mahmoud Gemy](https://github.com/MrGemy95)
-This project is inspired by the project [pytorch-template](https://github.com/victoresque/pytorch-template) by [victoresque](https://github.com/victoresque)
+
+This project is inspired by the project [Tensorflow-Project-Template](https://github.com/MrGemy95/Tensorflow-Project-Template) by [Mahmoud Gemy](https://github.com/MrGemy95).        
+This project is inspired by the project [pytorch-template](https://github.com/victoresque/pytorch-template) by [victoresque](https://github.com/victoresque).
 <br>

@@ -1,5 +1,4 @@
 # Folder Structure
----
 
 <!--
 The following commands in the terminal let you know the tree structure of the storage folder:

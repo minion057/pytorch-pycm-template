@@ -1,20 +1,20 @@
 # Config file format
----
+
 > Config files are in `.json` format.   
 > The following example is based on the examples provided in the repository.   
 > Add addional configurations if you need.   
 
 > ### **INDEX**
 > - [Config file format](#config-file-format)
->   * [`BaseRawDataLoader` Type](#--baserawdataloader---base-base-raw-data-loaderpy--type)
->   * [`BaseSplitDatasetLoader` Type](#--basesplitdatasetloader---base-base-split-data-loaderpy--type)
+>   * [`BaseRawDataLoader` Type](#baserawdataloader-type)
+>   * [`BaseSplitDatasetLoader` Type](#basesplitdatasetloader-type)
 > 
 > <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
 
 ## [`BaseRawDataLoader`](base/base_raw_data_loader.py) Type
----
-```json
+
+```javascript
 {
     "name": "Mnist_LeNet",            // Name for the output file.
     "n_gpu": 2,                       // number of GPUs to use for training.
@@ -82,8 +82,8 @@
 <br>
 
 ## [`BaseSplitDatasetLoader`](base/base_split_data_loader.py) Type
----
-```json
+
+```javascript
 {
     "name": "NPZ_TestNet",            // Name for the output file.
     "n_gpu": 2,                       // number of GPUs to use for training.

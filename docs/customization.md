@@ -1,5 +1,5 @@
 # Customization
----
+
 > This description includes instructions for initial project setup, CLI options, data loaders, models, loss functions, metrics, logging, and tests.   
 
 > ### **INDEX**
@@ -23,14 +23,14 @@
 <br>
 
 ### Project initialization
----
+
 Use the `new_project.py` script to make your new project directory with template files.   
 `python new_project.py ../NewProject` then a new project folder named 'NewProject' will be made.
 This script will filter out unneccessary files like cache, git files or readme file.     
 <br>
 
 ### Custom CLI options
----
+
 Changing values of config file is a clean, safe and easy way of tuning hyperparameters. However, sometimes
 it is better to have command line options if some values need to be changed too often or quickly.
 
@@ -54,7 +54,7 @@ which is increased to 256 by command line options.
 
 
 ### Data Loader
----
+
 1. **Writing your own data loader**
     - **Inherit ```BaseRawDataLoader```**   
         `BaseRawDataLoader` is a subclass of `torch.utils.data.DataLoader`, you can use either of them.     
@@ -78,16 +78,16 @@ which is increased to 256 by command line options.
         * Data shuffling
 <br>
 
-2. **DataLoader Usage**
+2. **DataLoader Usage**     
 `DataLoader` is an iterator, to iterate through batches:
   ```python
-  for batch_idx, (x_batch, y_batch) in data_loader:
-      pass
+      for batch_idx, (x_batch, y_batch) in data_loader:
+          pass
   ```
 <br>
 
 ### Trainer
----
+
 * **Writing your own trainer**
 
 1. **Inherit ```BaseTrainer```**
@@ -157,7 +157,7 @@ which is increased to 256 by command line options.
 <br>
 
 ### Tester
----
+
 * **Writing your own tester**
 
 1. **Inherit ```BaseTester```**
@@ -182,7 +182,7 @@ which is increased to 256 by command line options.
 <br>
 
 ### Model
----
+
 * **Writing your own model**
 
 1. **Inherit `BaseModel`**   
@@ -200,12 +200,12 @@ which is increased to 256 by command line options.
 <br>
 
 ### Loss
----
+
 Custom loss functions can be implemented in 'model/loss.py'. Use them by changing the name given in "loss" in config file, to corresponding name.     
 <br>
 
 ### Metrics
----
+
 Metric functions are located in 'model/metric.py'.
 
 You can monitor multiple metrics by providing a list in the configuration file, e.g.:
@@ -217,7 +217,7 @@ Additionally, if curve plots such as ROC are needed, please refer to 'model/metr
 <br>
 
 ### Additional logging
----
+
 If you have additional information to be logged, in `_train_epoch()` of your trainer class, merge them with `log` as shown below before returning:
 
   ```python
@@ -228,12 +228,12 @@ If you have additional information to be logged, in `_train_epoch()` of your tra
 <br>
 
 ### Testing
----
+
 You can test trained model by running `test.py` passing path to the trained checkpoint by `--resume` argument.     
 <br>
 
 ### Checkpoints
----
+
 You can specify the name of the training session in config files:
   ```json
   "name": "MNIST_LeNet",
@@ -257,7 +257,7 @@ A copy of config file will be saved in the same folder.
 <br>
 
 ### Tensorboard Visualization
----
+
 This template supports Tensorboard visualization by using either  `torch.utils.tensorboard` or [TensorboardX](https://github.com/lanpa/tensorboardX).
 
 1. **Install**
