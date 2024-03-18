@@ -1,4 +1,6 @@
-import torch.nn as nn
+from .TestNet import *
+
+from torch import nn
 import torch.nn.functional as F
 from base import BaseModel
 
