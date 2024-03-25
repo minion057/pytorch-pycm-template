@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # modify parameter
-WORKSPACE=$PWD
+WORKSPACE=$PWD #'/mnt/4d055040-c192-46c7-906e-bebc0ed47c00/jhyu/lab/DDP-PyTorch-test'
 SAVE_BEST_MODEL_FILE="model_best.pth"
 DEVICE="0, 1"
 
