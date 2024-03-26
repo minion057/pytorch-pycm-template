@@ -4,13 +4,9 @@ from torch.utils.data import Dataset, DataLoader
 DATASET_MODE = ['train', 'valid', 'test']
 
 class BaseSplitDatasetLoader():
-    def __init__(self, dataset, batch_size:int, shuffle:bool, num_workers:int, collate_fn):
-        # self.batch_size = batch_size
-        # self.shuffle = shuffle
-        # self.num_workers = num_workers
-        # self.collate_fn = collate_fn
+    def __init__(self, dataset, batch_size:int, shuffle:bool, num_workers:int, collate_fn, **kwargs):
         self.dataset = dataset
-        self.dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn)
+        self.dataloader = DataLoader(self.dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, **kwargs)
         
     def __len__(self):
         return len(self.dataset)
@@ -22,18 +18,15 @@ class BaseSplitDataset(Dataset):
     Alternatively, it is also applicable to consisting of a training set and a test set.
     This consists of only the desired three data sets through the parameter called `mode`.
     """
-    def __init__(self, dataset_path:str, mode:str, transform=None):       
+    def __init__(self, dataset_path:str, mode:str, trsfm=None):       
         # super(BaseSplitDataset, self).__init__()
         if mode not in DATASET_MODE: raise ValueError(f'INVALID mode: "{mode}".\nPlease select the mode from the following values: train, vaild, test.')
         self.init_kwargs = {
             'dataset_path': dataset_path,
             'mode': mode,
-            'transform': transform
+            'trsfm': trsfm
         }
         self.data, self.labels = None, None
-        # self.data, self.labels, self.path, self.classes = self._load_data_list(self.init_kwargs['dataset_path'])
-        # self.init_kwargs['data'], self.init_kwargs['labels'] = self.data, self.labels
-        # self.init_kwargs['path'], self.init_kwargs['classes'] = self.path, self.classes
 
     def __len__(self):
         return len(self.data)
@@ -52,5 +45,4 @@ class BaseSplitDataset(Dataset):
         raise NotImplementedError
 
     def _load_data_list(self, _path):
-        # return data, labels, path, classes
         raise NotImplementedError

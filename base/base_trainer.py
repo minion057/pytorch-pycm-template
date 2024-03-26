@@ -48,8 +48,7 @@ class BaseTrainer:
 
             self.mnt_best = inf if self.mnt_mode == 'min' else -inf
             self.early_stop = cfg_trainer.get('early_stop', inf)
-            if self.early_stop <= 0:
-                self.early_stop = inf
+            if self.early_stop <= 0: self.early_stop = inf
 
         self.start_epoch = 1
 
@@ -70,8 +69,7 @@ class BaseTrainer:
         self.tensorboard_pred_plot = cfg_trainer['tensorboard_pred_plot']
         self.save_performance_plot = cfg_trainer['save_performance_plot']
         
-        if config.resume is not None:
-            self._resume_checkpoint(config.resume)
+        if config.resume is not None: self._resume_checkpoint(config.resume)
 
     @abstractmethod
     def _train_epoch(self, epoch):
