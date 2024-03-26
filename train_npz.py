@@ -19,8 +19,8 @@ import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
-from trainer import Trainer
-from utils import prepare_device
+from runner import Trainer
+from utils import prepare_device, reset_device
 
 
 # fix random seeds for reproducibility

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTester, MetricTracker, ConfusionTracker
-from utils import tb_projecctor_resize, plot_classes_preds, plot_close
+from utils import tb_projector_resize, plot_classes_preds, plot_close
 import numpy as np
 from tqdm.auto import tqdm
 

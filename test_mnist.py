@@ -6,6 +6,9 @@ import collections
 import torch
 import numpy as np
 
+from torchinfo import summary
+import model.model as module_arch
+
 import data_loader.mnist_data_loaders as module_data
 from torchvision import transforms
 import data_loader.transforms as module_transforms
@@ -13,9 +16,8 @@ import model.loss as module_loss
 import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
 
-import model.model as module_arch
 from parse_config import ConfigParser
-from trainer import Tester
+from runner import Tester
 from utils import prepare_device
 
 

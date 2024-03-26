@@ -1,5 +1,5 @@
 """ 1. Input: n X m """
-from .LeNet5 import *
+from .models.LeNet5 import LeNet5
 
 from .models.ConvNeXt_v2 import convnextv2_atto, convnextv2_femto, convnextv2_pico, convnextv2_nano, convnextv2_tiny, convnextv2_base, convnextv2_large, convnextv2_huge
 

@@ -44,6 +44,7 @@ class BaseTester:
         self.tensorboard = cfg_trainer['tensorboard']
         self.writer = TensorboardWriter(config.log_dir, self.logger, self.tensorboard)
         self.projector = config['tester']['tensorboard_projector']
+        self.tensorboard_pred_plot = cfg_trainer['tensorboard_pred_plot']
         self.save_performance_plot = cfg_trainer['save_performance_plot']
         
         if config.resume is not None: self._resume_checkpoint(config.resume)

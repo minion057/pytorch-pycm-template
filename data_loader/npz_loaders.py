@@ -50,12 +50,12 @@ class NPZDataset(BaseSplitDataset):
         return data, labels, classes#, path, path_per_class
 
 class NPZDataLoader():
-    def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, transform=None, num_workers=0, collate_fn=None, **kwargs):
+    def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):
         self.loaderdict = dict()
         self.size, self.classes = None, None
         for m in mode:
-            self.loaderdict[m] = BaseSplitDatasetLoader(NPZDataset(dataset_path, m, transform), batch_size, \
-                                                        True if m==DATASET_MODE[0] else False, num_workers, collate_fn)
+            self.loaderdict[m] = BaseSplitDatasetLoader(NPZDataset(dataset_path, m, trsfm), batch_size, \
+                                                        True if m==DATASET_MODE[0] else False, num_workers, collate_fn, **kwargs)
             print(f'Make a {m} dataloader.')
             size, classes = self._check_dataloader_shape(self.loaderdict[m])
             if self.size is None: self.size = size
