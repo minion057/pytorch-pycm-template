@@ -11,7 +11,7 @@ data/*
 # Output dir
 saved/*
 # Config dir
-config/*
+# config/*
 # Test dir
 experiment/*
 
