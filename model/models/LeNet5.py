@@ -1,11 +1,12 @@
-import torch.nn as nn
-import torch.nn.functional as F
 from base import BaseModel
 
+import torch.nn as nn
+import torch.nn.functional as F
+
 class LeNet5(BaseModel):
-    def __init__(self, num_classes=10, H:int=28, W:int=28, in_channels:int=1):
+    def __init__(self, num_classes=10, H:int=28, W:int=28, in_chans:int=1):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, 10, kernel_size=5)
+        self.conv1 = nn.Conv2d(in_chans, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
         self.flat = nn.Flatten()
