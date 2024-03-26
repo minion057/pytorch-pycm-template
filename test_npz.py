@@ -7,6 +7,8 @@ import torch
 import numpy as np
 
 import data_loader.npz_loaders as module_data
+from torchvision import transforms
+import data_loader.transforms as module_transforms
 import model.loss as module_loss
 import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
@@ -21,30 +23,33 @@ def main(config):
     logger = config.get_logger('test')
 
     # setup data_loader instances
+    if 'trsfm' in config['data_loader']['args'].keys():
+        tf_list = []
+        for k, v in config['data_loader']['args']['trsfm'].items():
+            if v is None: tf_list.append(getattr(module_transforms, k)())
+            else: tf_list.append(getattr(module_transforms, k)(**v))
+        config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)  
     config.config['data_loader']['args']['mode'] = ['test']
     data_loader = config.init_obj('data_loader', module_data)
     test_data_loader = data_loader.loaderdict['test'].dataloader
 
     # build model architecture, then print to console
     classes = test_data_loader.dataset.classes
-    config['arch']['args']['num_classes'] = len(classes)
-    config['arch']['args']['in_channels'], config['arch']['args']['H'], config['arch']['args']['W'] = data_loader.size
     model = config.init_obj('arch', module_arch)
     
     # print the model infomation
     # 1. basic method
-    logger.info(model)
+    # logger.info(model)
     # 2. to use the torchinfo library (from torchinfo import summary)
-    # input_size = next(iter(train_data_loader))[0].shape
-    # logger.info('\nInput_size: {}'.format(input_size))
-    # model_info = str(summary(model, input_size=input_size, verbose=0))
-    # logger.info('{}\n'.format(model_info))
+    input_size = next(iter(test_data_loader))[0].shape
+    logger.info('\nInput_size: {}'.format(input_size))
+    model_info = str(summary(model, input_size=input_size, verbose=0))
+    logger.info('{}\n'.format(model_info))
 
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config['n_gpu'])
     model = model.to(device)
-    if len(device_ids) > 1:
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
+    if len(device_ids) > 1: model = torch.nn.DataParallel(model, device_ids=device_ids)
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
