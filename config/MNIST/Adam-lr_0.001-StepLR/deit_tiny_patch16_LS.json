@@ -1,0 +1,82 @@
+{
+    "name": "MNIST",
+    "n_gpu": 1,
+    "arch": {
+        "type": "deit_tiny_patch16_LS",
+        "args": {
+            "num_classes": 10,
+            "in_chans": 1,
+            "img_size": 128
+        },
+        "visualization": true
+    },
+    "data_loader": {
+        "type": "MnistDataLoader",
+        "args": {
+            "data_dir": "/mnt/test/dataset/",
+            "shuffle": true,
+            "validation_split": 0.1,
+            "num_workers": 2,
+            "batch_size":1024,
+            "trsfm": {
+                "Resize": {
+                    "size": 128
+                },
+                "ToTensor": null,
+                "Normalize": {
+                    "mean": [
+                        0.1307
+                    ],
+                    "std": [
+                        0.3081
+                    ]
+                }
+            }
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args": {
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": true
+        }
+    },
+    "lr_scheduler": {
+        "type": "StepLR",
+        "args": {
+            "step_size": 50,
+            "gamma": 0.1
+        }
+    },
+    "loss": "nll_loss",
+    "metrics": [
+        "ACC",
+        "ACC_class",
+        "TPR",
+        "TPR_class",
+        "TNR",
+        "TNR_class"
+    ],
+    "curve_metrics": [
+        "ROC"
+    ],
+    "trainer": {
+        "epochs": 1,
+        "save_dir": "saved/",
+        "save_period": 1,
+        "verbosity": 2,
+        "monitor": "min val_loss",
+        "early_stop": 10,
+        "tensorboard": true,
+        "tensorboard_projector": {
+            "train": false,
+            "valid": true
+        },
+        "tensorboard_pred_plot": true,
+        "save_performance_plot": true
+    },
+    "tester": {
+        "tensorboard_projector": true
+    }
+}
