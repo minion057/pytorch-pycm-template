@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTester, MetricTracker, ConfusionTracker
-from utils import inf_loop, tb_projector_resize, plot_classes_preds, plot_close
+from utils import tb_projector_resize, plot_classes_preds, plot_close
 import numpy as np
 from tqdm.auto import tqdm
 
@@ -23,6 +23,7 @@ class Tester(BaseTester):
         self.confusion = ConfusionTracker(*['confusion'], writer=self.writer, classes=self.classes)
 
         self.softmax = nn.Softmax(dim=0)
+        self.preds_item_cnt = 5
         self.prediction_images, self.prediction_labels = None, None
         self.prediction_preds, self.prediction_probs = None, None
 
@@ -62,7 +63,6 @@ class Tester(BaseTester):
                     self.metrics.update(met.__name__, met(confusion_obj, self.classes))
                     
                 if batch_idx % self.log_step == 0:
-                    # self.logger.debug(f'Test {self._progress(batch_idx)} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
                     self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
                 
                 # 4-1. Update the Projector
@@ -70,14 +70,20 @@ class Tester(BaseTester):
                     label_img, features = tb_projector_resize(data.detach().cpu().clone(), label_img, features)
                     class_labels.extend([str(self.classes[lab]) for lab in target.cpu().tolist()])
                 
-                if batch_idx+1 == len(self.data_loader) and self.tensorboard_pred_plot:
-                    self.prediction_images, self.prediction_labels = data.cpu()[-5:], [self.classes[lab] for lab in target.cpu().tolist()[-5:]]
+                if batch_idx == len(self.data_loader)-2 and self.tensorboard_pred_plot:
+                    # last batch -1 > To minimize batches with a length of 1 as much as possible.
+                    # If you want to modify the last batch, pretend that len(self.data_loader)-2 is self.len_epoch-1.
+                    self.prediction_images, self.prediction_labels = data.cpu()[-self.preds_item_cnt:], [self.classes[lab] for lab in target.cpu().tolist()[-self.preds_item_cnt:]]
                     data_channel = self.prediction_images.shape[1]
-                    preds = np.squeeze(predict[-5:].detach().cpu().numpy())
-                    use_prob = self.confusion.get_probability_vector('confusion')[-5:] if self.curve_metric_ftns is not None \
-                               else [self.softmax(el).tolist() for el in output[-5:].detach().cpu()]
+                    preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())                    
+                    preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
+                    use_prob = self.confusion.get_probability_vector('confusion')[-len(preds):] if self.curve_metric_ftns is not None \
+                               else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
+                    self.writer.add_figure('Prediction',plot_classes_preds(self.prediction_images, self.prediction_labels,
+                                                                           self.prediction_preds, self.prediction_probs, 
+                                                                           one_channel = True if data_channel == 1 else False, return_plot=True))
                     
         # 4-2. Upate the example of predtion
         if self.curve_metric_ftns is not None:
@@ -88,10 +94,6 @@ class Tester(BaseTester):
                 if self.save_performance_plot: curve_fig.savefig(self.output_dir / f'{met.__name__}_test-epoch{self.test_epoch}.png', bbox_inches='tight')
         if self.projector:            
             self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
-        if self.tensorboard_pred_plot:
-            self.writer.add_figure('Prediction',
-                                   plot_classes_preds(self.prediction_images, self.prediction_labels, self.prediction_preds, self.prediction_probs, 
-                                                      one_channel = True if data_channel == 1 else False, return_plot=True))
         plot_close()
         self.prediction_images, self.prediction_labels = None, None
         self.prediction_preds, self.prediction_probs = None, None
@@ -103,12 +105,3 @@ class Tester(BaseTester):
         log.update(log_confusion)  
         
         return log
-
-    def _progress(self, batch_idx):
-        current = batch_idx
-        total = self.len_epoch
-        
-        str_diff = len(str(total))-len(str(current))
-        current_str = str(current) if str_diff == 0 else ' '*str_diff+str(current)
-        percentage = f'{100.0 * (current/total):.0f}' 
-        return f'[{current_str}/{total} ({percentage:2s})%]'

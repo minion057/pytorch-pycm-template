@@ -11,13 +11,16 @@ from torchviz import make_dot
 import model.model as module_arch
 
 import data_loader.mnist_data_loaders as module_data
+from torchvision import transforms
+import data_loader.transforms as module_transforms
+import model.optim as module_optim
 import model.loss as module_loss
 import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
-from trainer import Trainer
-from utils import prepare_device
+from runner import Trainer
+from utils import prepare_device, reset_device
 
 
 # fix random seeds for reproducibility
@@ -32,27 +35,20 @@ def main(config):
     logger = config.get_logger('train')
 
     # setup data_loader instances
+    if 'trsfm' in config['data_loader']['args'].keys():
+        tf_list = []
+        for k, v in config['data_loader']['args']['trsfm'].items():
+            if v is None: tf_list.append(getattr(module_transforms, k)())
+            else: tf_list.append(getattr(module_transforms, k)(**v))
+        config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)  
     data_loader = config.init_obj('data_loader', module_data)
     valid_data_loader = data_loader.split_validation()
 
     # build model architecture, then print to console
     model = config.init_obj('arch', module_arch)
-    if config['arch']['visualization']:
-        logger.debug('Save the model graph...\n')
-        graph_path = config.output_dir / config['arch']['type']
-        logger.debug(graph_path)
-        modelviz = config.init_obj('arch', module_arch)
-        make_dot(modelviz(next(iter(valid_data_loader))[0]), params=dict(list(modelviz.named_parameters())), show_attrs=True, show_saved=True).render(graph_path, format='png')
-        del modelviz
 
     # print the model infomation
-    # 1. basic method
-    # logger.info(model)
-    # 2. to use the torchinfo library (from torchinfo import summary)
-    input_size = next(iter(valid_data_loader))[0].shape
-    logger.info('\nInput_size: {}'.format(input_size))
-    model_info = str(summary(model, input_size=input_size, verbose=0))
-    logger.info('{}\n'.format(model_info))
+    logger.info(model)
 
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config['n_gpu'])
@@ -80,6 +76,21 @@ def main(config):
                       lr_scheduler=lr_scheduler)
 
     trainer.train()
+
+    # print the model infomation
+    # Option. Use after training because data flows into the model and calculates it    
+    use_data = next(iter(valid_data_loader))[0].to(device)
+    input_size = use_data.shape
+    logger.info('\nInput_size: {}'.format(input_size))
+    model_info = str(summary(model, input_size=input_size, verbose=0))
+    logger.info('{}\n'.format(model_info))
+    
+    reset_device('cache')
+    if config['arch']['visualization']:
+        logger.debug('Save the model graph...\n')
+        graph_path = config.output_dir / config['arch']['type']
+        logger.debug(graph_path)
+        make_dot(model(use_data), params=dict(list(model.named_parameters())), show_attrs=True, show_saved=True).render(graph_path, format='png') 
 
 
 """ Run """

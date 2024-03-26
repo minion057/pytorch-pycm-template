@@ -7,7 +7,7 @@ from logger import TensorboardWriter
 from copy import deepcopy
 
 from pathlib import Path
-from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_1, plot_close
+from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, plot_close
 import model.metric_curve_plot as module_curve_metric
 
 import time
@@ -43,9 +43,7 @@ class BaseTester:
         cfg_trainer = config['trainer']
         self.tensorboard = cfg_trainer['tensorboard']
         self.writer = TensorboardWriter(config.log_dir, self.logger, self.tensorboard)
-        
         self.projector = config['tester']['tensorboard_projector']
-        
         self.tensorboard_pred_plot = cfg_trainer['tensorboard_pred_plot']
         self.save_performance_plot = cfg_trainer['save_performance_plot']
         

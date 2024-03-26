@@ -8,15 +8,14 @@ class NPZDataset(BaseSplitDataset):
     """
     npz data loading demo using BaseSplitDataLoader
     """
-    def __init__(self, dataset_path:str, mode:str, transform):
-        if transform is None:
-            transform = transforms.Compose([
+    def __init__(self, dataset_path:str, mode:str, trsfm=None):
+        if trsfm is None:
+            trsfm = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), #RGB
                 # transforms.Normalize((0.5, ), (0.5, )) # Grayscale
             ])
-        super().__init__(dataset_path, mode, transform)
-        # self.data, self.labels, self.classes, self.path, self.path_per_class = self._load_data_list(self.init_kwargs['dataset_path'])
+        super().__init__(dataset_path, mode, trsfm)
         self.data, self.labels, self.classes = self._load_data_list(self.init_kwargs['dataset_path'])
     
     def __getitem__(self, index):
@@ -31,8 +30,8 @@ class NPZDataset(BaseSplitDataset):
         elif len(item.shape) == 3 and item.shape[-1] == 4:
             item = item[..., :3]
             
-        if self.init_kwargs['transform'] is not None:
-            item = self.init_kwargs['transform'](item)
+        if self.init_kwargs['trsfm'] is not None:
+            item = self.init_kwargs['trsfm'](item)
         label = self.labels[index]
         return item, label
 
@@ -51,11 +50,12 @@ class NPZDataset(BaseSplitDataset):
         return data, labels, classes#, path, path_per_class
 
 class NPZDataLoader():
-    def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, transform=None, num_workers=0, collate_fn=None):
+    def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):
         self.loaderdict = dict()
         self.size, self.classes = None, None
         for m in mode:
-            self.loaderdict[m] = BaseSplitDatasetLoader(NPZDataset(dataset_path, m, transform), batch_size, True if m==DATASET_MODE[0] else False, num_workers, collate_fn)
+            self.loaderdict[m] = BaseSplitDatasetLoader(NPZDataset(dataset_path, m, trsfm), batch_size, \
+                                                        True if m==DATASET_MODE[0] else False, num_workers, collate_fn, **kwargs)
             print(f'Make a {m} dataloader.')
             size, classes = self._check_dataloader_shape(self.loaderdict[m])
             if self.size is None: self.size = size
@@ -68,17 +68,3 @@ class NPZDataLoader():
         if X.shape[1] != 3: raise Exception(f'Shape of batch is [N, C, H, W]. Please recheck.')
         _, C, H, W = X.shape
         return (C, H, W), dataloader.dataloader.dataset.classes
-
-    
-
-'''
-def NPZDataLoader(dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, transform=None, num_workers=0, collate_fn=None):
-    print('Strat!')
-    dataloader = {m:0 for m in mode}
-    for m in mode:
-        dataloader[m] = BaseSplitDatasetLoader(NPZDataset(dataset_path, m, transform), batch_size, True if m==MODE[0] else False, num_workers, collate_fn)
-        print(f'Make a {mode} dataloader.')
-        check_dataloader_shape(dataloader[m])
-    print('Done!')
-    return dataloader
-'''

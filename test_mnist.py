@@ -6,14 +6,18 @@ import collections
 import torch
 import numpy as np
 
+from torchinfo import summary
+import model.model as module_arch
+
 import data_loader.mnist_data_loaders as module_data
+from torchvision import transforms
+import data_loader.transforms as module_transforms
 import model.loss as module_loss
 import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
 
-import model.model as module_arch
 from parse_config import ConfigParser
-from trainer import Tester
+from runner import Tester
 from utils import prepare_device
 
 
@@ -21,13 +25,21 @@ def main(config):
     logger = config.get_logger('test')
 
     # setup data_loader instances
+    trsfm = None
+    if 'trsfm' in config['data_loader']['args'].keys():
+        tf_list = []
+        for k, v in config['data_loader']['args']['trsfm'].items():
+            if v is None: tf_list.append(getattr(module_transforms, k)())
+            else: tf_list.append(getattr(module_transforms, k)(**v))
+        trsfm = transforms.Compose(tf_list) 
     test_data_loader = getattr(module_data, config['data_loader']['type'])(
         config['data_loader']['args']['data_dir'],
         batch_size=config['data_loader']['args']['batch_size'],
         shuffle=False,
         validation_split=0.0,
         training=False,
-        num_workers=config['data_loader']['args']['num_workers']
+        num_workers=config['data_loader']['args']['num_workers'],
+        trsfm=trsfm
     )
 
     # build model architecture, then print to console
@@ -35,18 +47,17 @@ def main(config):
     
     # print the model infomation
     # 1. basic method
-    logger.info(model)
+    # logger.info(model)
     # 2. to use the torchinfo library (from torchinfo import summary)
-    # input_size = next(iter(train_data_loader))[0].shape
-    # logger.info('\nInput_size: {}'.format(input_size))
-    # model_info = str(summary(model, input_size=input_size, verbose=0))
-    # logger.info('{}\n'.format(model_info))
+    input_size = next(iter(test_data_loader))[0].shape
+    logger.info('\nInput_size: {}'.format(input_size))
+    model_info = str(summary(model, input_size=input_size, verbose=0))
+    logger.info('{}\n'.format(model_info))
 
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config['n_gpu'])
     model = model.to(device)
-    if len(device_ids) > 1:
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
+    if len(device_ids) > 1: model = torch.nn.DataParallel(model, device_ids=device_ids)
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])

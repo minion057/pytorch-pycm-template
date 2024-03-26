@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # modify parameter
-WORKSPACE=$PWD #'/mnt/4d055040-c192-46c7-906e-bebc0ed47c00/jhyu/lab/DDP-PyTorch-test'
+WORKSPACE=$PWD
 SAVE_BEST_MODEL_FILE="model_best.pth"
 DEVICE="0, 1"
 
@@ -11,10 +11,11 @@ TEST_FILE="test_$USE_TYPE.py"
 TRAIN_PATH="$WORKSPACE/$TRAIN_FILE"
 TEST_PATH="$WORKSPACE/$TEST_FILE"
 
-# CONFIG_FILE="config-$USE_TYPE.json"
+USE_OPTIM="NPZ/Adam-lr_0.001-StepLR"
 CONFIG_FILE=(
     "config/config-$USE_TYPE-LeNet5.json"
-    "config/config-$USE_TYPE-TestNet.json"
+    "config/$USE_OPTIM/convnextv2_atto.json"
+    "config/$USE_OPTIM/deit_tiny_patch16_LS.json"
 )
 USER=$(whoami)
 

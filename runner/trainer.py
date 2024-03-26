@@ -33,6 +33,7 @@ class Trainer(BaseTrainer):
         self.valid_confusion = ConfusionTracker(*['confusion'], writer=self.writer, classes=self.classes)
 
         self.softmax = nn.Softmax(dim=0)
+        self.preds_item_cnt = 5
         self.prediction_images, self.prediction_labels = None, None
         self.prediction_preds, self.prediction_probs = None, None
         
@@ -84,26 +85,27 @@ class Trainer(BaseTrainer):
             
             # 7-1. Update the Projector
             if self.train_projector and epoch == 1:                
-                # probs 추가하고 싶으면 metadata_header, zip list 이용해서 수정
                 label_img, features = tb_projector_resize(data.detach().cpu().clone(), label_img, features)
                 class_labels.extend([str(self.classes[lab]) for lab in target.cpu().tolist()])
                 
             # 8. Print the result
-            if batch_idx % self.log_step == 0:
+            if batch_idx % self.log_step == 0 or batch_idx == self.len_epoch-1 or self.len_epoch == 1:
                 self.logger.debug(f'Train Epoch: {epoch} {self._progress(batch_idx)} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
             
-            if batch_idx+1 == self.len_epoch and self.tensorboard_pred_plot:
-                self.prediction_images, self.prediction_labels = data.cpu()[-5:], [self.classes[lab] for lab in target.cpu().tolist()[-5:]]
+            if (batch_idx == self.len_epoch-2 or self.len_epoch == 1) and self.tensorboard_pred_plot: 
+                # last batch -1 > To minimize batches with a length of 1 as much as possible.
+                # If you want to modify the last batch, pretend that self.len_epoch-2 is self.len_epoch-1.
+                self.prediction_images, self.prediction_labels = data.cpu()[-self.preds_item_cnt:], [self.classes[lab] for lab in target.cpu().tolist()[-self.preds_item_cnt:]]
                 data_channel = self.prediction_images.shape[1]
-                preds = np.squeeze(predict[-5:].detach().cpu().numpy())
-                use_prob = self.train_confusion.get_probability_vector('confusion')[-5:] if self.curve_metric_ftns is not None \
-                           else [self.softmax(el).tolist() for el in output[-5:].detach().cpu()]
+                preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())
+                preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
+                use_prob = self.train_confusion.get_probability_vector('confusion')[-len(preds):] if self.curve_metric_ftns is not None \
+                           else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                 self.prediction_preds = [self.classes[lab] for lab in preds]
-                self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]                 
+                self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
             
-            if batch_idx == self.len_epoch:     
-                break
+            if batch_idx == self.len_epoch: break
         
         # 7-2. Upate the example of predtion and Projector
         self.writer.set_step(epoch-1)
@@ -183,12 +185,15 @@ class Trainer(BaseTrainer):
                     label_img, features = tb_projector_resize(data.detach().cpu().clone(), label_img, features)
                     class_labels.extend([str(self.classes[lab]) for lab in target.cpu().tolist()])
                 
-                if batch_idx+1 == len(self.valid_data_loader) and self.tensorboard_pred_plot:
-                    self.prediction_images, self.prediction_labels = data.cpu()[-5:], [self.classes[lab] for lab in target.cpu().tolist()[-5:]]
+                if (batch_idx == len(self.valid_data_loader)-2 or len(self.valid_data_loader) == 1) and self.tensorboard_pred_plot:
+                    # last batch -1 > To minimize batches with a length of 1 as much as possible.
+                    # If you want to modify the last batch, pretend that self.len_epoch-2 is self.len_epoch-1.
+                    self.prediction_images, self.prediction_labels = data.cpu()[-self.preds_item_cnt:], [self.classes[lab] for lab in target.cpu().tolist()[-self.preds_item_cnt:]]
                     data_channel = self.prediction_images.shape[1]
-                    preds = np.squeeze(predict[-5:].detach().cpu().numpy())
-                    use_prob = self.valid_confusion.get_probability_vector('confusion')[-5:] if self.curve_metric_ftns is not None \
-                               else [self.softmax(el).tolist() for el in output[-5:].detach().cpu()]
+                    preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())
+                    preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1  
+                    use_prob = self.valid_confusion.get_probability_vector('confusion')[-len(preds):] if self.curve_metric_ftns is not None \
+                               else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
                     
