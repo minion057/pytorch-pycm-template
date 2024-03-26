@@ -11,6 +11,7 @@
 >    + [Tester](#tester)
 >    + [Model](#model)
 >    + [Loss](#loss)
+>    + [Optimizer](#optimizer)
 >    + [Metrics](#metrics)
 >    + [Additional logging](#additional-logging)
 >    + [Testing](#testing)
@@ -202,6 +203,11 @@ which is increased to 256 by command line options.
 ### Loss
 
 Custom loss functions can be implemented in 'model/loss.py'. Use them by changing the name given in "loss" in config file, to corresponding name.     
+<br>
+
+### Optimizer
+
+Custom optimizer can be implemented in 'model/optim.py'. Use them by changing the name given in "optimizer" in config file, to corresponding name.     
 <br>
 
 ### Metrics
