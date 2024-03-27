@@ -181,43 +181,35 @@ class main_model(BaseModel): #(nn.Module):
     def forward(self, imgs):
 
         ######  Global Branch ######
-        x_s, H, W = self.patch_embed(imgs)
+        x_s, H1, W1 = self.patch_embed(imgs) 
         x_s = self.pos_drop(x_s)
-        x_s_1, H, W = self.layers1(x_s, H, W)
-        x_s_2, H, W = self.layers2(x_s_1, H, W)
-        x_s_3, H, W = self.layers3(x_s_2, H, W)
-        x_s_4, H, W = self.layers4(x_s_3, H, W)
+        x_s_1, H2, W2 = self.layers1(x_s, H1, W1)
+        x_s_2, H3, W3 = self.layers2(x_s_1, H2, W2)
+        x_s_3, H4, W4 = self.layers3(x_s_2, H3, W3)
+        x_s_4, H5, W5 = self.layers4(x_s_3, H4, W4)
 
         # [B,L,C] ---> [B,C,H,W]
         # Original. Input size: (224,224,3)
         # x_s_1 = torch.transpose(x_s_1, 1, 2)
-        # x_s_1 = x_s_1.view(x_s_1.shape[0], -1, 56, 56)
+        # x_s_1 = x_s_1.view(x_s_1.shape[0], -1, 56, 56) 
         # x_s_2 = torch.transpose(x_s_2, 1, 2)
         # x_s_2 = x_s_2.view(x_s_2.shape[0], -1, 28, 28)
         # x_s_3 = torch.transpose(x_s_3, 1, 2)
         # x_s_3 = x_s_3.view(x_s_3.shape[0], -1, 14, 14)
         # x_s_4 = torch.transpose(x_s_4, 1, 2)
         # x_s_4 = x_s_4.view(x_s_4.shape[0], -1, 7, 7)
-        # Changed. H//4
-        input_size = imgs.shape
-        input_H, input_W = input_size[-2], input_size[-1]
-        if input_H != input_W: raise ValueError('Currently, it\'s a rectangle. Change it to a square.')
-        
+        # Changed.         
         x_s_1 = torch.transpose(x_s_1, 1, 2)
-        change_size = input_H//4
-        x_s_1 = x_s_1.reshape(x_s_1.shape[0], -1, change_size, change_size)
+        x_s_1 = x_s_1.reshape(x_s_1.shape[0], -1, H2, W2)
         
         x_s_2 = torch.transpose(x_s_2, 1, 2)
-        change_size = change_size//2
-        x_s_2 = x_s_2.reshape(x_s_2.shape[0], -1, change_size, change_size)
+        x_s_2 = x_s_2.reshape(x_s_2.shape[0], -1, H3, W3)
         
         x_s_3 = torch.transpose(x_s_3, 1, 2)
-        change_size = change_size//2
-        x_s_3 = x_s_3.reshape(x_s_3.shape[0], -1, change_size, change_size)
+        x_s_3 = x_s_3.reshape(x_s_3.shape[0], -1, H4, W4)
         
         x_s_4 = torch.transpose(x_s_4, 1, 2)
-        change_size = change_size//2
-        x_s_4 = x_s_4.reshape(x_s_4.shape[0], -1, change_size, change_size)
+        x_s_4 = x_s_4.reshape(x_s_4.shape[0], -1, H5, W5)
 
         ######  Local Branch ######
         x_c = self.downsample_layers[0](imgs)
