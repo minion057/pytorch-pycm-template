@@ -24,6 +24,7 @@ class Trainer(BaseTrainer):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
+        self.lr_scheduler_name = config['lr_scheduler']['type'] if 'lr_scheduler' in config.config.keys() else None
         self.log_step = int(np.sqrt(data_loader.batch_size))
 
         self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
@@ -135,7 +136,8 @@ class Trainer(BaseTrainer):
         if self.lr_scheduler is not None:
             self.writer.set_step(epoch-1)
             self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
-            self.lr_scheduler.step()
+            if self.lr_scheduler_name == 'ReduceLROnPlateau': self.lr_scheduler.step(val_log['loss'])
+            else: self.lr_scheduler.step()
         
         log.update(log_confusion)            
         return log
