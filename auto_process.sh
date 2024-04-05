@@ -53,7 +53,7 @@ train () {
 test () {
     # $1 : TEST_PATH, $2 : DEVICE, $3 : CONFIG_PATH
     local MODEL_SAVE_PATH=$(python "$WORKSPACE/parse_save_path.py" -c $3 2>&1 >/dev/null)
-    find_file "$WORKSPACE/$MODEL_SAVE_PATH/$TRAIN_DATE" $SAVE_BEST_MODEL_FILE 1    
+    find_file "$MODEL_SAVE_PATH-$TRAIN_DATE" $SAVE_BEST_MODEL_FILE 1    
     python $1 --device "$2" -r $FIND_FILE_PATH
     local RUN_RESULT=$?
     if [ $RUN_RESULT -eq 1 ]; then

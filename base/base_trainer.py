@@ -170,6 +170,12 @@ class BaseTrainer:
             torch.save(state, best_path)
             self.logger.info("Saving current best: model_best.pth ...\n")
 
+        # For storage capacity
+        if epoch > 2 and Path(str(self.checkpoint_dir / 'model_best.pth')).is_file():
+            for e in range(1, epoch-1):
+                prev_save_model = Path(str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(e)))
+                if prev_save_model.is_file(): prev_save_model.unlink(missing_ok=True)
+
     def _resume_checkpoint(self, resume_path):
         """
         Resume from saved checkpoints

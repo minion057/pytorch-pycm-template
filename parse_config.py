@@ -33,7 +33,7 @@ class ConfigParser:
             exper_name += f"_{self.config['lr_scheduler']['type']}"
         exper_name += f"/{self.config['arch']['type']}"
         if run_id is None: # use timestamp as default run-id
-            run_id = datetime.now().strftime(r'%m%d_%H%M%S')
+            run_id = f"{self.config['data_loader']['args']['batch_size']}batch-{self.config['trainer']['epochs']}epoch-{datetime.now().strftime(r'%m%d_%H%M%S')}"
         self._checkpoint_dir = save_dir / 'models' / exper_name / run_id
         self._log_dir = save_dir / 'log' / exper_name / run_id
         self._output_dir = save_dir / 'output' / exper_name / run_id

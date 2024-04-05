@@ -1,10 +1,14 @@
-import json
 import torch
+import torchvision.transforms.functional as F
+
 import pandas as pd
 import numpy as np
+
+import json
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
+
 from sklearn.metrics import ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
@@ -32,6 +36,15 @@ def inf_loop(data_loader):
     ''' wrapper function for endless data loader. '''
     for loader in repeat(data_loader):
         yield from loader
+
+def get_mean_std(data):    
+    # calculate mean over each channel (e.g., r,g,b)
+    channel = data.shape[1]
+    mean, std = [], []
+    for idx in range(channel):
+        mean.append(data[:,idx,:,:].mean())
+        std.append( data[:,idx,:,:].std())
+    return mean, std
 
 def prepare_device(n_gpu_use):
     """
@@ -199,3 +212,16 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(15,5), show:boo
     if file_path is not None: plt.savefig(file_path, bbox_inches='tight')
     if show: plt.show()  
     plot_close()
+    
+def show_mix_result(imgs, titles:list=['Original Data', 'Mix Data', 'Result'], cmap='viridis'):
+    if len(imgs[0]) != len(titles): raise ValueError('The number of images and titles in a row must be the same.')
+    nrow, ncol = len(imgs), len(titles)
+    fig, axs = plt.subplots(nrows=nrow, ncols=ncol, squeeze=False, figsize=(5*ncol,3*nrow), tight_layout=True)
+    for idx, img_list in enumerate(imgs):
+        for i, t in enumerate(titles):
+            img = img_list[i].detach()
+            img = F.to_pil_image(img)
+            axs[idx, i].imshow(np.asarray(img), cmap=cmap)
+            axs[idx, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+            if idx==0: axs[0, i].set_title(titles[i], size=15)
+    return fig
