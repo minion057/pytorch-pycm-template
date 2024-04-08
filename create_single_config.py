@@ -67,6 +67,8 @@ def main():
     # trainer information
     config['trainer']=OrderedDict()
     config['trainer']['epochs']=type_int('\nPlease indicate the desired number of epochs for training. : ')
+    if yes_or_no('Do you want to set a accumulation_steps? '):
+        config['trainer']['accumulation_steps']=type_int('\nPlease indicate the desired number of accumulation_steps for training. : ')
 
     save_path=f"saved/"
     print(f'\nIf you don\'t specify a save path for the output files, ',\
@@ -105,7 +107,8 @@ def main():
         except Exception as e: print(e)
     
     # config_file_name=f"{config['arch']['type']}.json"
-    config_file_name=f"{config['data_loader']['args']['batch_size']}batch-{config['trainer']['epochs']}epoch-{config['loss']}-{config['arch']['type']}.json"
+    accumulation_steps = '' if 'accumulation_steps' not in config['trainer'].keys() else f"X{config['trainer']['accumulation_steps']}"
+    config_file_name=f"{config['data_loader']['args']['batch_size']}batch{accumulation_steps}-{config['trainer']['epochs']}epoch-{config['loss']}-{config['arch']['type']}.json"
     config_file_path=Path(save_path) / config_file_name
     write_json(config, config_file_path)
 
