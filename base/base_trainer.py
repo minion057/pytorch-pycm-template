@@ -35,6 +35,7 @@ class BaseTrainer:
 
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']
+        self.accumulation_steps = cfg_trainer['accumulation_steps'] if 'accumulation_steps' in cfg_trainer.keys() else None
         self.save_period = cfg_trainer['save_period']
         self.monitor = cfg_trainer.get('monitor', 'off')
 

@@ -67,10 +67,14 @@ class Trainer(BaseTrainer):
             else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
                 
             # 4. Backward pass: compute gradient of the loss with respect to model parameters
+            if self.accumulation_steps is not None: loss = loss / self.accumulation_steps
             loss.backward()
             # 5. Perform a single optimization step (parameter update)
-            self.optimizer.step()
-
+            if self.accumulation_steps is not None:
+                if (batch_idx+1) % self.accumulation_steps == 0: 
+                    print(f'Gradient Accumulation: {batch_idx+1} % {self.accumulation_steps} = 0')
+                    self.optimizer.step()
+            else: self.optimizer.step()
             # 6. Update the loss
             self.writer.set_step(batch_num, 'batch_train')
             self.train_metrics.update('loss', loss.item())
