@@ -226,7 +226,7 @@ class BaseTrainer:
 
         # Save the result of confusion matrix image.
         plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Training Data', self.output_dir/'confusion_matrix_training.png')
-        if 'val_confusion' in list(log.keys()): plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Validation Data', self.output_dir/'confusion_matrix_validation.png')
+        if 'val_confusion' in list(log.keys()): plot_confusion_matrix_1(log['val_confusion'], self.classes, 'Confusion Matrix: Validation Data', self.output_dir/'confusion_matrix_validation.png')
 
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot: plot_performance_N(result, self.output_dir/'metrics_graphs.png')

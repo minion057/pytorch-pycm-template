@@ -104,7 +104,8 @@ def main():
         try: Path(save_path).mkdir(parents=True, exist_ok=True)
         except Exception as e: print(e)
     
-    config_file_name=f"{config['arch']['type']}.json"
+    # config_file_name=f"{config['arch']['type']}.json"
+    config_file_name=f"{config['data_loader']['args']['batch_size']}batch-{config['trainer']['epochs']}epoch-{config['loss']}-{config['arch']['type']}.json"
     config_file_path=Path(save_path) / config_file_name
     write_json(config, config_file_path)
 
