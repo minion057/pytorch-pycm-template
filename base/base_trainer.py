@@ -73,7 +73,7 @@ class BaseTrainer:
         if config.resume is not None: self._resume_checkpoint(config.resume)
         
         # Sampling And DA
-        self.sampling = config['sampling'] if 'sampling' in config.config.keys() else None
+        self.sampling = config['data_sampling'] if 'data_sampling' in config.config.keys() else None
         if self.sampling is not None:
             self.sampling_type = sampling['type'] # down or up
             self.sampling_name = sampling['name'] # random, ...

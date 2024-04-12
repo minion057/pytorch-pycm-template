@@ -5,6 +5,10 @@ from base import BaseTrainer, MetricTracker, ConfusionTracker
 from utils import inf_loop, tb_projector_resize, plot_classes_preds, plot_close
 import numpy as np
 
+import data_loader.data_augmentation as module_DA
+import data_loader.data_sampling as module_sampling
+
+
 class Trainer(BaseTrainer):
     """
     Trainer class
@@ -275,22 +279,8 @@ class Trainer(BaseTrainer):
     
     def _sampling(self, data, target):
         if 'down' in str(self.sampling_type).lower():
-            data, target = self._downsampling(data, target)
+            if self.sampling_name == 'random': data, target = module_sampling.random_downsampling(data, target)
         if 'up' in str(self.sampling_type).lower():
-            data, target = self._upsampling(data, target)
+            # data, target = self._upsampling(data, target)
+            pass
         return data, target
-    
-    def _downsampling(self, data, target):
-        if self.sampling_name == 'random':
-            class_list, class_count = np.unique(target, return_counts=True)
-            min_cnt, max_cnt = min(class_count), max(class_count)
-            down_class_list = class_list[list(filter(lambda x: class_count[x] == max_cnt, range(len(class_count))))]
-            for down_class in down_class_list:
-                down_class_item_index = np.where(np.array(target) == down_class)[0]
-                down_class_remove_index = np.random.choice(down_class_item_index, max_cnt-min_cnt, replace=False)
-                index_list = [x for x in range(len(target)) if x not in down_class_remove_index]
-                data, target = data[index_list], target[index_list]
-        return data, target
-    
-    def _upsampling(self, data, target):
-        pass
