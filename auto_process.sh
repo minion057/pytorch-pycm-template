@@ -33,8 +33,7 @@ find_file () {
         FIND_FILE_PATH=$RESULT
         echo "FIND TEST FILE: $FIND_FILE_PATH"
     else
-    	# echo "$2 not found."
-        "$SAVE_BEST_MODEL_FILE not found."
+    	echo "$2 not found."
         set -e
         exit 1
     fi
