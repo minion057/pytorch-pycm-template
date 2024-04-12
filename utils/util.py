@@ -1,5 +1,5 @@
 import torch
-import torchvision.transforms.functional as F
+from torchvision.transforms.functional import to_pil_image
 
 import pandas as pd
 import numpy as np
@@ -220,7 +220,7 @@ def show_mix_result(imgs, titles:list=['Original Data', 'Mix Data', 'Result'], c
     for idx, img_list in enumerate(imgs):
         for i, t in enumerate(titles):
             img = img_list[i].detach()
-            img = F.to_pil_image(img)
+            img = to_pil_image(img)
             axs[idx, i].imshow(np.asarray(img), cmap=cmap)
             axs[idx, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
             if idx==0: axs[0, i].set_title(titles[i], size=15)

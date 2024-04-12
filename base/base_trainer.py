@@ -71,7 +71,18 @@ class BaseTrainer:
         self.save_performance_plot = cfg_trainer['save_performance_plot']
         
         if config.resume is not None: self._resume_checkpoint(config.resume)
-
+        
+        # Sampling And DA
+        self.sampling = config['sampling'] if 'sampling' in config.config.keys() else None
+        if self.sampling is not None:
+            self.sampling_type = sampling['type'] # down or up
+            self.sampling_name = sampling['name'] # random, ...
+        self.cfg_da = config['data_augmentation'] if 'data_augmentation' in config.config.keys() else None
+        if self.cfg_da is not None:
+            self.DA = self.cfg_da['type']
+            self.DAargs, self.hookargs = self.cfg_da['args'], self.cfg_da['hook_args']
+            self.pre_hook = self.cfg_da['hook_args']['pre']
+    
     @abstractmethod
     def _train_epoch(self, epoch):
         """
