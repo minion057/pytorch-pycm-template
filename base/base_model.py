@@ -1,7 +1,7 @@
 import torch.nn as nn
 import numpy as np
 from abc import abstractmethod
-
+from collections import OrderedDict
 
 class BaseModel(nn.Module):
     """
@@ -68,7 +68,6 @@ class BaseModel(nn.Module):
         
         :return: The result of the hook. (Remove the hook as needed.)
         """
-        print(module_hook_func)
         if layer_idx is None: handle = self.register_forward_pre_hook(module_hook_func)
         else:
             for idx, (layer_name, module) in enumerate(self._get_layers().items()):
@@ -79,11 +78,3 @@ class BaseModel(nn.Module):
                     break
             else: raise ValueError(f'Invalid layer Index: {layer_idx}')
         return handle
-            
-    def remove_hook(self, handle):
-        """
-        Remove a function as a hook.
-        
-        :param handle: The result of the hook.
-        """
-        handle.remove()
