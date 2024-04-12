@@ -3,6 +3,7 @@
 # modify parameter
 WORKSPACE=$PWD
 SAVE_BEST_MODEL_FILE="model_best.pth"
+SAVE_LAST_MODEL_FILE="latest.pth"
 DEVICE="0, 1"
 
 USE_TYPE="npz" #npz #mnist
@@ -11,7 +12,7 @@ TEST_FILE="test_$USE_TYPE.py"
 TRAIN_PATH="$WORKSPACE/$TRAIN_FILE"
 TEST_PATH="$WORKSPACE/$TEST_FILE"
 
-USE_OPTIM="NPZ/Adam-lr_0.001-StepLR"
+USE_OPTIM="$USE_TYPE/Adam-lr_0.001-StepLR"
 CONFIG_FILE=(
     "config/config-$USE_TYPE-LeNet5.json"
     "config/$USE_OPTIM/convnextv2_atto.json"
@@ -32,8 +33,7 @@ find_file () {
         FIND_FILE_PATH=$RESULT
         echo "FIND TEST FILE: $FIND_FILE_PATH"
     else
-    	# echo "$2 not found."
-        "$SAVE_BEST_MODEL_FILE not found."
+    	echo "$2 not found."
         set -e
         exit 1
     fi
@@ -50,10 +50,22 @@ train () {
     fi
 }
 
-test () {
+best_test () {
     # $1 : TEST_PATH, $2 : DEVICE, $3 : CONFIG_PATH
     local MODEL_SAVE_PATH=$(python "$WORKSPACE/parse_save_path.py" -c $3 2>&1 >/dev/null)
     find_file "$MODEL_SAVE_PATH-$TRAIN_DATE" $SAVE_BEST_MODEL_FILE 1    
+    python $1 --device "$2" -r $FIND_FILE_PATH
+    local RUN_RESULT=$?
+    if [ $RUN_RESULT -eq 1 ]; then
+        set -e
+        exit 1
+    fi
+}
+
+latest_test () {
+    # $1 : TEST_PATH, $2 : DEVICE, $3 : CONFIG_PATH
+    local MODEL_SAVE_PATH=$(python "$WORKSPACE/parse_save_path.py" -c $3 2>&1 >/dev/null)
+    find_file "$MODEL_SAVE_PATH-$TRAIN_DATE" $SAVE_LAST_MODEL_FILE 1    
     python $1 --device "$2" -r $FIND_FILE_PATH
     local RUN_RESULT=$?
     if [ $RUN_RESULT -eq 1 ]; then
@@ -66,5 +78,6 @@ for (( i=0; i<${#CONFIG_FILE[@]}; i++ )); do
     CONFIG_PATH="$WORKSPACE/${CONFIG_FILE[i]}"
     echo "RUNNING CONFIG: $CONFIG_PATH"
     train $TRAIN_PATH "$DEVICE" $CONFIG_PATH
-    test $TEST_PATH "$DEVICE" $CONFIG_PATH
+    best_test $TEST_PATH "$DEVICE" $CONFIG_PATH
+    latest_test $TEST_PATH "$DEVICE" $CONFIG_PATH
 done

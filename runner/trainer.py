@@ -5,6 +5,10 @@ from base import BaseTrainer, MetricTracker, ConfusionTracker
 from utils import inf_loop, tb_projector_resize, plot_classes_preds, plot_close
 import numpy as np
 
+import data_loader.data_augmentation as module_DA
+import data_loader.data_sampling as module_sampling
+
+
 class Trainer(BaseTrainer):
     """
     Trainer class
@@ -21,6 +25,7 @@ class Trainer(BaseTrainer):
         else:
             self.data_loader = inf_loop(data_loader)
             self.len_epoch = len_epoch
+            
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
@@ -37,7 +42,11 @@ class Trainer(BaseTrainer):
         self.preds_item_cnt = 5
         self.prediction_images, self.prediction_labels = None, None
         self.prediction_preds, self.prediction_probs = None, None
-        
+
+        # Hook for DA
+        if self.cfg_da is not None:            
+            if self.DA == 'Cutmix': self.DA_ftns = module_DA.CutMix(writer=self.writer, **self.DAargs)
+            
     
     def _train_epoch(self, epoch):
         """
@@ -51,10 +60,18 @@ class Trainer(BaseTrainer):
         self.train_confusion.reset()
         label_img, features, class_labels = None, None, []
         data_channel = None
+        gradient_acc_step = 0
+        
+        # Hook
+        if self.cfg_da is not None:
+            hook = self.model.register_forward_hook_layer(self.DA_ftns.forward_pre_hook if self.pre_hook else self.DA_ftns.forward_hook, **self.hookargs)
+        
         for batch_idx, (data, target) in enumerate(self.data_loader):
             batch_num = (epoch - 1) * self.len_epoch + batch_idx
+            self.writer.set_step(batch_num, 'batch_train')
                 
             # 1. To move Torch to the GPU or CPU
+            if self.sampling is not None: data, target = self._sampling(data, target)
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
@@ -63,16 +80,20 @@ class Trainer(BaseTrainer):
             # 3. Forward pass: compute predicted outputs by passing inputs to the model
             output = self.model(data)
             logit, predict = torch.max(output, 1)
-            if self.loss_fn_name != 'bce_loss': loss = self.criterion(output, target)
-            else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
+            loss = self._loss(output, target, logit)
+            if self.cfg_da is not None: loss = self._da_loss(output, target, logit, loss)
                 
             # 4. Backward pass: compute gradient of the loss with respect to model parameters
+            if self.accumulation_steps is not None: loss = loss / self.accumulation_steps
             loss.backward()
             # 5. Perform a single optimization step (parameter update)
-            self.optimizer.step()
-
+            if self.accumulation_steps is not None:
+                gradient_acc_step += 1
+                if batch_idx == self.len_epoch-1 or self.len_epoch == 1 or (batch_idx+1) % self.accumulation_steps == 0: 
+                    gradient_acc_step = 0
+                    self.optimizer.step()
+            else: self.optimizer.step()
             # 6. Update the loss
-            self.writer.set_step(batch_num, 'batch_train')
             self.train_metrics.update('loss', loss.item())
             
             # 7. Update the confusion matrix 
@@ -108,6 +129,7 @@ class Trainer(BaseTrainer):
             
             if batch_idx == self.len_epoch: break
         
+        if self.cfg_da is not None: hook.remove()
         # 7-2. Upate the example of predtion and Projector
         self.writer.set_step(epoch-1)
         if self.curve_metric_ftns is not None:
@@ -154,9 +176,11 @@ class Trainer(BaseTrainer):
         self.valid_confusion.reset()
         label_img, features, class_labels = None, None, []
         data_channel = None
+        
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 batch_num = (epoch - 1) * len(self.valid_data_loader) + batch_idx
+                self.writer.set_step(batch_num, 'batch_valid')
                 
                 # 1. To move Torch to the GPU or CPU
                 data, target = data.to(self.device), target.to(self.device)
@@ -164,12 +188,10 @@ class Trainer(BaseTrainer):
                 # Compute prediction error
                 # 2. Forward pass: compute predicted outputs by passing inputs to the model
                 output = self.model(data)
-                logit, predict = torch.max(output, 1)
-                if self.loss_fn_name != 'bce_loss': loss = self.criterion(output, target)
-                else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
-                    
+                logit, predict = torch.max(output, 1) 
+                loss = self._loss(output, target, logit)
+
                 # 3. Update the loss
-                self.writer.set_step(batch_num, 'batch_valid')
                 self.valid_metrics.update('loss', loss.item())
                 # 4. Update the confusion matrix and input data
                 confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
@@ -226,6 +248,22 @@ class Trainer(BaseTrainer):
             self.writer.add_histogram(name, p, bins='auto')
         return self.valid_metrics.result(), self.valid_confusion.result()
 
+    def _loss(self, output, target, logit):
+        if self.loss_fn_name != 'bce_loss': loss = self.criterion(output, target)
+        else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
+        return loss
+        
+    def _da_loss(self, output, target, logit, loss):
+        if self.DA == 'Cutmix':
+            if self.DA_ftns.rand_index() is None: return loss
+            random_index = self.DA_ftns.rand_index()
+            if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
+            random_loss = self._loss(output, target[random_index], logit).item()
+            lam = self.DA_ftns.lam()
+            loss = loss*lam +  random_loss*(1.-lam)
+        self.DA_ftns.reset()
+        return loss
+    
     def _progress(self, batch_idx):
         if hasattr(self.data_loader, 'n_samples'):
             current = batch_idx * self.data_loader.batch_size
@@ -238,3 +276,12 @@ class Trainer(BaseTrainer):
         current_str = str(current) if str_diff == 0 else ' '*str_diff+str(current)
         percentage = f'{100.0 * (current/total):.0f}' 
         return f'[{current_str}/{total} ({percentage:2s})%]'
+    
+    def _sampling(self, data, target):
+        if 'down' in str(self.sampling_type).lower():
+            if 'random' in self.sampling_name: return module_sampling.random_downsampling(data, target)
+        elif 'up' in str(self.sampling_type).lower():
+            # data, target = self._upsampling(data, target)
+            pass
+        else: TypeError('The applicable types are up or down.')
+        

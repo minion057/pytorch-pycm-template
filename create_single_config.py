@@ -12,14 +12,15 @@ import torch.optim.lr_scheduler as module_lr_s
 import model.loss as module_loss
 import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
-   
+import data_loader.data_augmentation as module_DA
+import data_loader.data_sampling as module_sampling
 
 def main():
     config = OrderedDict()
 
     # basic information
     print('To easily distinguish config files, the additional information will be appended after the name you entered.')
-    print('Now setting: {config/name/optim-lr_0.1-lr_scheduler/model.json}')
+    print('Now setting: {config/{name}/{optim}-lr_{lr}-{lr_scheduler}/{model}/{batch_size}X{accumulation_steps}-{epoch}epoch-{loss}-{DA}-{Sampling}.json}')
     config['name']=input("Please enter the folder name to save the outputs. : ")
     config['n_gpu']=type_int('\nPlease enter the number of GPUs to use. : ')
 
@@ -30,6 +31,7 @@ def main():
     config['arch']['args']=OrderedDict()
     config['arch']['args']['num_classes']=type_int('\nPlease enter the number of classes in the dataset. : ')
     config['arch']['args']['custom']=CUSTOM_MASSAGE
+    config['arch']['visualization'] = yes_or_no('Would you like to visualize the model structure as a graph? ')
     
     # dataloader information
     config['data_loader']=OrderedDict()
@@ -38,6 +40,28 @@ def main():
     config['data_loader']['args']=OrderedDict()
     config['data_loader']['args']['batch_size']=type_int('\nPlease enter the batch size. : ')
     config['data_loader']['args']['custom']=CUSTOM_MASSAGE
+    
+    # data augmentation information
+    print('\nPlease refer to the \'data_loader/data_augmentation.py\' document for available funtion.')
+    if yes_or_no('Will you use a data augmentation techniques? '):
+        config['data_augmentation']=OrderedDict()
+        config['data_augmentation']['type']=type_attr(module_DA, "Please enter the name of the data augmentation technique you would like to use. : ")
+        # input("Please enter the name of the data augmentation technique you would like to use. : ")
+        config['data_augmentation']['args']=OrderedDict()
+        config['data_augmentation']['args']['custom']=CUSTOM_MASSAGE
+        config['data_augmentation']['hook_args']=OrderedDict()
+        config['data_augmentation']['hook_args']['layer_idx']=type_int('Please enter the index of the layer you would like to apply the hook to. : ')
+        config['data_augmentation']['hook_args']['pre']=yes_or_no('Before executing the forward operation, will you proceed with the hook? ')
+    
+    # data sampling information
+    print('\nPlease refer to the \'data_loader/data_sampling.py\' document for available funtion.')
+    if yes_or_no('Will you use a data sampling techniques? '):
+        config['data_sampling']=OrderedDict()
+        config['data_sampling']['type']=str(input("Please enter the type of the data sampling technique you would like to use. (Up or Down) : ")).lower()
+        config['data_sampling']['name']=type_attr(module_sampling, "Please enter the name of the data sampling technique you would like to use. : ")
+        # input("Please enter the name of the data sampling technique you would like to use. : ")
+        # config['data_sampling']['args']=OrderedDict()
+        # config['data_sampling']['args']['custom']=CUSTOM_MASSAGE
     
     # optimizer information
     config['optimizer']=OrderedDict()
@@ -67,6 +91,8 @@ def main():
     # trainer information
     config['trainer']=OrderedDict()
     config['trainer']['epochs']=type_int('\nPlease indicate the desired number of epochs for training. : ')
+    if yes_or_no('Do you want to set a accumulation_steps? '):
+        config['trainer']['accumulation_steps']=type_int('\nPlease indicate the desired number of accumulation_steps for training. : ')
 
     save_path=f"saved/"
     print(f'\nIf you don\'t specify a save path for the output files, ',\
@@ -104,8 +130,13 @@ def main():
         try: Path(save_path).mkdir(parents=True, exist_ok=True)
         except Exception as e: print(e)
     
-    config_file_name=f"{config['arch']['type']}.json"
-    config_file_path=Path(save_path) / config_file_name
+    # config_file_name=f"{config['arch']['type']}.json"
+    acc_steps = '' if 'accumulation_steps' not in config['trainer'].keys() else f"X{config['trainer']['accumulation_steps']}"
+    sampling = '' if 'data_sampling' not in config.keys() else f"-{config['data_sampling']['type']}_{config['data_sampling']['name']}"
+    da = '' if 'data_augmentation' not in config.keys() else f"-{config['data_augmentation']['type']}"
+    config_file_name =f"{config['data_loader']['args']['batch_size']}batch{acc_steps}-{config['trainer']['epochs']}epoch"
+    config_file_name+=f"-{config['loss']}{da}{sampling}.json"
+    config_file_path=Path(save_path) / config['arch']['type'] / config_file_name
     write_json(config, config_file_path)
 
     # Done

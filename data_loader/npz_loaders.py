@@ -38,16 +38,14 @@ class NPZDataset(BaseSplitDataset):
     def _load_data_list(self, _path):
         with np.load(_path, allow_pickle=True) as file:
             classes = file['class_names']
-            path_per_class = file['path_per_class']
-            data, labels, path = None, None, None
+            data, labels = None, None
             for k in [k for k in file.files if self.init_kwargs['mode'] in k]:
                 if 'x' in k or 'data' in k: data = file[k]
                 elif 'y' in k or 'label' in k: labels = file[k]
-                elif 'path' in k: path = file[k] 
-            if data is None or labels is None or path is None:
-                raise Exception(f'Only data, labels, and file paths should exist. Currently found values:{keys}')
+            if data is None or labels is None:
+                raise Exception(f'Only data and labels should exist. Currently found values:{keys}')
         labels = torch.from_numpy(labels)
-        return data, labels, classes#, path, path_per_class
+        return data, labels, classes
 
 class NPZDataLoader():
     def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):

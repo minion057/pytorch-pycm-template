@@ -16,13 +16,11 @@ class BaseHook:
         return dict(self._data)
     
     @abstractmethod
-    def forward_hook(self):
-        def hook(module, input, output):
-            raise NotImplementedError
-        return hook
+    def forward_hook(self, module, input_data, output_data):
+        raise NotImplementedError
+        return output_data
     
     @abstractmethod
-    def forward_pre_hook(self):
-        def hook(module, input):
-            raise NotImplementedError
-        return hook
+    def forward_pre_hook(self, module, input_data):
+        raise NotImplementedError
+        return input_data

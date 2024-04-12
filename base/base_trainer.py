@@ -35,6 +35,7 @@ class BaseTrainer:
 
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']
+        self.accumulation_steps = cfg_trainer['accumulation_steps'] if 'accumulation_steps' in cfg_trainer.keys() else None
         self.save_period = cfg_trainer['save_period']
         self.monitor = cfg_trainer.get('monitor', 'off')
 
@@ -70,7 +71,18 @@ class BaseTrainer:
         self.save_performance_plot = cfg_trainer['save_performance_plot']
         
         if config.resume is not None: self._resume_checkpoint(config.resume)
-
+        
+        # Sampling And DA
+        self.sampling = config['data_sampling'] if 'data_sampling' in config.config.keys() else None
+        if self.sampling is not None:
+            self.sampling_type = self.sampling['type'] # down or up
+            self.sampling_name = self.sampling['name'] # random, ...
+        self.cfg_da = config['data_augmentation'] if 'data_augmentation' in config.config.keys() else None
+        if self.cfg_da is not None:
+            self.DA = self.cfg_da['type']
+            self.DAargs, self.hookargs = self.cfg_da['args'], self.cfg_da['hook_args']
+            self.pre_hook = self.cfg_da['hook_args']['pre']
+    
     @abstractmethod
     def _train_epoch(self, epoch):
         """
@@ -162,19 +174,15 @@ class BaseTrainer:
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-        filename = str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(epoch))
+        with open(str(self.checkpoint_dir / 'latest.txt'), "a") as f:
+            f.write('latest.pth -> epoch{}\n'.format(epoch))
+        filename = str(self.checkpoint_dir / 'latest.pth') #'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
         self.logger.info("Saving checkpoint: {} ...{}".format(filename, '' if save_best else '\n'))
         if save_best:
             best_path = str(self.checkpoint_dir / 'model_best.pth')
             torch.save(state, best_path)
             self.logger.info("Saving current best: model_best.pth ...\n")
-
-        # For storage capacity
-        if epoch > 2 and Path(str(self.checkpoint_dir / 'model_best.pth')).is_file():
-            for e in range(1, epoch-1):
-                prev_save_model = Path(str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(e)))
-                if prev_save_model.is_file(): prev_save_model.unlink(missing_ok=True)
 
     def _resume_checkpoint(self, resume_path):
         """
@@ -226,7 +234,7 @@ class BaseTrainer:
 
         # Save the result of confusion matrix image.
         plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Training Data', self.output_dir/'confusion_matrix_training.png')
-        if 'val_confusion' in list(log.keys()): plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Validation Data', self.output_dir/'confusion_matrix_validation.png')
+        if 'val_confusion' in list(log.keys()): plot_confusion_matrix_1(log['val_confusion'], self.classes, 'Confusion Matrix: Validation Data', self.output_dir/'confusion_matrix_validation.png')
 
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot: plot_performance_N(result, self.output_dir/'metrics_graphs.png')
