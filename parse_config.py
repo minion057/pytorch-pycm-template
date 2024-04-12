@@ -32,12 +32,12 @@ class ConfigParser:
         if 'lr_scheduler' in self.config.keys():
             exper_name += f"_{self.config['lr_scheduler']['type']}"
         exper_name += f"/{self.config['arch']['type']}"
-        if run_id is None: # use timestamp as default run-id
-            accumulation_steps = '' if 'accumulation_steps' not in self.config['trainer'].keys() else f"X{self.config['trainer']['accumulation_steps']}"
-            _downsampling = '' if 'downsampling' not in self.config['trainer'].keys() else f"-down_{self.config['trainer']['downsampling']}"
-            _DA = '' if 'data_augmentation' not in self.config.keys() else f"-{self.config['data_augmentation']['type']}"
-            run_id =  f"{self.config['data_loader']['args']['batch_size']}batch{accumulation_steps}"
-            run_id += f"-{self.config['trainer']['epochs']}epoch-{self.config['loss']}{_DA}{_downsampling}"
+        if run_id is None: # use timestamp as default run-id    
+            acc_steps = '' if 'accumulation_steps' not in self.config['trainer'].keys() else f"X{self.config['trainer']['accumulation_steps']}"
+            sampling = '' if 'data_sampling' not in self.config.keys() else f"-{self.config['data_sampling']['type']}_{self.config['data_sampling']['name']}"
+            da = '' if 'data_augmentation' not in self.config.keys() else f"-{self.config['data_augmentation']['type']}"
+            run_id =  f"{self.config['data_loader']['args']['batch_size']}batch{acc_steps}"
+            run_id += f"-{self.config['trainer']['epochs']}epoch-{self.config['loss']}{da}{sampling}"
             run_id += f"-{datetime.now().strftime(r'%m%d_%H%M%S')}"
         self._checkpoint_dir = save_dir / 'models' / exper_name / run_id
         self._log_dir = save_dir / 'log' / exper_name / run_id
