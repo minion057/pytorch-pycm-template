@@ -75,8 +75,8 @@ class BaseTrainer:
         # Sampling And DA
         self.sampling = config['data_sampling'] if 'data_sampling' in config.config.keys() else None
         if self.sampling is not None:
-            self.sampling_type = sampling['type'] # down or up
-            self.sampling_name = sampling['name'] # random, ...
+            self.sampling_type = self.sampling['type'] # down or up
+            self.sampling_name = self.sampling['name'] # random, ...
         self.cfg_da = config['data_augmentation'] if 'data_augmentation' in config.config.keys() else None
         if self.cfg_da is not None:
             self.DA = self.cfg_da['type']
@@ -174,19 +174,15 @@ class BaseTrainer:
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-        filename = str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(epoch))
+        with open(str(self.checkpoint_dir / 'latest.txt'), "a") as f:
+            f.write('latest.pth -> epoch{}\n'.format(epoch))
+        filename = str(self.checkpoint_dir / 'latest.pth') #'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
         self.logger.info("Saving checkpoint: {} ...{}".format(filename, '' if save_best else '\n'))
         if save_best:
             best_path = str(self.checkpoint_dir / 'model_best.pth')
             torch.save(state, best_path)
             self.logger.info("Saving current best: model_best.pth ...\n")
-
-        # For storage capacity
-        if epoch > 2 and Path(str(self.checkpoint_dir / 'model_best.pth')).is_file():
-            for e in range(1, epoch-1):
-                prev_save_model = Path(str(self.checkpoint_dir / 'checkpoint-epoch{}.pth'.format(e)))
-                if prev_save_model.is_file(): prev_save_model.unlink(missing_ok=True)
 
     def _resume_checkpoint(self, resume_path):
         """

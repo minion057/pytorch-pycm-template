@@ -1,2 +1,2 @@
-from .mnist_data_loaders import *
-from .npz_loaders import *
+from .mnist_data_loaders import MnistDataLoader
+from .npz_loaders import NPZDataLoader

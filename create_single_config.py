@@ -20,7 +20,7 @@ def main():
 
     # basic information
     print('To easily distinguish config files, the additional information will be appended after the name you entered.')
-    print('Now setting: {config/{name}/{optim}-lr_{lr}-{lr_scheduler}/{batch_size}X{accumulation_steps}-{epoch}epoch-{loss}-{DA}-{Sampling}-model.json}')
+    print('Now setting: {config/{name}/{optim}-lr_{lr}-{lr_scheduler}/{model}/{batch_size}X{accumulation_steps}-{epoch}epoch-{loss}-{DA}-{Sampling}.json}')
     config['name']=input("Please enter the folder name to save the outputs. : ")
     config['n_gpu']=type_int('\nPlease enter the number of GPUs to use. : ')
 
@@ -135,8 +135,8 @@ def main():
     sampling = '' if 'data_sampling' not in config.keys() else f"-{config['data_sampling']['type']}_{config['data_sampling']['name']}"
     da = '' if 'data_augmentation' not in config.keys() else f"-{config['data_augmentation']['type']}"
     config_file_name =f"{config['data_loader']['args']['batch_size']}batch{acc_steps}-{config['trainer']['epochs']}epoch"
-    config_file_name+=f"-{config['loss']}{da}{sampling}-{config['arch']['type']}.json"
-    config_file_path=Path(save_path) / config_file_name
+    config_file_name+=f"-{config['loss']}{da}{sampling}.json"
+    config_file_path=Path(save_path) / config['arch']['type'] / config_file_name
     write_json(config, config_file_path)
 
     # Done

@@ -71,7 +71,7 @@ class Trainer(BaseTrainer):
             self.writer.set_step(batch_num, 'batch_train')
                 
             # 1. To move Torch to the GPU or CPU
-            if self.sampling is not None: data, targe = self._sampling(data, target)
+            if self.sampling is not None: data, target = self._sampling(data, target)
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
@@ -279,8 +279,9 @@ class Trainer(BaseTrainer):
     
     def _sampling(self, data, target):
         if 'down' in str(self.sampling_type).lower():
-            if self.sampling_name == 'random': data, target = module_sampling.random_downsampling(data, target)
-        if 'up' in str(self.sampling_type).lower():
+            if 'random' in self.sampling_name: return module_sampling.random_downsampling(data, target)
+        elif 'up' in str(self.sampling_type).lower():
             # data, target = self._upsampling(data, target)
             pass
-        return data, target
+        else: TypeError('The applicable types are up or down.')
+        
