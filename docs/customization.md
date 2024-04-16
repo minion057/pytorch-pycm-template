@@ -98,8 +98,11 @@ which is increased to 256 by command line options.
     * Checkpoint saving & Checkpoint resuming
         * This requires device information for `map_location`.
     * Reconfigurable performance monitoring for saving current best model, and early stop training.
-      * If config `monitor` is set to `max val_accuracy`, which means then the trainer will save a checkpoint `model_best.pth` when `validation accuracy` of epoch replaces current `maximum`.
-      * If config `early_stop` is set, training will be automatically terminated when model performance does not improve for given number of epochs. This feature can be turned off by passing 0 to the `early_stop` option, or just deleting the line of config.
+      * If `monitor` is set in the config to `max val_accuracy`, which means then the trainer will save a checkpoint `model_best.pth` when `validation accuracy` of epoch replaces current `maximum`.
+      * If `early_stop` is set in the config, training will be automatically terminated when model performance does not improve for given number of epochs. This feature can be turned off by passing 0 to the `early_stop` option, or just deleting the line of config.
+      * If `accumulation_steps` is set in the config, gradient accumulation will be performed. For example, if the `batch size` is 4 and `accumulation_steps` is 4, it means employing a technique where the effect is similar to having a `batch size` of 16.
+      * If `data_augmentation` is set in the config, the specified technique will be applied. However, this will be performed by setting a hook on the designated layer using `hook_args`. In this case, `pre` determines whether to apply data augmentation to the input values.
+      * If the `data_sampling` is set in the config, sampling will be performed for each batch. If the `type` is set to "down," the data will decrease; if it's set to "up," the data will increase.
     * outputs saving
         * This requires device information for `classes` (class name list).
       * If `save_performance_plot` is configured in the config, the performance of the model up to the last epoch is saved in both `plot` and `json` formats.

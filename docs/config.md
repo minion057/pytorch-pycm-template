@@ -50,6 +50,21 @@
             }     
         }
     },
+    "data_augmentation": {
+        "type": "Cutmix",              // The data augmentation technic defined in data_augmentation.py.
+        "args": {
+            "beta": 0.1,
+            "prob": 0.5
+        },
+        "hook_args": {                 // Set up a hook on the layer where data augmentation will be performed.
+            "layer_idx": 0,
+            "pre": true                // Determine whether to apply data augmentation to the input values.
+        }
+    },
+    "data_sampling":{                  // Perform data sampling for each batch.
+        "type": "down",                // If "down," reduce the data. If "up," increase the data.
+        "name": "random_downsampling"  // The data sampling technic defined in data_sampling.py.
+    },
     "optimizer": {
         "type": "Adam",                // Optimizers supported by PyTorch. (https://pytorch.org/docs/stable/optim.html#algorithms)
         "args":{
@@ -74,6 +89,7 @@
     },
     "trainer": {
         "epochs": 50,                   // number of training epochs
+        "accumulation_steps": 4,        // gradient accumulation
 
         "save_dir": "saved/",           // checkpoints are saved in save_dir/models/name
         "save_period": 1,               // save checkpoints every save_freq epochs
@@ -126,6 +142,21 @@
             }         
         }
     },
+    "data_augmentation": {
+        "type": "Cutmix",                // The data augmentation technic defined in data_augmentation.py.
+        "args": {
+            "beta": 0.1,
+            "prob": 0.5
+        },
+        "hook_args": {                   // Set up a hook on the layer where data augmentation will be performed.
+            "layer_idx": 0,
+            "pre": true                  // Determine whether to apply data augmentation to the input values.
+        }
+    },
+    "data_sampling":{                    // Perform data sampling for each batch.
+        "type": "down",                  // If "down," reduce the data. If "up," increase the data.
+        "name": "random_downsampling"    // The data sampling technic defined in data_sampling.py.
+    },
     "optimizer": {
         "type": "Adam",                  // Optimizers supported by PyTorch. (https://pytorch.org/docs/stable/optim.html#algorithms)
         "args":{
@@ -150,6 +181,7 @@
     },
     "trainer": {
         "epochs": 50,                     // number of training epochs
+        "accumulation_steps": 4,          // gradient accumulation
 
         "save_dir": "saved/",             // checkpoints are saved in save_dir/models/name
         "save_period": 1,                 // save checkpoints every save_freq epochs
