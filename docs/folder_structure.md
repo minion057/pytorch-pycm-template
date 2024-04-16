@@ -24,6 +24,7 @@ tree -I "__pycache__" -I "saved" -I "__init__.py"
   │
   ├── base/ - abstract base classes
   │   ├── base_metric.py
+  │   ├── base_hook.py
   │   ├── base_model.py
   │   ├── base_raw_data_loader.py
   │   ├── base_split_data_loader.py
@@ -31,6 +32,12 @@ tree -I "__pycache__" -I "saved" -I "__init__.py"
   │   └── base_trainer.py
   │
   ├── data_loader/ - anything about data loading goes here
+  │   ├── DA - Please specify the folder for data augmentation management.
+  │   │   └── ...
+  │   ├── data_augmentation.py
+  │   ├── sampling - Please specify the folder for data sampling management.
+  │   │   └── ...
+  │   ├── data_sampling.py
   │   ├── mnist_data_loaders.py
   │   ├── npz_data_loaders.py
   │   └── transforms.py

@@ -33,6 +33,21 @@
             }
         }
     },
+    "data_augmentation": {
+        "type": "Cutmix",
+        "args": {
+            "beta": 0.1,
+            "prob": 0.5
+        },
+        "hook_args": {
+            "layer_idx": 0,
+            "pre": true
+        }
+    },
+    "data_sampling":{
+        "type": "down",
+        "name": "random_downsampling"
+    },
     "optimizer": {
         "type": "Adam",
         "args": {
