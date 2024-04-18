@@ -1,7 +1,6 @@
 import torch.nn as nn
 import numpy as np
 from abc import abstractmethod
-from collections import OrderedDict
 
 class BaseModel(nn.Module):
     """
@@ -43,38 +42,3 @@ class BaseModel(nn.Module):
         :param PS: Pooling size
         """
         return IS//PS
-
-    def _get_layers(self):
-        layers = OrderedDict()
-        for key, module in self.named_modules():
-            if key == '': continue
-            key_split = key.split('.')
-            parents = ('.'.join([(f'[{k}]' if k.isdigit() else k) for k in key_split[:-1]])).replace('.[', '[')
-            if parents != '':
-                child = key_split[-1]
-                key = f'{parents}[{child}]' if child.isdigit() else f'{parents}.{child}'
-            if len(layers) != 0 and parents in layers.keys(): layers.pop(parents)
-            layers[key] = module
-        return layers
-    
-    def register_forward_hook_layer(self, module_hook_func, layer_idx=None, pre:bool=False):
-        """
-        Register a function as a hook to be executed before performing forward pass at a specific layer.
-        
-        :param module_hook_func: The function to be executed in the hook.
-        :param layer_idx: Index of the specified layer.
-        :param pre: If true, the hook is registered using `register_forward_pre_hook`.
-                    Otherwise, it is registered using `register_forward_hook`.
-        
-        :return: The result of the hook. (Remove the hook as needed.)
-        """
-        if layer_idx is None: handle = self.register_forward_pre_hook(module_hook_func)
-        else:
-            for idx, (layer_name, module) in enumerate(self._get_layers().items()):
-                if idx == layer_idx:
-                    handle = eval(f'self.{layer_name}.register_forward_pre_hook(module_hook_func)') if pre \
-                             else eval(f'self.{layer_name}.register_forward_hook(module_hook_func)')
-                    print(f'{"Pre " if pre else ""}Hook... {layer_name} - {module}')
-                    break
-            else: raise ValueError(f'Invalid layer Index: {layer_idx}')
-        return handle
