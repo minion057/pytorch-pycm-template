@@ -19,6 +19,7 @@ import model.metric as module_metric
 from parse_config import ConfigParser
 from runner import Tester
 from utils import prepare_device
+from utils import cal_model_parameters
 
 
 def main(config):
@@ -47,7 +48,8 @@ def main(config):
     
     # print the model infomation
     # 1. basic method
-    # logger.info(model)
+    # if model.__str__().split('\n')[-1] != ')': logger.info(model) # Based on the basic model (BaseModel).
+    # else: logger.info(cal_model_parameters(model))
     # 2. to use the torchinfo library (from torchinfo import summary)
     input_size = next(iter(test_data_loader))[0].shape
     logger.info('\nInput_size: {}'.format(input_size))

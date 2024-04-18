@@ -21,6 +21,7 @@ import model.metric as module_metric
 from parse_config import ConfigParser
 from runner import Trainer
 from utils import prepare_device, reset_device
+from utils import cal_model_parameters
 
 
 # fix random seeds for reproducibility
@@ -50,7 +51,8 @@ def main(config):
     model = config.init_obj('arch', module_arch)
 
     # print the model infomation
-    logger.info(model)
+    if model.__str__().split('\n')[-1] != ')': logger.info(model) # Based on the basic model (BaseModel).
+    else: logger.info(cal_model_parameters(model))
     
     # prepare for (multi-device) GPU training
     device, device_ids = prepare_device(config['n_gpu'])
