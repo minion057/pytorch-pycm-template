@@ -37,15 +37,6 @@ def inf_loop(data_loader):
     for loader in repeat(data_loader):
         yield from loader
 
-def get_mean_std(data):    
-    # calculate mean over each channel (e.g., r,g,b)
-    channel = data.shape[1]
-    mean, std = [], []
-    for idx in range(channel):
-        mean.append(data[:,idx,:,:].mean())
-        std.append( data[:,idx,:,:].std())
-    return mean, std
-
 def prepare_device(n_gpu_use):
     """
     setup GPU device if available. get gpu device indices which are used for DataParallel
