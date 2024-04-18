@@ -1,6 +1,8 @@
 """ 1. Input: n X m """
 from .models.LeNet5 import LeNet5
 
+from .models.DenseNet import DenseNet121, DenseNet161, DenseNet169, DenseNet201
+
 from .models.ConvNeXt_v2 import convnextv2_atto, convnextv2_femto, convnextv2_pico, convnextv2_nano, convnextv2_tiny, convnextv2_base, convnextv2_large, convnextv2_huge
 
 from .models.InceptionNeXt import inceptionnext_tiny, inceptionnext_small, inceptionnext_base, inceptionnext_base_384
