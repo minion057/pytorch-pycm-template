@@ -3,6 +3,7 @@ from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTrainer, MetricTracker, ConfusionTracker
 from utils import inf_loop, tb_projector_resize, plot_classes_preds, plot_close
+from utils import register_forward_hook_layer
 import numpy as np
 
 import data_loader.data_augmentation as module_DA
@@ -45,8 +46,10 @@ class Trainer(BaseTrainer):
 
         # Hook for DA
         if self.cfg_da is not None:            
-            if self.DA == 'Cutmix': self.DA_ftns = module_DA.CutMix(writer=self.writer, **self.DAargs)
+            if self.DA == 'cutmix': self.DA_ftns = module_DA.CutMix(writer=self.writer, **self.DAargs)
             
+        # Clear the gradients of all optimized variables 
+        self.optimizer.zero_grad()
     
     def _train_epoch(self, epoch):
         """
@@ -60,11 +63,10 @@ class Trainer(BaseTrainer):
         self.train_confusion.reset()
         label_img, features, class_labels = None, None, []
         data_channel = None
-        gradient_acc_step = 0
         
         # Hook
         if self.cfg_da is not None:
-            hook = self.model.register_forward_hook_layer(self.DA_ftns.forward_pre_hook if self.pre_hook else self.DA_ftns.forward_hook, **self.hookargs)
+            hook = register_forward_hook_layer(self.model, self.DA_ftns.forward_pre_hook if self.pre_hook else self.DA_ftns.forward_hook, **self.hookargs)
         
         for batch_idx, (data, target) in enumerate(self.data_loader):
             batch_num = (epoch - 1) * self.len_epoch + batch_idx
@@ -75,28 +77,30 @@ class Trainer(BaseTrainer):
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
-            # 2. Clear the gradients of all optimized variables 
-            self.optimizer.zero_grad()
-            # 3. Forward pass: compute predicted outputs by passing inputs to the model
+            # 2. Forward pass: compute predicted outputs by passing inputs to the model
             output = self.model(data)
             logit, predict = torch.max(output, 1)
             loss = self._loss(output, target, logit)
             if self.cfg_da is not None: loss = self._da_loss(output, target, logit, loss)
                 
-            # 4. Backward pass: compute gradient of the loss with respect to model parameters
+            # 3. Backward pass: compute gradient of the loss with respect to model parameters
             if self.accumulation_steps is not None: loss = loss / self.accumulation_steps
             loss.backward()
-            # 5. Perform a single optimization step (parameter update)
+            # 4-1. Perform a single optimization step (parameter update)
+            # 4-2. Clear the gradients of all optimized variables 
             if self.accumulation_steps is not None:
-                gradient_acc_step += 1
                 if batch_idx == self.len_epoch-1 or self.len_epoch == 1 or (batch_idx+1) % self.accumulation_steps == 0: 
-                    gradient_acc_step = 0
                     self.optimizer.step()
-            else: self.optimizer.step()
-            # 6. Update the loss
+                    self.optimizer.zero_grad()
+            else: 
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                
+            # 5. Update the Result
+            # 5-1. loss
             self.train_metrics.update('loss', loss.item())
             
-            # 7. Update the confusion matrix 
+            # 5-2. confusion matrix 
             confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
             if self.curve_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
             self.train_confusion.update('confusion', confusion_content, img_update=False)
@@ -105,12 +109,14 @@ class Trainer(BaseTrainer):
             for met in self.metric_ftns:# pycm version
                 self.train_metrics.update(met.__name__, met(confusion_obj, self.classes))
             
-            # 7-1. Update the Projector
+            # 5-3-1. Projector
+            # The data concerning the projector is collected with each batch and will be updated after all batches are completed.
+            # See 5-3-2.
             if self.train_projector and epoch == 1:                
                 label_img, features = tb_projector_resize(data.detach().cpu().clone(), label_img, features)
                 class_labels.extend([str(self.classes[lab]) for lab in target.cpu().tolist()])
                 
-            # 8. Print the result
+            # 6. Print the result
             if batch_idx % self.log_step == 0 or batch_idx == self.len_epoch-1 or self.len_epoch == 1:
                 self.logger.debug(f'Train Epoch: {epoch} {self._progress(batch_idx)} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
@@ -130,7 +136,7 @@ class Trainer(BaseTrainer):
             if batch_idx == self.len_epoch: break
         
         if self.cfg_da is not None: hook.remove()
-        # 7-2. Upate the example of predtion and Projector
+        # 5-3-2. Upate the example of predtion and Projector
         self.writer.set_step(epoch-1)
         if self.curve_metric_ftns is not None:
             for met in self.curve_metric_ftns:
@@ -254,7 +260,7 @@ class Trainer(BaseTrainer):
         return loss
         
     def _da_loss(self, output, target, logit, loss):
-        if self.DA == 'Cutmix':
+        if self.DA == 'cutmix':
             if self.DA_ftns.rand_index() is None: return loss
             random_index = self.DA_ftns.rand_index()
             if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
@@ -278,9 +284,9 @@ class Trainer(BaseTrainer):
         return f'[{current_str}/{total} ({percentage:2s})%]'
     
     def _sampling(self, data, target):
-        if 'down' in str(self.sampling_type).lower():
+        if 'down' in self.sampling_type:
             if 'random' in self.sampling_name: return module_sampling.random_downsampling(data, target)
-        elif 'up' in str(self.sampling_type).lower():
+        elif 'up' in self.sampling_type:
             # data, target = self._upsampling(data, target)
             pass
         else: TypeError('The applicable types are up or down.')
