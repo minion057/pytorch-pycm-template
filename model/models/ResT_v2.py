@@ -18,6 +18,8 @@ import torch.nn as nn
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 
+from utils import change_kwargs, load_download_checkpoint  # for pre-trained model
+
 class Mlp(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -266,25 +268,69 @@ class ResTV2(BaseModel): #(nn.Module):
         return x
 
 
+def _change_model_num_class(model, num_classes):
+    model.head = nn.Linear(model.head.in_features, num_classes, bias=model.head.bias.requires_grad)
+    return model
+def _change_model_in_chans(model, in_chans):
+    model.stem.proj[0] = nn.Conv2d(in_chans, model.stem.proj[0].out_channels, kernel_size=model.stem.proj[0].kernel_size, stride=model.stem.proj[0].stride)
+    return model
+
+
 @register_model
-def restv2_tiny(pretrained=False, **kwargs):  # 82.3|4.7G|24M -> |3.92G|30.37M   4.5G|30.33M
+def restv2_tiny(pretrained=False, pretrained_path=None, **kwargs):  # 82.3|4.7G|24M -> |3.92G|30.37M   4.5G|30.33M
+    if pretrained: 
+        if pretrained_path is None: ValueError('Please provide the path where the pre-trained model was downloaded')
+        num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ResTV2(embed_dims=[96, 192, 384, 768], depths=[1, 2, 6, 2], **kwargs)
+    
+    if pretrained:
+        # The model can be downloaded from the official GitHub. For Baidu, the password is 'rest'.
+        model.load_state_dict(load_download_checkpoint(pretrained_path))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 
 @register_model
-def restv2_small(pretrained=False, **kwargs):  # 83.6|7.0G|35M   -> |5.78G|40.94M
+def restv2_small(pretrained=False, pretrained_path=None, **kwargs):  # 83.6|7.0G|35M   -> |5.78G|40.94M
+    if pretrained: 
+        if pretrained_path is None: ValueError('Please provide the path where the pre-trained model was downloaded')
+        num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ResTV2(embed_dims=[96, 192, 384, 768], depths=[1, 2, 12, 2], **kwargs)
+    
+    if pretrained:
+        # The model can be downloaded from the official GitHub. For Baidu, the password is 'rest'.
+        model.load_state_dict(load_download_checkpoint(pretrained_path))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 
 @register_model
-def restv2_base(pretrained=False, **kwargs):  # 84.4|10.2G|52M -> |7.25G|55.75M
+def restv2_base(pretrained=False, pretrained_path=None, **kwargs):  # 84.4|10.2G|52M -> |7.25G|55.75M
+    if pretrained: 
+        if pretrained_path is None: ValueError('Please provide the path where the pre-trained model was downloaded')
+        num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ResTV2(embed_dims=[96, 192, 384, 768], depths=[1, 3, 16, 3], **kwargs)
+    
+    if pretrained:
+        # The model can be downloaded from the official GitHub. For Baidu, the password is 'rest'.
+        model.load_state_dict(load_download_checkpoint(pretrained_path))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 
 @register_model
-def restv2_large(pretrained=False, **kwargs):  # 85.3|39.6|218M -> |14.09G|98.61M
+def restv2_large(pretrained=False, pretrained_path=None, **kwargs):  # 85.3|39.6|218M -> |14.09G|98.61M
+    if pretrained: 
+        if pretrained_path is None: ValueError('Please provide the path where the pre-trained model was downloaded')
+        num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ResTV2(num_heads=[2, 4, 8, 16], embed_dims=[128, 256, 512, 1024], depths=[2, 3, 16, 2], **kwargs)
+    
+    if pretrained:
+        # The model can be downloaded from the official GitHub. For Baidu, the password is 'rest'.
+        model.load_state_dict(load_download_checkpoint(pretrained_path))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model

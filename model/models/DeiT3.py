@@ -34,6 +34,8 @@ from timm.models.vision_transformer import Mlp, PatchEmbed , _cfg
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 
+from utils import change_kwargs, load_url_checkpoint  # for pre-trained model
+
 class Attention(nn.Module):
     # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
@@ -173,7 +175,7 @@ class hMLP_stem(nn.Module):
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
         num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0])
-        self.img_size = img_size
+        self.img_size=img_size
         self.patch_size = patch_size
         self.num_patches = num_patches
         self.proj = torch.nn.Sequential(*[nn.Conv2d(in_chans, embed_dim//4, kernel_size=4, stride=4),
@@ -213,8 +215,7 @@ class vit_models(BaseModel): #(nn.Module):
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim
 
-        self.patch_embed = Patch_layer(
-                img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+        self.patch_embed = Patch_layer(img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -290,229 +291,257 @@ class vit_models(BaseModel): #(nn.Module):
         
         return x
 
+
+def _change_model_num_class(model, num_classes):
+    model.head = nn.Linear(model.head.in_features, num_classes, bias=model.head.bias.requires_grad)
+    return model
+def _change_model_in_chans(model, in_chans):
+    model.patch_embed.proj = nn.Conv2d(in_chans, model.patch_embed.proj.out_channels, 
+                                       kernel_size=model.patch_embed.proj.kernel_size, stride=model.patch_embed.proj.stride)
+    return model
+
+
 # DeiT III: Revenge of the ViT (https://arxiv.org/abs/2204.07118)
-
 @register_model
-def deit_tiny_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,   **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
+def deit_tiny_patch16_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    # DeiT: Data-efficient Image Transformers
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block, **kwargs)
     
     return model
     
     
 @register_model
-def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
+def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    # DeiT: Data-efficient Image Transformers
+    # DeiT III: Revenge of the ViT
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block, **kwargs)
     model.default_cfg = _cfg()
+    
     if pretrained:
-        name = 'https://dl.fbaipublicfiles.com/deit/deit_3_small_'+str(img_size)+'_'
-        if pretrained_21k:
-            name+='21k.pth'
-        else:
-            name+='1k.pth'
+        path = 'https://dl.fbaipublicfiles.com/deit/deit_3_small_224_' + ('21k.pth' if pretrained_21k else '1k.pth')
+        model.load_state_dict(load_url_checkpoint(path))
+        if img_size != 224:   
+            if in_chans is None: in_chans = 3
+            Patch_layer = PatchEmbed if 'Patch_layer' not in list(kwargs.keys()) else kwargs['Patch_layer']
+            new_patch_embed = Patch_layer(img_size=img_size, patch_size=16, in_chans=in_chans, embed_dim=384)
+            num_patches = new_patch_embed.num_patches
+            new_pos_embed = nn.Parameter(torch.zeros(1, num_patches, 384))
+            trunc_normal_(new_pos_embed, std=.02)
             
-        checkpoint = torch.hub.load_state_dict_from_url(
-            url=name,
-            map_location="cpu", check_hash=True
-        )
-        model.load_state_dict(checkpoint["model"])
-
+            model.patch_embed = new_patch_embed
+            model.pos_embed = new_pos_embed
+        else:
+            if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans)
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+         
     return model
 
 @register_model
-def deit_medium_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False, **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=512, depth=12, num_heads=8, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Layer_scale_init_Block, **kwargs)
+def deit_medium_patch16_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=512, depth=12, num_heads=8, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Layer_scale_init_Block, **kwargs)
     model.default_cfg = _cfg()
     if pretrained:
-        name = 'https://dl.fbaipublicfiles.com/deit/deit_3_medium_'+str(img_size)+'_'
-        if pretrained_21k:
-            name+='21k.pth'
-        else:
-            name+='1k.pth'
+        path = 'https://dl.fbaipublicfiles.com/deit/deit_3_medium_224_' + ('21k.pth' if pretrained_21k else '1k.pth')
+        model.load_state_dict(load_url_checkpoint(path))
+        if img_size != 224:   
+            if in_chans is None: in_chans = 3
+            Patch_layer = PatchEmbed if 'Patch_layer' not in list(kwargs.keys()) else kwargs['Patch_layer']
+            new_patch_embed = Patch_layer(img_size=img_size, patch_size=16, in_chans=in_chans, embed_dim=384)
+            num_patches = new_patch_embed.num_patches
+            new_pos_embed = nn.Parameter(torch.zeros(1, num_patches, 384))
+            trunc_normal_(new_pos_embed, std=.02)
             
-        checkpoint = torch.hub.load_state_dict_from_url(
-            url=name,
-            map_location="cpu", check_hash=True
-        )
-        model.load_state_dict(checkpoint["model"])
+            model.patch_embed = new_patch_embed
+            model.pos_embed = new_pos_embed
+        else:
+            if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans)
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
     return model 
 
 @register_model
-def deit_base_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
+def deit_base_patch16_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    # DeiT: Data-efficient Image Transformers
+    # DeiT III: Revenge of the ViT
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block, **kwargs)
     if pretrained:
-        name = 'https://dl.fbaipublicfiles.com/deit/deit_3_base_'+str(img_size)+'_'
-        if pretrained_21k:
-            name+='21k.pth'
-        else:
-            name+='1k.pth'
+        path = 'https://dl.fbaipublicfiles.com/deit/deit_3_base_224_' + ('21k.pth' if pretrained_21k else '1k.pth')
+        model.load_state_dict(load_url_checkpoint(path))
+        if img_size != 224:   
+            if in_chans is None: in_chans = 3
+            Patch_layer = PatchEmbed if 'Patch_layer' not in list(kwargs.keys()) else kwargs['Patch_layer']
+            new_patch_embed = Patch_layer(img_size=img_size, patch_size=16, in_chans=in_chans, embed_dim=384)
+            num_patches = new_patch_embed.num_patches
+            new_pos_embed = nn.Parameter(torch.zeros(1, num_patches, 384))
+            trunc_normal_(new_pos_embed, std=.02)
             
-        checkpoint = torch.hub.load_state_dict_from_url(
-            url=name,
-            map_location="cpu", check_hash=True
-        )
-        model.load_state_dict(checkpoint["model"])
+            model.patch_embed = new_patch_embed
+            model.pos_embed = new_pos_embed
+        else:
+            if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans)
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
     return model
     
 @register_model
-def deit_large_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
+def deit_large_patch16_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    # DeiT III: Revenge of the ViT
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block, **kwargs)
     if pretrained:
-        name = 'https://dl.fbaipublicfiles.com/deit/deit_3_large_'+str(img_size)+'_'
-        if pretrained_21k:
-            name+='21k.pth'
-        else:
-            name+='1k.pth'
+        path = 'https://dl.fbaipublicfiles.com/deit/deit_3_large_224_' + ('21k.pth' if pretrained_21k else '1k.pth')
+        model.load_state_dict(load_url_checkpoint(path))
+        if img_size != 224:   
+            if in_chans is None: in_chans = 3
+            Patch_layer = PatchEmbed if 'Patch_layer' not in list(kwargs.keys()) else kwargs['Patch_layer']
+            new_patch_embed = Patch_layer(img_size=img_size, patch_size=16, in_chans=in_chans, embed_dim=384)
+            num_patches = new_patch_embed.num_patches
+            new_pos_embed = nn.Parameter(torch.zeros(1, num_patches, 384))
+            trunc_normal_(new_pos_embed, std=.02)
             
-        checkpoint = torch.hub.load_state_dict_from_url(
-            url=name,
-            map_location="cpu", check_hash=True
-        )
-        model.load_state_dict(checkpoint["model"])
+            model.patch_embed = new_patch_embed
+            model.pos_embed = new_pos_embed
+        else:
+            if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans)
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
     return model
     
 @register_model
-def deit_huge_patch14_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=14, embed_dim=1280, depth=32, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Layer_scale_init_Block, **kwargs)
-    if pretrained:
-        name = 'https://dl.fbaipublicfiles.com/deit/deit_3_huge_'+str(img_size)+'_'
-        if pretrained_21k:
-            name+='21k_v1.pth'
-        else:
-            name+='1k_v1.pth'
+def deit_huge_patch14_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    # DeiT III: Revenge of the ViT
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=14, embed_dim=1280, depth=32, num_heads=16, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Layer_scale_init_Block, **kwargs)
+    if pretrained:            
+        path = 'https://dl.fbaipublicfiles.com/deit/deit_3_huge_224_' + ('21k_v1.pth' if pretrained_21k else '1k_v1.pth')
+        model.load_state_dict(load_url_checkpoint(path))
+        if img_size != 224:   
+            if in_chans is None: in_chans = 3
+            Patch_layer = PatchEmbed if 'Patch_layer' not in list(kwargs.keys()) else kwargs['Patch_layer']
+            new_patch_embed = Patch_layer(img_size=img_size, patch_size=16, in_chans=in_chans, embed_dim=384)
+            num_patches = new_patch_embed.num_patches
+            new_pos_embed = nn.Parameter(torch.zeros(1, num_patches, 384))
+            trunc_normal_(new_pos_embed, std=.02)
             
-        checkpoint = torch.hub.load_state_dict_from_url(
-            url=name,
-            map_location="cpu", check_hash=True
-        )
-        model.load_state_dict(checkpoint["model"])
+            model.patch_embed = new_patch_embed
+            model.pos_embed = new_pos_embed
+        else:
+            if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans)
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
     return model
     
 @register_model
-def deit_huge_patch14_52_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=14, embed_dim=1280, depth=52, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Layer_scale_init_Block, **kwargs)
+def deit_huge_patch14_52_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=14, embed_dim=1280, depth=52, num_heads=16, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Layer_scale_init_Block, **kwargs)
 
     return model
     
 @register_model
-def deit_huge_patch14_26x2_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=14, embed_dim=1280, depth=26, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Layer_scale_init_Block_paralx2, **kwargs)
+def deit_huge_patch14_26x2_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=14, embed_dim=1280, depth=26, num_heads=16, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Layer_scale_init_Block_paralx2, **kwargs)
 
     return model
     
 """ Block_paral_LS is not defined
 @register_model
-def deit_Giant_48x2_patch14_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
+def deit_Giant_48x2_patch14_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
     model = vit_models(
-        img_size = img_size, patch_size=14, embed_dim=1664, depth=48, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Block_paral_LS, **kwargs)
+        img_size = 224 if pretrained else img_size, patch_size=14, embed_dim=1664, depth=48, num_heads=16, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Block_paral_LS, **kwargs)
 
     return model
 
 @register_model
-def deit_giant_40x2_patch14_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
+def deit_giant_40x2_patch14_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
     model = vit_models(
-        img_size = img_size, patch_size=14, embed_dim=1408, depth=40, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Block_paral_LS, **kwargs)
+        img_size = 224 if pretrained else img_size, patch_size=14, embed_dim=1408, depth=40, num_heads=16, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Block_paral_LS, **kwargs)
     return model
 """
 
 @register_model
-def deit_Giant_48_patch14_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=14, embed_dim=1664, depth=48, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Layer_scale_init_Block, **kwargs)
+def deit_Giant_48_patch14_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=14, embed_dim=1664, depth=48, num_heads=16, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Layer_scale_init_Block, **kwargs)
     return model
 
 @register_model
-def deit_giant_40_patch14_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=14, embed_dim=1408, depth=40, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers = Layer_scale_init_Block, **kwargs)
-    #model.default_cfg = _cfg()
-
+def deit_giant_40_patch14_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=14, embed_dim=1408, depth=40, num_heads=16, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers = Layer_scale_init_Block, **kwargs)
     return model
 
 # Models from Three things everyone should know about Vision Transformers (https://arxiv.org/pdf/2203.09795.pdf)
-
 @register_model
-def deit_small_patch16_36_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=384, depth=36, num_heads=6, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
+def deit_small_patch16_36_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=384, depth=36, num_heads=6, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block, **kwargs)
 
     return model
     
 @register_model
-def deit_small_patch16_36(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=384, depth=36, num_heads=6, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-
+def deit_small_patch16_36(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=384, depth=36, num_heads=6, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
     
 @register_model
-def deit_small_patch16_18x2_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=384, depth=18, num_heads=6, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block_paralx2, **kwargs)
-
+def deit_small_patch16_18x2_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=384, depth=18, num_heads=6, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block_paralx2, **kwargs)
     return model
     
 @register_model
-def deit_small_patch16_18x2(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=384, depth=18, num_heads=6, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Block_paralx2, **kwargs)
-
+def deit_small_patch16_18x2(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=384, depth=18, num_heads=6, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Block_paralx2, **kwargs)
     return model
     
   
 @register_model
-def deit_base_patch16_18x2_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=768, depth=18, num_heads=12, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block_paralx2, **kwargs)
-
+def deit_base_patch16_18x2_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=768, depth=18, num_heads=12, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block_paralx2, **kwargs)
     return model
 
 
 @register_model
-def deit_base_patch16_18x2(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=768, depth=18, num_heads=12, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Block_paralx2, **kwargs)
-
+def deit_base_patch16_18x2(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=768, depth=18, num_heads=12, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Block_paralx2, **kwargs)
     return model
     
 
 @register_model
-def deit_base_patch16_36x1_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=768, depth=36, num_heads=12, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
-
+def deit_base_patch16_36x1_LS(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=768, depth=36, num_heads=12, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), block_layers=Layer_scale_init_Block, **kwargs)
     return model
 
 @register_model
-def deit_base_patch16_36x1(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=768, depth=36, num_heads=12, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-
+def deit_base_patch16_36x1(pretrained=False, img_size=224, pretrained_21k=False, **kwargs):
+    if pretrained: raise ValueError('This module does not include pre-trained models. If you have the file, you can modify that part.')
+    model = vit_models(img_size = 224 if pretrained else img_size, patch_size=16, embed_dim=768, depth=36, num_heads=12, mlp_ratio=4, 
+                       qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model

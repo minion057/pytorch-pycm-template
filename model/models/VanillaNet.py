@@ -19,6 +19,8 @@ import torch.nn.functional as F
 from timm.models.layers import trunc_normal_, DropPath
 from timm.models.registry import register_model
 
+from utils import change_kwargs, load_url_checkpoint  # for pre-trained model
+
 # Series informed activation function. Implemented by conv.
 class activation(nn.ReLU):
     def __init__(self, dim, act_num=3, deploy=False):
@@ -249,77 +251,134 @@ class VanillaNet(BaseModel): #(nn.Module):
         self.__delattr__('cls2')
         self.deploy = True
 
+def _change_model_num_class(model, num_classes):
+    model.cls2[0] = nn.Conv2d(model.cls2[0].in_channels, num_classes, kernel_size=model.cls2[0].kernel_size, stride=model.cls2[0].stride)
+    return model
+def _change_model_in_chans(model, in_chans):
+    model.stem1[0] = nn.Conv2d(in_chans, model.stem1[0].out_channels, kernel_size=model.stem1[0].kernel_size, stride=model.stem1[0].stride)
+    return model
 
 @register_model
-def vanillanet_5(pretrained=False,in_22k=False, **kwargs):
+def vanillanet_5(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = VanillaNet(dims=[128*4, 256*4, 512*4, 1024*4], strides=[2,2,2], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_5.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_6(pretrained=False,in_22k=False, **kwargs):
+def vanillanet_6(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = VanillaNet(dims=[128*4, 256*4, 512*4, 1024*4, 1024*4], strides=[2,2,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_6.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_7(pretrained=False,in_22k=False, **kwargs):
+def vanillanet_7(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = VanillaNet(dims=[128*4, 128*4, 256*4, 512*4, 1024*4, 1024*4], strides=[1,2,2,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_7.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_8(pretrained=False, in_22k=False, **kwargs):
+def vanillanet_8(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = VanillaNet(dims=[128*4, 128*4, 256*4, 512*4, 512*4, 1024*4, 1024*4], strides=[1,2,2,1,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_8.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_9(pretrained=False, in_22k=False, **kwargs):
+def vanillanet_9(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = VanillaNet(dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 1024*4, 1024*4], strides=[1,2,2,1,1,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_9.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_10(pretrained=False, in_22k=False, **kwargs):
-    model = VanillaNet(
-        dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4],
-        strides=[1,2,2,1,1,1,2,1],
-        **kwargs)
+def vanillanet_10(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = VanillaNet(dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4], strides=[1,2,2,1,1,1,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_10.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_11(pretrained=False, in_22k=False, **kwargs):
-    model = VanillaNet(
-        dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4],
-        strides=[1,2,2,1,1,1,1,2,1],
-        **kwargs)
+def vanillanet_11(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = VanillaNet(dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4], strides=[1,2,2,1,1,1,1,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_11.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_12(pretrained=False, in_22k=False, **kwargs):
-    model = VanillaNet(
-        dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4],
-        strides=[1,2,2,1,1,1,1,1,2,1],
-        **kwargs)
+def vanillanet_12(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = VanillaNet(dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4], 
+                       strides=[1,2,2,1,1,1,1,1,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_12.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_13(pretrained=False, in_22k=False, **kwargs):
-    model = VanillaNet(
-        dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4],
-        strides=[1,2,2,1,1,1,1,1,1,2,1],
-        **kwargs)
+def vanillanet_13(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = VanillaNet(dims=[128*4, 128*4, 256*4, 512*4, 512*4, 512*4, 512*4, 512*4, 512*4, 512*4, 1024*4, 1024*4], 
+                       strides=[1,2,2,1,1,1,1,1,1,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_13.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_13_x1_5(pretrained=False, in_22k=False, **kwargs):
-    model = VanillaNet(
-        dims=[128*6, 128*6, 256*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 1024*6, 1024*6],
-        strides=[1,2,2,1,1,1,1,1,1,2,1],
-        **kwargs)
+def vanillanet_13_x1_5(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = VanillaNet(dims=[128*6, 128*6, 256*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 1024*6, 1024*6], 
+                       strides=[1,2,2,1,1,1,1,1,1,2,1], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_13_x1_5.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
 @register_model
-def vanillanet_13_x1_5_ada_pool(pretrained=False, in_22k=False, **kwargs):
-    model = VanillaNet(
-        dims=[128*6, 128*6, 256*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 1024*6, 1024*6],
-        strides=[1,2,2,1,1,1,1,1,1,2,1],
-        ada_pool=[0,38,19,0,0,0,0,0,0,10,0],
-        **kwargs)
+def vanillanet_13_x1_5_ada_pool(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    model = VanillaNet(dims=[128*6, 128*6, 256*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 512*6, 1024*6, 1024*6],
+                       strides=[1,2,2,1,1,1,1,1,1,2,1], ada_pool=[0,38,19,0,0,0,0,0,0,10,0], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://github.com/huawei-noah/VanillaNet/releases/download/ckpt/vanillanet_13_x1_5_ada_pool.pth'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
