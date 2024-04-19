@@ -1,6 +1,9 @@
 import numpy as np
 from collections import OrderedDict
 
+import timm # for pre-trained model
+
+
 def get_mean_std(data):    
     # calculate mean over each channel (e.g., r,g,b)
     channel = data.shape[1]
@@ -50,3 +53,16 @@ def register_forward_hook_layer(model, module_hook_func, layer_idx=None, pre:boo
                 break
         else: raise ValueError(f'Invalid layer Index: {layer_idx}')
     return handle
+
+def load_timm_model(model_name, pretrained:bool=True, num_classes=None):
+    return timm.create_model(model_name, pretrained=True, num_classes=num_classes)    
+
+def change_kwargs(**kwargs):
+    num_classes, in_chans = None, None
+    if 'num_classes' in list(kwargs.keys()):
+        num_classes = kwargs['num_classes']
+        kwargs.pop('num_classes')
+    if 'in_chans' in list(kwargs.keys()):
+        in_chans = kwargs['in_chans']
+        kwargs.pop('in_chans')
+    return num_classes, in_chans, kwargs

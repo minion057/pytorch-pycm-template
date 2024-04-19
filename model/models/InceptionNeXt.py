@@ -23,6 +23,8 @@ from timm.models.layers import trunc_normal_, DropPath, to_2tuple
 from timm.models.registry import register_model
 # from timm.models.layers.helpers import to_2tuple
 
+from utils import change_kwargs
+
 class InceptionDWConv2d(nn.Module):
     """ Inception depthweise convolution
     """
@@ -315,56 +317,80 @@ default_cfgs = dict(
     ),
 )
 
+    
 
 @register_model
 def inceptionnext_tiny(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+            
     model = MetaNeXt(depths=(3, 3, 9, 3), dims=(96, 192, 384, 768), 
                       token_mixers=InceptionDWConv2d,
                       **kwargs
     )
     model.default_cfg = default_cfgs['inceptionnext_tiny']
+    
     if pretrained:
-        state_dict = torch.hub.load_state_dict_from_url(
-            url=model.default_cfg['url'], map_location="cpu", check_hash=True)
+        state_dict = torch.hub.load_state_dict_from_url(url=model.default_cfg['url'], map_location="cpu", check_hash=True)
         model.load_state_dict(state_dict)
+        if num_classes is not None and num_classes != 1000: model.head.fc2 = nn.Linear(model.head.fc2.in_features, num_classes)
+        if in_chans is not None and in_chans != 3: model.stem[0] = nn.Conv2d(in_chans, model.stem[0].out_channels, 
+                                                    kernel_size=model.stem[0].kernel_size, stride=model.stem[0].stride)
     return model
 
 @register_model
 def inceptionnext_small(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    
     model = MetaNeXt(depths=(3, 3, 27, 3), dims=(96, 192, 384, 768), 
                       token_mixers=InceptionDWConv2d,
                       **kwargs
     )
     model.default_cfg = default_cfgs['inceptionnext_small']
+    
     if pretrained:
         state_dict = torch.hub.load_state_dict_from_url(
             url=model.default_cfg['url'], map_location="cpu", check_hash=True)
         model.load_state_dict(state_dict)
+        if num_classes is not None and num_classes != 1000: model.head.fc2 = nn.Linear(model.head.fc2.in_features, num_classes)
+        if in_chans is not None and in_chans != 3: model.stem[0] = nn.Conv2d(in_chans, model.stem[0].out_channels, 
+                                                    kernel_size=model.stem[0].kernel_size, stride=model.stem[0].stride)
     return model
 
 @register_model
 def inceptionnext_base(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    
     model = MetaNeXt(depths=(3, 3, 27, 3), dims=(128, 256, 512, 1024), 
                       token_mixers=InceptionDWConv2d,
                       **kwargs
     )
     model.default_cfg = default_cfgs['inceptionnext_base']
+    
     if pretrained:
         state_dict = torch.hub.load_state_dict_from_url(
             url=model.default_cfg['url'], map_location="cpu", check_hash=True)
         model.load_state_dict(state_dict)
+        if num_classes is not None and num_classes != 1000: model.head.fc2 = nn.Linear(model.head.fc2.in_features, num_classes)
+        if in_chans is not None and in_chans != 3: model.stem[0] = nn.Conv2d(in_chans, model.stem[0].out_channels, 
+                                                    kernel_size=model.stem[0].kernel_size, stride=model.stem[0].stride)
     return model
 
 @register_model
 def inceptionnext_base_384(pretrained=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
+    
     model = MetaNeXt(depths=[3, 3, 27, 3], dims=[128, 256, 512, 1024], 
                       mlp_ratios=[4, 4, 4, 3],
                       token_mixers=InceptionDWConv2d,
                       **kwargs
     )
     model.default_cfg = default_cfgs['inceptionnext_base_384']
+    
     if pretrained:
         state_dict = torch.hub.load_state_dict_from_url(
             url=model.default_cfg['url'], map_location="cpu", check_hash=True)
         model.load_state_dict(state_dict)
+        if num_classes is not None and num_classes != 1000: model.head.fc2 = nn.Linear(model.head.fc2.in_features, num_classes)
+        if in_chans is not None and in_chans != 3: model.stem[0] = nn.Conv2d(in_chans, model.stem[0].out_channels, 
+                                                    kernel_size=model.stem[0].kernel_size, stride=model.stem[0].stride)
     return model
