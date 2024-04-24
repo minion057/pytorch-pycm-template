@@ -5,6 +5,7 @@ from base import BaseTrainer, MetricTracker, ConfusionTracker
 from utils import inf_loop, tb_projector_resize, plot_classes_preds, plot_close
 from utils import register_forward_hook_layer
 import numpy as np
+from copy import deepcopy
 
 import data_loader.data_augmentation as module_DA
 import data_loader.data_sampling as module_sampling
@@ -104,10 +105,13 @@ class Trainer(BaseTrainer):
             confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
             if self.curve_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
             self.train_confusion.update('confusion', confusion_content, img_update=False)
-
+            
             confusion_obj = self.train_confusion.get_confusion_obj('confusion')
             for met in self.metric_ftns:# pycm version
-                self.train_metrics.update(met.__name__, met(confusion_obj, self.classes))
+                met_name_idx = self.metrics_class_index[met.__name__]
+                use_confusion_obj = deepcopy(confusion_obj)
+                if met_name_idx is None: self.train_metrics.update(met.__name__, met(use_confusion_obj, self.classes))
+                else: self.train_metrics.update(met.__name__, met(use_confusion_obj, self.classes, met_name_idx))
             
             # 5-3-1. Projector
             # The data concerning the projector is collected with each batch and will be updated after all batches are completed.
@@ -203,10 +207,14 @@ class Trainer(BaseTrainer):
                 confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
                 if self.curve_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
                 self.valid_confusion.update('confusion', confusion_content, img_update=False)
-
+                    
                 confusion_obj = self.valid_confusion.get_confusion_obj('confusion')
                 for met in self.metric_ftns:# pycm version
-                    self.valid_metrics.update(met.__name__, met(confusion_obj, self.classes))
+                    met_name_idx = self.metrics_class_index[met.__name__]
+                    use_confusion_obj = deepcopy(confusion_obj)
+                    if met_name_idx is None: self.valid_metrics.update(met.__name__, met(use_confusion_obj, self.classes))
+                    else: self.valid_metrics.update(met.__name__, met(use_confusion_obj, self.classes, met_name_idx))
+                
                     
                 if batch_idx % self.log_step == 0: self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
                 

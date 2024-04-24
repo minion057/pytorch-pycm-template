@@ -59,7 +59,7 @@ def main(config):
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
-    metrics = [getattr(module_metric, met) for met in config['metrics']]
+    metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
     curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics']] if 'curve_metrics' in config.config.keys() else None
     if curve_metric is None: print('curve_metric is not set.\n')
 

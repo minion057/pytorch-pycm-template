@@ -74,11 +74,16 @@ def type_path(message:str, valuecnt:int=0, file:bool=False):
         return type_path(message, cnt, file)
 
 def type_metrics(attr):    
-    metrics=list()
+    metrics=dict()
     while True:
-        metrics.append(type_attr(attr, '\nPlease enter only one metric function to use. : '))
+        m = type_attr(attr, '\nPlease enter only one metric function to use. : ')
+        if yes_or_no('Would you like to calculate this metric only for a specific class (positive)? '):
+            m_idx = input('Please input a specific class. : ')
+            if m_idx.isnumeric(): m_idx = int(m_idx)
+        else: m_idx = None
+        metrics[m] = m_idx
         if not yes_or_no('Do you have any additional metric functions to use? '): break
-    return list(set(metrics))
+    return metrics
 
 def yes_or_no(message:str, cnt:int=0):
     print('\nPlease answer the following questions with \'yes(y)\' or \'no(n)\'.')

@@ -32,6 +32,7 @@ class BaseTrainer:
         self.curve_metric_ftns = curve_metric_ftns
         self.optimizer = optimizer
         self.loss_fn_name = config['loss'] 
+        self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
 
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']

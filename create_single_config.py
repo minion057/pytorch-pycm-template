@@ -124,6 +124,7 @@ def main():
     # Saving the file.
     save_path=f"config/{config['name']}/{config['optimizer']['type']}-lr_{config['optimizer']['args']['lr']}"
     if 'lr_scheduler' in config.keys(): save_path+=f"-{config['lr_scheduler']['type']}"
+    save_path+= f"/{config['arch']['type']}"
     print(f'\nIf you don\'t set a file save path, it will be saved in the {save_path} folder in the current execution directory.')
     if yes_or_no('Do you want to set the file save path? '): save_path=type_path('\nPlease enter the file path. : ')
     else:
@@ -136,7 +137,7 @@ def main():
     da = '' if 'data_augmentation' not in config.keys() else f"-{config['data_augmentation']['type']}"
     config_file_name =f"{config['data_loader']['args']['batch_size']}batch{acc_steps}-{config['trainer']['epochs']}epoch"
     config_file_name+=f"-{config['loss']}{da}{sampling}.json"
-    config_file_path=Path(save_path) / config['arch']['type'] / config_file_name
+    config_file_path=Path(save_path) / config_file_name
     write_json(config, config_file_path)
 
     # Done
