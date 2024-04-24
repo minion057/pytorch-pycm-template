@@ -269,9 +269,12 @@ class Result_visualization:
             for bar_container in ax.containers: # 막대 컨테이너 가져오기
                 for bar, _ in zip(bar_container, pivot_table.columns):
                     height = bar.get_height()  # 막대의 높이 가져오기
-                    if height <= min_y: height = min_y
-                    val = ''.join([h+'\n' for h in str(round(height*100, 2))])#+'%'
-                    ax.text(bar.get_x() + bar.get_width() / 2, height + 0.001, val, ha='center', va='bottom', fontsize=8)
+                    padding = 0.05
+                    val = str(round(height*100, 2)).replace('.00', '')
+                    if val[-1] == '0' and '.' in val: val = val[:-2]
+                    val = ''.join([h+'\n' for h in val])
+                    if height-padding <= min_y: height = (min_y if height < min_y else height) + padding
+                    ax.text(bar.get_x() + bar.get_width() / 2, height - padding, val, ha='center', va='bottom', fontsize=8)
 
         # 범례 설정
         if show_legend:
