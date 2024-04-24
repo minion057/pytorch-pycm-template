@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from utils import load_url_checkpoint, change_kwargs # for pre-trained model
+
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
     This is the same as the DropConnect impl I created for EfficientNet, etc networks, however,
@@ -175,42 +177,91 @@ class ConvNeXtV2(BaseModel): #(nn.Module):
         x = self.head(x)
         return x
 
-def convnextv2_atto(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_atto_1k_224_ema.pt
+def _change_model_num_class(model, num_classes):
+    model.head = nn.Linear(model.head.in_features, num_classes, bias=model.head.bias.requires_grad)
+    return model
+def _change_model_in_chans(model, in_chans):
+    model.downsample_layers[0][0] = nn.Conv2d(in_chans, model.downsample_layers[0][0].out_channels,
+                                              kernel_size=model.downsample_layers[0][0].kernel_size, 
+                                              stride=model.downsample_layers[0][0].stride) 
+    return model
+
+def convnextv2_atto(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[2, 2, 6, 2], dims=[40, 80, 160, 320], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_atto_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def convnextv2_femto(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_femto_1k_224_ema.pt
+def convnextv2_femto(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[2, 2, 6, 2], dims=[48, 96, 192, 384], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_femto_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def convnextv2_pico(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_pico_1k_224_ema.pt
+def convnextv2_pico(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[2, 2, 6, 2], dims=[64, 128, 256, 512], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_pico_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def convnextv2_nano(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_nano_1k_224_ema.pt
+def convnextv2_nano(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[2, 2, 8, 2], dims=[80, 160, 320, 640], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_nano_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def convnextv2_tiny(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_tiny_1k_224_ema.pt
+def convnextv2_tiny(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_tiny_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def convnextv2_base(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_base_1k_224_ema.pt
+def convnextv2_base(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[3, 3, 27, 3], dims=[128, 256, 512, 1024], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_base_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def convnextv2_large(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_large_1k_224_ema.pt
+def convnextv2_large(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[3, 3, 27, 3], dims=[192, 384, 768, 1536], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_large_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def convnextv2_huge(**kwargs):
-    #https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_huge_1k_224_ema.pt
+def convnextv2_huge(pretrained:bool=False, **kwargs):
+    if pretrained: num_classes, in_chans, kwargs = change_kwargs(**kwargs)
     model = ConvNeXtV2(depths=[3, 3, 27, 3], dims=[352, 704, 1408, 2816], **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_url_checkpoint('https://dl.fbaipublicfiles.com/convnext/convnextv2/im1k/convnextv2_huge_1k_224_ema.pt'))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model

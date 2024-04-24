@@ -74,9 +74,10 @@
         }
     },
     "loss": "nll_loss",                // The loss function defined in loss.py.
-    "metrics": [                       // list of metrics to evaluate using pycm object
-        "ACC", "ACC_class" 
-    ],
+    "metrics": {                       // list of metrics to evaluate using pycm object
+        "ACC": null,                   // When calculating average metrics across all classes, it is null.
+        "TPR": 1                       // When calculating metrics for a specific class, it is currently set to class 1 as an example.
+    },
     "curve_metrics":[                  // list of curve metrics to evaluate using scikit-learn
         "ROC"  
     ],
@@ -166,9 +167,10 @@
         }
     }, 
     "loss": "bce_loss",                  // The loss function defined in loss.py.
-    "metrics": [                         // list of metrics to evaluate using pycm object
-        "ACC", "ACC_class" 
-    ],
+    "metrics": {                         // list of metrics to evaluate using pycm object
+        "ACC": null,                     // When calculating average metrics across all classes, it is null.
+        "TPR": 1                         // When calculating metrics for a specific class, it is currently set to class 1 as an example.
+    },
     "curve_metrics":[                    // list of curve metrics to evaluate using scikit-learn
         "ROC"  
     ], 

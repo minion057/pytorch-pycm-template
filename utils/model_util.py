@@ -1,5 +1,9 @@
+import torch
 import numpy as np
 from collections import OrderedDict
+
+import timm # for pre-trained model
+
 
 def get_mean_std(data):    
     # calculate mean over each channel (e.g., r,g,b)
@@ -50,3 +54,41 @@ def register_forward_hook_layer(model, module_hook_func, layer_idx=None, pre:boo
                 break
         else: raise ValueError(f'Invalid layer Index: {layer_idx}')
     return handle
+
+def load_timm_model(model_name, pretrained:bool=True, num_classes=None):
+    # https://huggingface.co/docs/timm/en/reference/models#timm.create_model
+    ''' Example Code    
+    if pretrained:
+        # https://huggingface.co/timm/convnextv2_atto.fcmae_ft_in1k
+        num_classes, in_chans, _ = change_kwargs(**kwargs)
+        model = load_timm_model('convnextv2_atto.fcmae_ft_in1k', pretrained=True, num_classes=num_classes)
+        if in_chans is not None: model.stem[0] = nn.Conv2d(in_chans, model.stem[0].out_channels, 
+                                                           kernel_size=model.stem[0].kernel_size, stride=model.stem[0].stride)
+    '''
+    return timm.create_model(model_name, pretrained=True, num_classes=num_classes)   
+
+def load_download_checkpoint(path):
+    checkpoint = torch.load(path, map_location='cpu')
+    key_list = list(checkpoint.keys())
+    if 'model' in key_list: return checkpoint['model']
+    elif 'state_dict' in key_list: return checkpoint['state_dict']
+    return checkpoint
+
+def load_url_checkpoint(path):
+    # https://pytorch.org/docs/stable/hub.html#torch.hub.load_state_dict_from_url
+    checkpoint = torch.hub.load_state_dict_from_url(path, map_location='cpu', check_hash=True)
+    key_list = list(checkpoint.keys())
+    if 'model' in key_list: return checkpoint['model']
+    elif 'state_dict' in key_list: return checkpoint['state_dict']
+    return checkpoint
+    
+
+def change_kwargs(**kwargs):
+    num_classes, in_chans = None, None
+    if 'num_classes' in list(kwargs.keys()):
+        num_classes = kwargs['num_classes']
+        kwargs.pop('num_classes')
+    if 'in_chans' in list(kwargs.keys()):
+        in_chans = kwargs['in_chans']
+        kwargs.pop('in_chans')
+    return num_classes, in_chans, kwargs

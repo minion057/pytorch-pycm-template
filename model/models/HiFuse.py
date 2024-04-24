@@ -44,7 +44,6 @@ class DropPath(nn.Module):
         return drop_path_f(x, self.drop_prob, self.training)
 
 class main_model(BaseModel): #(nn.Module):
-
     def __init__(self, num_classes, patch_size=4, in_chans=3, embed_dim=96, depths=(2, 2, 2, 2),
                  num_heads=(3, 6, 12, 24), window_size=7, qkv_bias=True, drop_rate=0,
                  attn_drop_rate=0, drop_path_rate=0., norm_layer=nn.LayerNorm, patch_norm=True,
@@ -790,21 +789,17 @@ class PatchMerging(nn.Module):
 
         return x
 
-def HiFuse_Tiny(num_classes: int, **kwargs):
-    model = main_model(depths=(2, 2, 2, 2),
-                     conv_depths=(2, 2, 2, 2),
-                     num_classes=num_classes, **kwargs)
+def HiFuse_Tiny(num_classes:int, **kwargs):
+    if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
+    model = main_model(depths=(2, 2, 2, 2), conv_depths=(2, 2, 2, 2), num_classes=num_classes, **kwargs)
     return model
 
-
-def HiFuse_Small(num_classes: int, **kwargs):
-    model = main_model(depths=(2, 2, 6, 2),
-                     conv_depths=(2, 2, 6, 2),
-                     num_classes=num_classes, **kwargs)
+def HiFuse_Small(num_classes:int, **kwargs):
+    if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
+    model = main_model(depths=(2, 2, 6, 2), conv_depths=(2, 2, 6, 2), num_classes=num_classes, **kwargs)
     return model
 
-def HiFuse_Base(num_classes: int, **kwargs):
-    model = main_model(depths=(2, 2, 18, 2),
-                     conv_depths=(2, 2, 18, 2),
-                     num_classes=num_classes, **kwargs)
+def HiFuse_Base(num_classes:int, **kwargs):
+    if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
+    model = main_model(depths=(2, 2, 18, 2), conv_depths=(2, 2, 18, 2), num_classes=num_classes, **kwargs)
     return model

@@ -10,7 +10,7 @@ from torchinfo import summary
 from torchviz import make_dot
 import model.model as module_arch
 
-import data_loader.mnist_data_loaders as module_data
+import data_loader.imagenet1k_data_loaders as module_data
 from torchvision import transforms
 import data_loader.transforms as module_transforms
 import model.optim as module_optim
@@ -59,7 +59,7 @@ def main(config):
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
-    metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
+    metrics = [getattr(module_metric, met) for met in config['metrics']]
     curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics']] if 'curve_metrics' in config.config.keys() else None
     if curve_metric is None: print('curve_metric is not set.\n')
 
