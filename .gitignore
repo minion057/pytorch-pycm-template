@@ -11,9 +11,11 @@ data/*
 # Output dir
 saved/*
 # Config dir
-# config/*
+config/*
 # Test dir
 experiment/*
+# Custom files
+model/metric_custiom.py
 
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
