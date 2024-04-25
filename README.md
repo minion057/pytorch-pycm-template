@@ -4,7 +4,25 @@
 > It's based on the [pytorch-template](https://github.com/victoresque/pytorch-template), so some parts aren't explained in detail.    
 > Unlike the original, it utilizes the pycm library for metrics computation.    
 > Consequently, the example files have been adjusted to incorporate the pycm library.     
-> Moreover, the template supports pre-split npz data examples for training, validation, and testing sets.    
+> And the added features are as follows:   
+>   1.  Added support for loading npz data.    
+>       - added an [example](data_loader/npz_loaders.py) of a data loader.  
+>   2.  Data Augmentation support.    
+>       - added [CutMix example](data_loader/DA/cutmix.py)  
+>   3.  Additional model support.   
+>       - added examples for models [provided in PyTorch](model/models/DenseNet.py), as well as unsupported models.   
+>   4.  Support for the process of creating config files.   
+>       - added an [example](create_single_config.py) for creating one config. Use it as a reference to create multiple configs.  
+>   5.  Comprehensive visualization output supporting aggregation of experimental results.   
+>       - refer to the [example](result_visualization.ipynb) for guidance.   
+
+
+
+Support for npz data (added data loader example)
+Augmentation support (added CutMix example)
+Additional model support (added examples for models provided in PyTorch, as well as unsupported models)
+Support for the process of creating config files (added an example for creating one config. Use it as a reference to create multiple configs.)
+Comprehensive visualization output supporting aggregation of experimental results (refer to the example for guidance).  
 
 <br>
 
