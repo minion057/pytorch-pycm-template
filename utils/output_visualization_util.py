@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 
 class Result_visualization:
-    def __init__(self, parent_dir, result_name, best_metric):
+    def __init__(self, parent_dir, result_name, best_metric, comparison_metric=None, threshold:float=0.5):
         parent_dir = Path(parent_dir)
         self.name = result_name
         self.output_dir = parent_dir / 'output' / self.name
@@ -19,6 +19,8 @@ class Result_visualization:
         # 이때, test가 여러번 수행되었다면 설정된 best_metric을 기준으로 가장 높은 점수를 가진 정보만 가져옴
         self.sheet_list = ['training', 'validation', 'test']
         self.best_metric = best_metric
+        self.comparison_metric = comparison_metric
+        self.threshold = threshold
         self.df_dict = self._json2df()
 
     # output 중, metric.json 경로 정보 셋팅하는 함수
@@ -177,7 +179,9 @@ class Result_visualization:
                             if best_result is None:
                                 best_result = deepcopy(te)
                                 if self.best_metric not in list(te.keys()): raise ValueError(f'Not found {self.best_metric}')
+                                if self.comparison_metric is not None and self.comparison_metric not in list(te.keys()): raise ValueError(f'Not found {self.comparison_metric}')
                             else:
+                                if self.comparison_metric is not None and abs(te[self.best_metric] - te[self.comparison_metric]) > self.threshold: continue
                                 if best_result[self.best_metric] < te[self.best_metric]: best_result = deepcopy(te)
                         data_dict['test']['data'].append(self._list_concat(basic_data, list(best_result.values())))
                         data_dict['test']['col'].append(self._list_concat(basic_column_list, list(best_result.keys())))
