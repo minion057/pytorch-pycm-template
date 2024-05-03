@@ -14,6 +14,8 @@ import torch.utils.checkpoint as checkpoint
 import numpy as np
 from typing import Optional
 
+from utils import change_kwargs
+
 def drop_path_f(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
 
@@ -789,17 +791,17 @@ class PatchMerging(nn.Module):
 
         return x
 
-def HiFuse_Tiny(num_classes:int, **kwargs):
+def HiFuse_Tiny(num_classes:int, pretrained:bool=False, **kwargs):
     if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
     model = main_model(depths=(2, 2, 2, 2), conv_depths=(2, 2, 2, 2), num_classes=num_classes, **kwargs)
     return model
 
-def HiFuse_Small(num_classes:int, **kwargs):
+def HiFuse_Small(num_classes:int, pretrained:bool=False, **kwargs):
     if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
     model = main_model(depths=(2, 2, 6, 2), conv_depths=(2, 2, 6, 2), num_classes=num_classes, **kwargs)
     return model
 
-def HiFuse_Base(num_classes:int, **kwargs):
+def HiFuse_Base(num_classes:int, pretrained:bool=False, **kwargs):
     if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
     model = main_model(depths=(2, 2, 18, 2), conv_depths=(2, 2, 18, 2), num_classes=num_classes, **kwargs)
     return model
