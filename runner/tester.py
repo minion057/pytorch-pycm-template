@@ -60,7 +60,10 @@ class Tester(BaseTester):
 
                 confusion_obj = self.confusion.get_confusion_obj('confusion')
                 for met in self.metric_ftns:# pycm version
-                    self.metrics.update(met.__name__, met(confusion_obj, self.classes))
+                    met_name_idx = self.metrics_class_index[met.__name__]
+                    use_confusion_obj = deepcopy(confusion_obj)
+                    if met_name_idx is None: self.metrics.update(met.__name__, met(use_confusion_obj, self.classes))
+                    else: self.metrics.update(met.__name__, met(use_confusion_obj, self.classes, met_name_idx))
                     
                 if batch_idx % self.log_step == 0:
                     self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))

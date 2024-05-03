@@ -29,6 +29,7 @@ class BaseTester:
         self.metric_ftns = metric_ftns
         self.curve_metric_ftns = curve_metric_ftns
         self.loss_fn_name = config['loss'] 
+        self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
 
         self.test_epoch = 1
         

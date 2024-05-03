@@ -32,7 +32,7 @@ class BaseTrainer:
         self.curve_metric_ftns = curve_metric_ftns
         self.optimizer = optimizer
         self.loss_fn_name = config['loss'] 
-        self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.metrics_class_index = config['metrics'] if 'metrics' in self.config.keys() else None
 
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']
@@ -74,11 +74,11 @@ class BaseTrainer:
         if config.resume is not None: self._resume_checkpoint(config.resume)
         
         # Sampling And DA
-        self.sampling = config['data_sampling'] if 'data_sampling' in config.config.keys() else None
+        self.sampling = config['data_sampling'] if 'data_sampling' in self.config.keys() else None
         if self.sampling is not None:
             self.sampling_type = str(self.sampling['type']).lower() # down or up
             self.sampling_name = str(self.sampling['name']).lower() # random, ...
-        self.cfg_da = config['data_augmentation'] if 'data_augmentation' in config.config.keys() else None
+        self.cfg_da = config['data_augmentation'] if 'data_augmentation' in self.config.keys() else None
         if self.cfg_da is not None:
             self.DA = str(self.cfg_da['type']).lower()
             self.DAargs, self.hookargs = self.cfg_da['args'], self.cfg_da['hook_args']
@@ -154,7 +154,7 @@ class BaseTrainer:
         end = time.time()
         self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
 
-    def _save_checkpoint(self, epoch, save_best=False):
+    def _save_checkpoint(self, epoch, save_best=False, filename='latest'):
         """
         Saving checkpoints
 
@@ -175,9 +175,9 @@ class BaseTrainer:
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-        with open(str(self.checkpoint_dir / 'latest.txt'), "a") as f:
-            f.write('latest.pth -> epoch{}\n'.format(epoch))
-        filename = str(self.checkpoint_dir / 'latest.pth') #'checkpoint-epoch{}.pth'.format(epoch))
+        with open(str(self.checkpoint_dir / f'{filename}.txt'), "a") as f:
+            f.write(f'{filename}.pth -> epoch{epoch}\n')
+        filename = str(self.checkpoint_dir / f'{filename}.pth') #'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
         self.logger.info("Saving checkpoint: {} ...{}".format(filename, '' if save_best else '\n'))
         if save_best:

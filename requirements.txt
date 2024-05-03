@@ -7,7 +7,7 @@ torchinfo
 torchviz
 matplotlib
 
-numpy
+numpy==1.26.4
 pandas==2.1
 tqdm
 pycm==4.0

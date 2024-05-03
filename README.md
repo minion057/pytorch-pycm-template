@@ -8,16 +8,17 @@
 > 
 > 1. Added support for loading npz data.
 >     - added an [example](data_loader/npz_loaders.py) of a data loader.  
-> 2.  Data Augmentation support.    
+> 2. Data Augmentation support.    
 >     - added [CutMix example](data_loader/DA/cutmix.py)  
-> 3.  Additional model support.   
+> 3. Additional model support.   
 >     - added examples for models [provided in PyTorch](model/models/DenseNet.py), as well as unsupported models.   
-> 4.  Support for the process of creating config files.   
+> 4. Support for the process of creating config files.   
 >     - added an [example](create_single_config.py) for creating one config. 
 >     - Use it as a reference to create multiple configs.  
-> 5.  Comprehensive visualization output supporting aggregation of experimental results.   
+> 5. Comprehensive visualization output supporting aggregation of experimental results.   
 >     - refer to the [example](result_visualization.ipynb) for guidance.
-> 
+> 6. Experiment automation support.   
+>     - added an [example](auto_process.sh)
 
 <br>
 
