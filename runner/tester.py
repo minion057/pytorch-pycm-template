@@ -4,6 +4,7 @@ from torchvision.utils import make_grid
 from base import BaseTester, MetricTracker, ConfusionTracker
 from utils import tb_projector_resize, plot_classes_preds, plot_close
 import numpy as np
+from copy import deepcopy
 from tqdm.auto import tqdm
 
 class Tester(BaseTester):
