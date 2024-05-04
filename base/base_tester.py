@@ -4,11 +4,9 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from abc import abstractmethod
 from logger import TensorboardWriter
-from copy import deepcopy
 
 from pathlib import Path
 from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, plot_close
-import model.metric_curve_plot as module_curve_metric
 
 import time
 import datetime
@@ -119,7 +117,8 @@ class BaseTester:
         write_dict2json(result, self.output_metrics)
 
         # Save the result of confusion matrix image.
-        plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Test Data', self.output_dir/f'confusion_matrix_test-epoch{self.test_epoch}.png')
+        plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Test Data', 
+                                    self.output_dir/f'confusion_matrix_test-epoch{self.test_epoch}.png')
 
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot:

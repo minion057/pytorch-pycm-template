@@ -1,6 +1,8 @@
+import os
 import pandas as pd
 import numpy as np
 from copy import deepcopy
+from pathlib import Path
 
 from sklearn.metrics import ConfusionMatrixDisplay
 from pycm import ConfusionMatrix as pycmCM
@@ -43,7 +45,7 @@ class ConfusionTracker:
         if self.writer is not None and img_update:
             self.writer.add_figure('ConfusionMatrix', confusion_plt.figure_)
         if img_save_dir_path is not None:
-            confusion_plt.figure_.savefig(os.path.join(img_save_dir_path, f'ConfusionMatrix{key}.png'),dpi=300)
+            confusion_plt.figure_.savefig(Path(img_save_dir_path) / f'ConfusionMatrix{key}.png', dpi=300, bbox_inches='tight')
 
     def get_actual_vector(self, key):
         return list(self._data.actual[key])
@@ -83,7 +85,6 @@ class FixedSpecConfusionTracker:
             self._data['confusion'][key], self._data['best'][key] = None, False  
             self._data['threshold'][key], self._data['fixed_score'][key], = 1., float(key)
             self._data['refer_score'][key], self._data['refer_loss'][key] = None, np.inf
-    
         
     def update(self, actual_vector, probability_vector, loss,
                set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):
@@ -92,14 +93,18 @@ class FixedSpecConfusionTracker:
             if type(actual_vector[0]) == np.ndarray: actual_vector = actual_vector.tolist()
             actual_vector = [a.index(1.) for a in actual_vector]
         elif type(actual_vector[0]) == 'str': actual_vector = [self.classes.index(a) for a in actual_vector]
-        actual_prob_vector = [p[a] for p, a in zip(probability_vector, actual_vector)]
                
         # Generating a confusion matrix with predetermined scores.
         crv = ROCCurve(actual_vector=np.array(actual_vector), probs=np.array(probability_vector), classes=np.unique(actual_vector).tolist())
-        fpr = crv.data[self.negative_class_idx]['FPR']
-        tpr = {class_idx:crv.data[class_idx]['TPR'] for class_idx in self.positive_classes.keys()}
         
+        # ROCCurve에서는 thresholds의 인덱스 기준으로 FPR과 TPR을 반환함.
+        # 그러나 FPR은 맨 뒤에 0, TPR은 맨 앞에 1이 하나 더 삽입된 상태로 반환됨.
+        # 그리고 FPR의 경우 뒤집힌 상태로 반환되어, 가장 적절한 값의 index를 사용하기 위해 뒤집음
+        fpr = np.flip(np.delete(np.array(crv.data[self.negative_class_idx]['FPR']), -1))
+        tpr = {class_idx:np.delete(np.array(crv.data[class_idx]['TPR']), 0) for class_idx in self.positive_classes.keys()}
+
         for goal in self.goal_score:
+            if goal > 1: print('Warring: Goal score should be less than 1.')
             # If no instances meet the target score, it will return closest_value. 
             target_fpr, closest_fpr = round(1-goal, 2), None
             same_value_index  = np.where(np.around(fpr, 2) == target_fpr)[0]
@@ -117,31 +122,32 @@ class FixedSpecConfusionTracker:
                 elif fpr[best_idx] < fpr[goal_index]: best_idx = goal_index 
             
              # Evaluating for optimal performance by analyzing various metrics from the confusion matrix with predefined scores.
-            if self._data.refer_score[goal] is not None and closest_fpr is None: # target_fpr
+            if self._data.refer_score[goal] is not None: # target_fpr
                 refer_score = self._data.refer_score[goal]
                 if type(refer_score) == dict: refer_score = np.mean(list(refer_score.values()))
                 if refer_score == fpr[best_idx]:
                     if loss < self._data.refer_loss[goal]: self._data.best[goal] = True
                 elif refer_score < fpr[best_idx]: self._data.best[goal] = True
-            else: # closest_fpr
-                if closest_fpr is None: self._data.best[goal] = True
+            elif closest_fpr is None: self._data.best[goal] = True
             
-            self._data.confusion[goal] = self._createConfusionMatrixobj(actual_vector, probability_vector, actual_prob_vector, crv.thresholds[best_idx])
-            self._data.threshold[goal] = crv.thresholds[best_idx]
-            self._data.refer_score[goal] = self.refer_metrics_ftns(self._data.confusion[goal], self.classes) #tpr[best_idx]
-            self._data.refer_loss[goal] = loss
+            best_confusion = self._createConfusionMatrixobj(actual_vector, probability_vector, crv.thresholds[best_idx])
+            self._data.confusion[goal] = deepcopy(best_confusion)
+            self._data.threshold[goal] = deepcopy(crv.thresholds[best_idx])
+            self._data.refer_score[goal] = {class_idx:tpr[class_idx][best_idx] for class_idx in self.positive_classes.keys()}
+            self._data.refer_loss[goal] = deepcopy(loss)
             
             if img_update or set_title is not None or img_save_dir_path is not None:
                 confusion_plt = self.createConfusionMatrix(goal)
                 confusion_plt.ax_.set_title(set_title if set_title is not None else f'Confusion matrix - Fixed Spec: {goal}')
-            use_tag = f'ConfusionMatrix_FixedSpec_{goal}'
+            use_tag = f'ConfusionMatrix_FixedSpec_{str(goal).replace("0.", "")}'
             if self.writer is not None and img_update:
                 self.writer.add_figure(use_tag, confusion_plt.figure_)
             if img_save_dir_path is not None:
-                confusion_plt.figure_.savefig(os.path.join(img_save_dir_path, f'{use_tag}.png'), dpi=300)
+                confusion_plt.figure_.savefig(Path(img_save_dir_path) / use_tag, dpi=300, bbox_inches='tight')
 
-    def _createConfusionMatrixobj(self, actual_vector, probability_vector, actual_prob_vector, threshold):
-        use_pred, use_prob = np.array(actual_prob_vector > threshold), deepcopy(probability_vector)
+    def _createConfusionMatrixobj(self, actual_vector, probability_vector, threshold):
+        actual_prob_vector = [p[a] for p, a in zip(probability_vector, actual_vector)]       
+        use_pred, use_prob = np.array(actual_prob_vector > threshold), np.array(deepcopy(probability_vector))
         use_prob[np.arange(len(actual_vector)), actual_vector] = -np.inf
         use_pred = np.where(use_pred, actual_vector, np.argmax(use_prob, axis=1))
         return pycmCM(actual_vector, use_pred)    
