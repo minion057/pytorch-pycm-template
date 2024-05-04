@@ -16,3 +16,5 @@ class ImageNet1kDataLoader(BaseRawDataLoader):
         self.dataset = datasets.ImageNet(self.data_dir, train=training, download=True, transform=trsfm)
         classes = list(range(1000))
         super().__init__(self.dataset, classes, batch_size, shuffle, validation_split, num_workers)
+        
+        raise ValueError('Incomplete! Not tested. Please modify if needed.')
