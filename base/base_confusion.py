@@ -72,8 +72,8 @@ class FixedSpecConfusionTracker:
         
         self.fixed_metrics_ftns = getattr(module_metric, 'specificity')
         self.refer_metrics_ftns = getattr(module_metric, 'sensitivity')
-        self.negative_class_idx = negative_class_idx
-        self.positive_classes = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx != self.negative_class_idx}
+        self.negetive_class_idx = negative_class_idx
+        self.postive_classes = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx != self.negetive_class_idx}
         self.goal_score = goal_score 
         
         self._data = pd.DataFrame(index=goal_score, columns=['confusion', 'threshold', 'fixed_score', 'refer_score', 'refer_loss', 'best'])
@@ -98,42 +98,43 @@ class FixedSpecConfusionTracker:
         crv = ROCCurve(actual_vector=np.array(actual_vector), probs=np.array(probability_vector), classes=np.unique(actual_vector).tolist())
         
         # ROCCurve에서는 thresholds의 인덱스 기준으로 FPR과 TPR을 반환함.
-        # 그러나 FPR은 맨 뒤에 0, TPR은 맨 앞에 1이 하나 더 삽입된 상태로 반환됨.
-        # 그리고 FPR의 경우 뒤집힌 상태로 반환되어, 가장 적절한 값의 index를 사용하기 위해 뒤집음
-        fpr = np.flip(np.delete(np.array(crv.data[self.negative_class_idx]['FPR']), -1))
-        tpr = {class_idx:np.delete(np.array(crv.data[class_idx]['TPR']), 0) for class_idx in self.positive_classes.keys()}
+        # threshold와 달리 FPR은 맨 뒤에 0, TPR은 맨 앞에 1이 하나 더 삽입된 상태로 반환됨.
+        # 또한, Negative를 기준으로 값을 고정할 것이기 때문에 fpr은 tpr 중 negative index에 해당하는 값을 가져옴.        
+        spec = np.delete(np.array(crv.data[self.negetive_class_idx]['TPR']), 0)
+        tpr = {class_idx:np.delete(np.array(crv.data[class_idx]['TPR']), 0) for class_idx in self.postive_classes.keys()}
 
         for goal in self.goal_score:
-            if goal > 1: print('Warring: Goal score should be less than 1.')
+            if goal > 1 or goal <= 0: print('Warring: Goal score should be less than 1.')
             # If no instances meet the target score, it will return closest_value. 
-            target_fpr, closest_fpr = round(1-goal, 2), None
-            same_value_index  = np.where(np.around(fpr, 2) == target_fpr)[0]
+            digit = len(str(goal).split('.')[-1])
+            target_spec, closest_spec = round(goal, digit), None
+            same_value_index  = np.where(np.around(spec, digit) == target_spec)[0]
             if len(same_value_index) == 0:
                 # print('Find the closest value')
-                closest_fpr = fpr[np.abs(fpr - target_fpr).argmin()]
-                same_value_index = np.where(fpr == closest_fpr)[0]
-            
+                closest_spec = spec[np.abs(spec - target_spec).argmin()]
+                same_value_index = np.where(spec == closest_spec)[0]
+            print()
             best_idx = None
             for goal_index in same_value_index:
                 if best_idx is None: best_idx = goal_index                
-                elif fpr[best_idx] == fpr[goal_index]:
+                elif spec[best_idx] == spec[goal_index]:
                     now_item_is_best = [pos_class_idx for pos_class_idx in tpr.keys() if tpr[pos_class_idx][best_idx] < tpr[pos_class_idx][goal_index]]
                     if len(now_item_is_best) > len(self.classes)/2: best_idx = goal_index 
-                elif fpr[best_idx] < fpr[goal_index]: best_idx = goal_index 
+                elif spec[best_idx] < spec[goal_index]: best_idx = goal_index 
             
              # Evaluating for optimal performance by analyzing various metrics from the confusion matrix with predefined scores.
-            if self._data.refer_score[goal] is not None: # target_fpr
+            if self._data.refer_score[goal] is not None: # target_spec
                 refer_score = self._data.refer_score[goal]
                 if type(refer_score) == dict: refer_score = np.mean(list(refer_score.values()))
-                if refer_score == fpr[best_idx]:
+                if refer_score == spec[best_idx]:
                     if loss < self._data.refer_loss[goal]: self._data.best[goal] = True
-                elif refer_score < fpr[best_idx]: self._data.best[goal] = True
-            elif closest_fpr is None: self._data.best[goal] = True
+                elif refer_score < spec[best_idx]: self._data.best[goal] = True
+            elif closest_spec is None: self._data.best[goal] = True
             
             best_confusion = self._createConfusionMatrixobj(actual_vector, probability_vector, crv.thresholds[best_idx])
             self._data.confusion[goal] = deepcopy(best_confusion)
-            self._data.threshold[goal] = deepcopy(crv.thresholds[best_idx])
-            self._data.refer_score[goal] = {class_idx:tpr[class_idx][best_idx] for class_idx in self.positive_classes.keys()}
+            self._data.threshold[goal] = crv.thresholds[best_idx]
+            self._data.refer_score[goal] = {class_idx:tpr[class_idx][best_idx] for class_idx in self.postive_classes.keys()}
             self._data.refer_loss[goal] = deepcopy(loss)
             
             if img_update or set_title is not None or img_save_dir_path is not None:

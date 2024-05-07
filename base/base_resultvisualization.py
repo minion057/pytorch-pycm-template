@@ -7,13 +7,14 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 
 class ResultVisualization:
-    def __init__(self, parent_dir, result_name, test_dirname:str='test', test_filename:str='metrics'):
+    def __init__(self, parent_dir, result_name, test_dirname:str='test', test_filename:str='metrics', test_file_addtional_name:str='test'):
         parent_dir = Path(parent_dir)
         self.name = result_name
         self.output_dir = parent_dir / 'output' / self.name
         
         self.test_dirname = test_dirname
         self.test_filename = test_filename
+        self.test_file_addtional_name = test_file_addtional_name
         self.sheet_list = ['training', 'validation', 'test']
         
         # output 중, metric.json 경로 정보 가져오기
@@ -99,11 +100,13 @@ class ResultVisualization:
                         test_epochs = []
                         for t in test_json:
                             test_epoch = str(t).split(self.test_dirname)[-1].split('epoch')[-1].replace('/metrics-test', '').replace('.json', '')
+                            test_epoch = test_epoch.split('_')[0]
                             if not test_epoch.isnumeric(): raise ValueError(f'Warring: The testing epoch is unknown. -> {t.name}')
                             test_epochs.append(int(test_epoch))
                         use_test_json = OrderedDict()
                         for sort_index in np.argsort(test_epochs):
-                            use_test_json[test_epochs[sort_index]] = test_json[sort_index]
+                            # use_test_json[test_epochs[sort_index]] = test_json[sort_index]
+                            use_test_json[test_json[sort_index]] = test_epochs[sort_index]
                     else : raise ValueError('The JSON file containing the test results could not be found.')
                     metrics_dict[category][model][run_cate].update({run_id:{'train':train_json,'test':use_test_json, 'latest': latest}})
         
@@ -111,10 +114,10 @@ class ResultVisualization:
         use_cate = category_list[0]
         print(f'Category list : {len(category_list)}cnt -> {category_list}')
         model_list = list(metrics_dict[use_cate].keys())
-        use_model = model_list[3]
+        use_model = model_list[0]
         print(f'Model_list    : {len(model_list)}cnt -> {model_list}')
         run_list = list(metrics_dict[use_cate][use_model].keys())
-        use_run = run_list[1]
+        use_run = run_list[0]
         print(f'Run_list      : {len(run_list)}cnt -> {run_list}')
         for run_id, run_json in metrics_dict[use_cate][use_model][use_run].items():
             print(f'example run id: {run_id}')
@@ -186,9 +189,13 @@ class ResultVisualization:
         if mode not in ['train', 'test']: TypeError('The model can only accept "train" and "test" as inputs.')
         json_content = self._read_json(json_path)
         train_epoch = len(json_content['epoch']) if mode == 'train' else 0
-        test_epoch = json_content['epoch'][0] if mode == 'test' else 0
+        # test_epoch = json_content['epoch'][0] if mode == 'test' else 0 #-> 나중에 이걸로 수정
+        test_epoch = 0
+        if mode == 'test': 
+            test_epoch = json_content['epoch'][0] if type(json_content['epoch']) == list else json_content['epoch']
         train, valid, test = {'epoch':train_epoch}, {'epoch':train_epoch}, {'epoch':test_epoch, 'latest':latest}
         if mode == 'train': train = {'epoch':train_epoch, 'runtime':':'.join(json_content['totaltime'].split('.')[:-1])}
+        
         for k, v in json_content.items():
             if k in ['epoch', 'runtime', 'totaltime', 'loss', 'confusion', 'val_loss', 'val_confusion']: continue
             if mode == 'train':
@@ -227,7 +234,9 @@ class ResultVisualization:
         # 0. SAVE FILE : self.output_dir / (self.name.extension or save_name.extension)
         save_name = save_name if save_name is not None else self.name
         save_name += f'.{extension}' 
-        save_path = self.output_dir / save_name
+        if str(save_name)[0] != '/': save_path = self.output_dir / save_name
+        else: save_path = Path(save_name)
+        if not save_path.parent.is_dir(): save_path.parent.mkdir(parents=True, exist_ok=True)
         
         writer=pd.ExcelWriter(save_path, engine='openpyxl')
         for sheet_name, df in self.df_dict.items():
@@ -241,7 +250,9 @@ class ResultVisualization:
         # by에는 optimizer, loss를 제외한 구분 특성을 입력해야 합니다.
         save_name = save_name if save_name is not None else self.name
         save_name += f'.{extension}' 
-        save_path = self.output_dir / save_name
+        if str(save_name)[0] != '/': save_path = self.output_dir / save_name
+        else: save_path = Path(save_name)
+        if not save_path.parent.is_dir(): save_path.parent.mkdir(parents=True, exist_ok=True)
         
         title = (by_metric.lower().capitalize() if by_metric_replace_str is None else by_metric_replace_str) + ' by '
         for idx, b in enumerate(by, 1):
