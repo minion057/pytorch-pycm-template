@@ -7,43 +7,37 @@ except:
     print(traceback.format_exc())
 
 from pycm import ConfusionMatrix as pycmCM
-
+from base import base_metric, base_class_metric
 
 """ Accuracy """
-def ACC(confusion_obj:pycmCM, classes=None, specific_class_idx=None):
-    if specific_class_idx is None: return confusion_obj.Overall_ACC
-    else:
-        classes = list(confusion_obj.classes)
-        score = confusion_obj.ACC[classes[specific_class_idx]]
-        return score if score != 'None' else 0.
+def ACC(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    return base_metric('ACC', confusion_obj, classes, positive_class_idx)
 def ACC_class(confusion_obj:pycmCM, classes=None):
-    if classes is not None and classes != list(confusion_obj.classes):
-        return {classes[class_idx]:score for class_idx, score in enumerate(confusion_obj.ACC.values())}
-    else: return confusion_obj.ACC
+    return base_class_metric('ACC', confusion_obj, classes)
 
 """ Sensitivity, hit rate, recall, or true positive rate """
-def TPR(confusion_obj:pycmCM, classes=None, specific_class_idx=None):
-    if specific_class_idx is None: # Returns the macro-average of True Positive Rate (TPR) across all classes.
-        return confusion_obj.TPR_Macro if confusion_obj.TPR_Macro != 'None' else 0.
-    else: # Returns the True Positive Rate (TPR) when a specific class is considered positive.
-        classes = list(confusion_obj.classes)
-        score = confusion_obj.TPR[classes[specific_class_idx]]
-        return score if score != 'None' else 0.
-
+def TPR(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    return base_metric('TPR', confusion_obj, classes, positive_class_idx)
 def TPR_class(confusion_obj:pycmCM, classes=None):
-    if classes is not None and list(classes) != list(confusion_obj.classes):
-        return {classes[class_idx]:score for class_idx, score in enumerate(confusion_obj.TPR.values())}
-    else: return confusion_obj.TPR
+    return base_class_metric('TPR', confusion_obj, classes)
 
 """ Specificity or true negative rate """
-def TNR(confusion_obj:pycmCM, classes=None, specific_class_idx=None):
-    if specific_class_idx is None: # Returns the macro-average of TNR across all classes.
-        return confusion_obj.TNR_Macro if confusion_obj.TNR_Macro != 'None' else 0.
-    else: # Returns the TNR when a specific class is considered positive.
-        classes = list(confusion_obj.classes)
-        score = confusion_obj.TNR[classes[specific_class_idx]]
-        return score if score != 'None' else 0.
+def TNR(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    return base_metric('TNR', confusion_obj, classes, positive_class_idx)
 def TNR_class(confusion_obj:pycmCM, classes=None):
-    if classes is not None and list(classes) != list(confusion_obj.classes):
-        return {classes[class_idx]:score for class_idx, score in enumerate(confusion_obj.TNR.values())}
-    else: return confusion_obj.TNR
+    return base_class_metric('TNR', confusion_obj, classes)
+    
+""" F1 Score """
+def F1(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    return base_metric('F1', confusion_obj, classes, positive_class_idx)
+def F1_class(confusion_obj:pycmCM, classes=None):
+    return base_class_metric('F1', confusion_obj, classes)
+    
+""" PPV, Precision or positive predictive value """
+def precision(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    return base_metric('PPV', confusion_obj, classes, positive_class_idx)
+def precision_class(confusion_obj:pycmCM, classes=None):
+    return base_class_metric('PPV', confusion_obj, classes)
+
+
+                  
