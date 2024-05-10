@@ -161,6 +161,6 @@ def FixedNegativeROC(label, prob, classes:list, negative_class_idx:int=0):
         new_legend.append(f'{classes[class_idx]} (Area = {crv.area()[class_idx]:.3f})')
     new_legend.append('y = x')
     roc_plot.legend(labels=new_legend, loc='upper left', bbox_to_anchor=(1, 1.02), ncol=1)
-        
+    roc_plot.figure.tight_layout(rect=[0, 0, 1, 1])
     return roc_plot.figure # plot_close()
 """ 2. Drawing a Fixed specificity ROC curve """

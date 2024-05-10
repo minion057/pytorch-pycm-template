@@ -76,17 +76,16 @@ class FixedSpecConfusionTracker:
         self.postive_classes = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx != self.negetive_class_idx}
         self.goal_score = goal_score 
         
-        self._data = pd.DataFrame(index=goal_score, columns=['confusion', 'threshold', 'fixed_score', 'refer_score', 'refer_loss', 'best'])
+        self._data = pd.DataFrame(index=goal_score, columns=['confusion', 'threshold', 'fixed_score', 'refer_score'])
         self.reset()
     
     def reset(self):
         self.actual_vector, self.probability_vector = None, None
         for key in self._data.index.values:
-            self._data['confusion'][key], self._data['best'][key] = None, False  
-            self._data['threshold'][key], self._data['fixed_score'][key], = 1., float(key)
-            self._data['refer_score'][key], self._data['refer_loss'][key] = None, np.inf
-        
-    def update(self, actual_vector, probability_vector, loss,
+            self._data['confusion'][key], self._data['threshold'][key] = None, 1.  
+            self._data['fixed_score'][key], self._data['refer_score'][key] = float(key), None
+    
+    def update(self, actual_vector, probability_vector,
                set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):
         # Setting up for use with `pycm` 
         if type(actual_vector[0]) in [list, np.ndarray]: 
@@ -110,10 +109,10 @@ class FixedSpecConfusionTracker:
             target_spec, closest_spec = round(goal, digit), None
             same_value_index  = np.where(np.around(spec, digit) == target_spec)[0]
             if len(same_value_index) == 0:
-                # print('Find the closest value')
                 closest_spec = spec[np.abs(spec - target_spec).argmin()]
                 same_value_index = np.where(spec == closest_spec)[0]
-            print()
+            
+            # Best Spec 기준: 동일한 Spec에서 가장 높은 tpr을 가진 threshold를 선택.
             best_idx = None
             for goal_index in same_value_index:
                 if best_idx is None: best_idx = goal_index                
@@ -122,20 +121,10 @@ class FixedSpecConfusionTracker:
                     if len(now_item_is_best) > len(self.classes)/2: best_idx = goal_index 
                 elif spec[best_idx] < spec[goal_index]: best_idx = goal_index 
             
-             # Evaluating for optimal performance by analyzing various metrics from the confusion matrix with predefined scores.
-            if self._data.refer_score[goal] is not None: # target_spec
-                refer_score = self._data.refer_score[goal]
-                if type(refer_score) == dict: refer_score = np.mean(list(refer_score.values()))
-                if refer_score == spec[best_idx]:
-                    if loss < self._data.refer_loss[goal]: self._data.best[goal] = True
-                elif refer_score < spec[best_idx]: self._data.best[goal] = True
-            elif closest_spec is None: self._data.best[goal] = True
-            
             best_confusion = self._createConfusionMatrixobj(actual_vector, probability_vector, crv.thresholds[best_idx])
             self._data.confusion[goal] = deepcopy(best_confusion)
             self._data.threshold[goal] = crv.thresholds[best_idx]
             self._data.refer_score[goal] = {class_idx:tpr[class_idx][best_idx] for class_idx in self.postive_classes.keys()}
-            self._data.refer_loss[goal] = deepcopy(loss)
             
             if img_update or set_title is not None or img_save_dir_path is not None:
                 confusion_plt = self.createConfusionMatrix(goal)
@@ -161,8 +150,6 @@ class FixedSpecConfusionTracker:
         return self._data.fixed_score[key]
     def get_refer_score(self, key):
         return self._data.refer_score[key]
-    def get_refer_loss(self, key):
-        return self._data.refer_loss[key]
     def result(self):
         result_data = deepcopy(self._data)
         for key in result_data.index.values:
