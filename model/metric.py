@@ -1,8 +1,8 @@
 import traceback
 try:
-    from .metric_custiom import *
+    from .metric_custom import *
 except:
-    print('Please check if "model/metric_custiom.py" exists, and if it does, add its path to sys.path.')
+    print('Please check if "model/metric_custom.py" exists, and if it does, add its path to sys.path.')
     print('If necessary, please create and write the file. If not necessary, please comment out this section.')
     print(traceback.format_exc())
 
