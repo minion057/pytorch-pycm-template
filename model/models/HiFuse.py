@@ -14,7 +14,7 @@ import torch.utils.checkpoint as checkpoint
 import numpy as np
 from typing import Optional
 
-from utils import change_kwargs
+from utils import change_kwargs, load_download_checkpoint # for pre-trained model
 
 def drop_path_f(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
@@ -791,17 +791,53 @@ class PatchMerging(nn.Module):
 
         return x
 
-def HiFuse_Tiny(num_classes:int, pretrained:bool=False, **kwargs):
-    if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
-    model = main_model(depths=(2, 2, 2, 2), conv_depths=(2, 2, 2, 2), num_classes=num_classes, **kwargs)
+
+
+def _change_model_num_class(model, num_classes):
+    model.conv_head = nn.Linear(model.conv_head.in_features, num_classes, bias=model.conv_head.bias.requires_grad)
+    return model
+def _change_model_in_chans(model, in_chans):
+    model.downsample_layers[0][0] = nn.Conv2d(in_chans, model.downsample_layers[0][0].out_channels, 
+                                              kernel_size=model.downsample_layers[0][0].kernel_size, 
+                                              stride=model.downsample_layers[0][0].stride)
+    model.patch_embed.proj = nn.Conv2d(in_chans, model.patch_embed.proj.out_channels, 
+                                        kernel_size=model.patch_embed.proj.kernel_size, 
+                                        stride=model.patch_embed.proj.stride)
     return model
 
-def HiFuse_Small(num_classes:int, pretrained:bool=False, **kwargs):
-    if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
-    model = main_model(depths=(2, 2, 6, 2), conv_depths=(2, 2, 6, 2), num_classes=num_classes, **kwargs)
+
+def HiFuse_Tiny(num_classes:int=1000, pretrained:bool=False, pretrained_path=None, **kwargs):
+    if pretrained: 
+        if pretrained_path is None: ValueError('Please provide the path where the pre-trained model was downloaded')
+        _, in_chans, kwargs = change_kwargs(**kwargs)
+    model = main_model(depths=(2, 2, 2, 2), conv_depths=(2, 2, 2, 2), num_classes=1000 if pretrained else num_classes, **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_download_checkpoint(pretrained_path))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
 
-def HiFuse_Base(num_classes:int, pretrained:bool=False, **kwargs):
-    if pretrained: _, in_chans, kwargs = change_kwargs(**kwargs)
-    model = main_model(depths=(2, 2, 18, 2), conv_depths=(2, 2, 18, 2), num_classes=num_classes, **kwargs)
+def HiFuse_Small(num_classes:int=1000, pretrained:bool=False, pretrained_path=None, **kwargs):
+    if pretrained: 
+        if pretrained_path is None: ValueError('Please provide the path where the pre-trained model was downloaded')
+        _, in_chans, kwargs = change_kwargs(**kwargs)
+    model = main_model(depths=(2, 2, 6, 2), conv_depths=(2, 2, 6, 2), num_classes=1000 if pretrained else num_classes, **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_download_checkpoint(pretrained_path))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
+    return model
+
+def HiFuse_Base(num_classes:int=1000, pretrained:bool=False, pretrained_path=None, **kwargs):
+    if pretrained: 
+        if pretrained_path is None: ValueError('Please provide the path where the pre-trained model was downloaded')
+        _, in_chans, kwargs = change_kwargs(**kwargs)
+    model = main_model(depths=(2, 2, 18, 2), conv_depths=(2, 2, 18, 2), num_classes=1000 if pretrained else num_classes, **kwargs)
+    
+    if pretrained:
+        model.load_state_dict(load_download_checkpoint(pretrained_path))
+        if num_classes is not None and num_classes != 1000: model = _change_model_num_class(model, num_classes)
+        if in_chans is not None and in_chans != 3: model = _change_model_in_chans(model, in_chans) 
     return model
