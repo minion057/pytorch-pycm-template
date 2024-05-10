@@ -37,8 +37,9 @@ class Trainer(BaseTrainer):
         self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
         self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
-        self.train_confusion = ConfusionTracker(*['confusion'], writer=self.writer, classes=self.classes)
-        self.valid_confusion = ConfusionTracker(*['confusion'], writer=self.writer, classes=self.classes)
+        self.confusion_key = 'confusion'
+        self.train_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
+        self.valid_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
 
         self.softmax = nn.Softmax(dim=0)
         self.preds_item_cnt = 5
@@ -51,6 +52,29 @@ class Trainer(BaseTrainer):
             
         # Clear the gradients of all optimized variables 
         self.optimizer.zero_grad()
+
+    def _curve_metrics(self, mode='training'):
+        for met in self.curve_metric_ftns:
+            if mode=='training':
+                actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
+                probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
+            else:
+                actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
+                probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
+            curve_fig = met(actual_vector, probability_vector, self.classes)
+            self.writer.add_figure(met.__name__, curve_fig)
+            if self.save_performance_plot: curve_fig.savefig(self.output_dir / f'{met.__name__}_{mode}.png', bbox_inches='tight')
+            
+    def _get_a_log(self, epoch):        
+        log = self.train_metrics.result()        
+        log_confusion = self.train_confusion.result()
+
+        if self.do_validation:
+            val_log, val_confusion = self._valid_epoch(epoch) # Validation Result
+            log.update(**{'val_'+k : v for k, v in val_log.items()})
+            log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
+        log.update(log_confusion)           
+        return log
     
     def _train_epoch(self, epoch):
         """
@@ -104,9 +128,9 @@ class Trainer(BaseTrainer):
             # 5-2. confusion matrix 
             confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
             if self.curve_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
-            self.train_confusion.update('confusion', confusion_content, img_update=False)
+            self.train_confusion.update(self.confusion_key, confusion_content, img_update=False)
             
-            confusion_obj = self.train_confusion.get_confusion_obj('confusion')
+            confusion_obj = self.train_confusion.get_confusion_obj(self.confusion_key)
             for met in self.metric_ftns:# pycm version
                 met_name_idx = self.metrics_class_index[met.__name__]
                 use_confusion_obj = deepcopy(confusion_obj)
@@ -132,7 +156,7 @@ class Trainer(BaseTrainer):
                 data_channel = self.prediction_images.shape[1]
                 preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())
                 preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
-                use_prob = self.train_confusion.get_probability_vector('confusion')[-len(preds):] if self.curve_metric_ftns is not None \
+                use_prob = self.train_confusion.get_probability_vector(self.confusion_key)[-len(preds):] if self.curve_metric_ftns is not None \
                            else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                 self.prediction_preds = [self.classes[lab] for lab in preds]
                 self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
@@ -140,40 +164,29 @@ class Trainer(BaseTrainer):
             if batch_idx == self.len_epoch: break
         
         if self.cfg_da is not None: hook.remove()
-        # 5-3-2. Upate the example of predtion and Projector
+        # 5-3-2. Update the curve plot and projector
         self.writer.set_step(epoch-1)
-        if self.curve_metric_ftns is not None:
-            for met in self.curve_metric_ftns:
-                curve_fig = met(self.train_confusion.get_actual_vector('confusion'),
-                                self.train_confusion.get_probability_vector('confusion'), self.classes)
-                self.writer.add_figure(met.__name__, curve_fig)
-                if self.save_performance_plot: curve_fig.savefig(self.output_dir / f'{met.__name__}_training.png', bbox_inches='tight')
+        if self.curve_metric_ftns is not None: self._curve_metrics(mode='training')
         if self.train_projector and epoch == 1: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
+        # 5-3-3. Upate the example of predtion
         if self.tensorboard_pred_plot:
-            self.writer.add_figure('Prediction',
-                                   plot_classes_preds(self.prediction_images, self.prediction_labels, self.prediction_preds, self.prediction_probs,
-                                                      one_channel = True if data_channel == 1 else False, return_plot=True))
+            self.writer.add_figure('Prediction', plot_classes_preds(self.prediction_images, self.prediction_labels, 
+                                                                    self.prediction_preds, self.prediction_probs,
+                                                                    one_channel = True if data_channel == 1 else False, return_plot=True))
         plot_close()
         self.prediction_images, self.prediction_labels = None, None
-        self.prediction_preds, self.prediction_probs = None, None
-
-        log = self.train_metrics.result()        
-        log_confusion = self.train_confusion.result()
-
-        if self.do_validation:
-            val_log, val_confusion = self._valid_epoch(epoch) # Validation Result
-            log.update(**{'val_'+k : v for k, v in val_log.items()})
-            log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
+        self.prediction_preds, self.prediction_probs = None, None   
         
+        # 6. Upate the lr scheduler
         if self.lr_scheduler is not None:
             self.writer.set_step(epoch-1)
             self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
             if self.lr_scheduler_name == 'ReduceLROnPlateau': self.lr_scheduler.step(val_log['loss'])
             else: self.lr_scheduler.step()
         
-        log.update(log_confusion)            
-        return log
-
+        # 7. setting result     
+        return self._get_a_log(epoch)
+    
     def _valid_epoch(self, epoch):
         """
         Validate after training an epoch
@@ -206,9 +219,9 @@ class Trainer(BaseTrainer):
                 # 4. Update the confusion matrix and input data
                 confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
                 if self.curve_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
-                self.valid_confusion.update('confusion', confusion_content, img_update=False)
+                self.valid_confusion.update(self.confusion_key, confusion_content, img_update=False)
                     
-                confusion_obj = self.valid_confusion.get_confusion_obj('confusion')
+                confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
                 for met in self.metric_ftns:# pycm version
                     met_name_idx = self.metrics_class_index[met.__name__]
                     use_confusion_obj = deepcopy(confusion_obj)
@@ -230,32 +243,27 @@ class Trainer(BaseTrainer):
                     data_channel = self.prediction_images.shape[1]
                     preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())
                     preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1  
-                    use_prob = self.valid_confusion.get_probability_vector('confusion')[-len(preds):] if self.curve_metric_ftns is not None \
+                    use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] if self.curve_metric_ftns is not None \
                                else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
                     
-        # 4-2. Upate the example of predtion
+        # 4-2. Update the curve plot and projector
         self.writer.set_step(epoch-1, 'valid')
-        if self.curve_metric_ftns is not None:
-            for met in self.curve_metric_ftns:
-                curve_fig = met(self.valid_confusion.get_actual_vector('confusion'),
-                                self.valid_confusion.get_probability_vector('confusion'), self.classes)
-                self.writer.add_figure(met.__name__, curve_fig)
-                if self.save_performance_plot: curve_fig.savefig(self.output_dir / f'{met.__name__}_validation.png', bbox_inches='tight')
-        if self.valid_projector and epoch == 1:            
-            self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
+        if self.curve_metric_ftns is not None: self._curve_metrics(mode='validation')
+        if self.valid_projector and epoch == 1: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
+        # 4-3. Upate the example of predtion
         if self.tensorboard_pred_plot:
-            self.writer.add_figure('Prediction',
-                                   plot_classes_preds(self.prediction_images, self.prediction_labels, self.prediction_preds, self.prediction_probs, 
-                                                      one_channel = True if data_channel == 1 else False, return_plot=True))
+            self.writer.add_figure('Prediction', plot_classes_preds(self.prediction_images, self.prediction_labels, 
+                                                                    self.prediction_preds, self.prediction_probs,
+                                                                    one_channel = True if data_channel == 1 else False, return_plot=True))
         plot_close()
         self.prediction_images, self.prediction_labels = None, None
-        self.prediction_preds, self.prediction_probs = None, None
+        self.prediction_preds, self.prediction_probs = None, None   
         
         # 5. Print the result
-        confusion_obj = self.valid_confusion.get_confusion_obj('confusion')
-        self.logger.debug(f'Valid Epoch: {epoch} [last batch] | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
+        confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
+        self.logger.debug(f'Valid Epoch: {epoch} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
         
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
