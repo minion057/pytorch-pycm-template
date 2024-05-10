@@ -24,12 +24,15 @@ tree -I "__pycache__" -I "saved" -I "__init__.py"
   │
   ├── base/ - abstract base classes
   │   ├── base_metric.py
+  │   ├── base_metric_ftns.py
+  │   ├── base_confusion.py
   │   ├── base_hook.py
   │   ├── base_model.py
   │   ├── base_raw_data_loader.py
   │   ├── base_split_data_loader.py
   │   ├── base_tester.py
-  │   └── base_trainer.py
+  │   ├── base_trainer.py
+  │   └── base_resultvisualization.py
   │
   ├── data_loader/ - anything about data loading goes here
   │   ├── DA - Please specify the folder for data augmentation management.
@@ -53,6 +56,7 @@ tree -I "__pycache__" -I "saved" -I "__init__.py"
   │   ├── model.py
   │   ├── optim.py
   │   ├── metric.py
+  │   ├── metric_custom.py
   │   ├── metric_curve_plot.py
   │   └── loss.py
   │
@@ -62,8 +66,13 @@ tree -I "__pycache__" -I "saved" -I "__init__.py"
   │   └── output/ - Optional. To save 1. model visualization image  2. performance plot at last epoch 3. metrics result per epoch
   │
   ├── runner/ - trainers and testers
-  │   ├── tester.py
-  │   └── trainer.py
+  │   ├── trainer.py
+  │   └── tester.py
+  │
+  ├── runfile/
+  │   ├── auto_process.sh
+  │   ├── trainer.py
+  │   └── tester.py
   │
   ├── logger/ - module for tensorboard visualization and logging
   │   ├── visualization.py

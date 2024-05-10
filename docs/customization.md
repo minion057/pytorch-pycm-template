@@ -219,7 +219,8 @@ Metric functions are located in 'model/metric.py'.
 
 You can monitor multiple metrics by providing a list in the configuration file, e.g.:
   ```json
-  "metrics": ["ACC", "ACC_class"],
+  "metrics": {"ACC":1, "ACC_class":null},
+  "curve_metrics": {"ROC":null},
   ```
 
 Additionally, if curve plots such as ROC are needed, please refer to 'model/metric_curve.py'. Here, ROC plots are implemented using `scikit-learn` to calculate macro and micro values. If simply class-wise ROC plots are needed, they can be easily implemented using [pycm](https://www.pycm.io/doc/#ROC-curve).
