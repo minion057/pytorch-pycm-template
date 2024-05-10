@@ -2,4 +2,5 @@
 # from .{Python file name located in the current file path} import *
 from .trainer import *
 from .tester import *
-from .tester_fixedROC import *
+from .trainer_fixedSpec import *
+from .tester_fixedSpec import *
