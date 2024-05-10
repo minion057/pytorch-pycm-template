@@ -1,5 +1,7 @@
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"  # Arrange GPU devices starting from 0
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import argparse
 import collections
@@ -9,7 +11,7 @@ import numpy as np
 from torchinfo import summary
 import model.model as module_arch
 
-import data_loader.npz_loaders as module_data
+import data_loader.mnist_data_loaders as module_data
 from torchvision import transforms
 import data_loader.transforms as module_transforms
 import model.loss as module_loss
@@ -26,18 +28,24 @@ def main(config):
     logger = config.get_logger('test')
 
     # setup data_loader instances
+    trsfm = None
     if 'trsfm' in config['data_loader']['args'].keys():
         tf_list = []
         for k, v in config['data_loader']['args']['trsfm'].items():
             if v is None: tf_list.append(getattr(module_transforms, k)())
             else: tf_list.append(getattr(module_transforms, k)(**v))
-        config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)  
-    config.config['data_loader']['args']['mode'] = ['test']
-    data_loader = config.init_obj('data_loader', module_data)
-    test_data_loader = data_loader.loaderdict['test'].dataloader
+        trsfm = transforms.Compose(tf_list) 
+    test_data_loader = getattr(module_data, config['data_loader']['type'])(
+        config['data_loader']['args']['data_dir'],
+        batch_size=config['data_loader']['args']['batch_size'],
+        shuffle=False,
+        validation_split=0.0,
+        training=False,
+        num_workers=config['data_loader']['args']['num_workers'],
+        trsfm=trsfm
+    )
 
     # build model architecture, then print to console
-    classes = test_data_loader.dataset.classes
     model = config.init_obj('arch', module_arch)
     
     # print the model infomation
@@ -57,12 +65,12 @@ def main(config):
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
-    metrics = [getattr(module_metric, met) for met in config['metrics']]
-    curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics']] if 'curve_metrics' in config.config.keys() else None
-
+    metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
+    curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics'].keys()] if 'curve_metrics' in config.config.keys() else None
+    
     tester = Tester(model, criterion, metrics, curve_metric,
                       config=config,
-                      classes=classes,
+                      classes=test_data_loader.classes,
                       device=device,
                       data_loader=test_data_loader)
 
