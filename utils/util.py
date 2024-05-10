@@ -94,6 +94,7 @@ def plot_imshow(img, one_channel=False):
         plt.imshow(np.transpose(npimg, (1, 2, 0)))
         
 def plot_classes_preds(images, labels, preds, probs, idx:int=5, one_channel:bool=False, return_plot:bool=False, show:bool=False):
+    plot_close()
     idx = idx if len(images) <= idx else len(images)
     fig = plt.figure(figsize=(3*idx, 5))
     for i in np.arange(idx):
@@ -105,12 +106,8 @@ def plot_classes_preds(images, labels, preds, probs, idx:int=5, one_channel:bool
     if show: plt.show()
     plot_close()
 
-def plot_ROC_curve(self, confusion, save:bool=False):
-    # fpr, tpr
-    self.ROC['FPR'].append(fpr)
-    self.ROC['TPR'].append
-
 def plot_confusion_matrix_1(confusion:list, classes:list, title:str=None, file_path=None, dpi:int=300, return_plot:bool=False, show:bool=False):
+    plot_close()
     disp = ConfusionMatrixDisplay(confusion_matrix=np.array(confusion), display_labels=np.array(classes))
     confusion_plt = disp.plot(cmap=plt.cm.binary)
     if title is not None: confusion_plt.ax_.set_title(title)
@@ -120,6 +117,7 @@ def plot_confusion_matrix_1(confusion:list, classes:list, title:str=None, file_p
     plot_close()
 
 def plot_confusion_matrix_N(confusion_list:list, classes:list, title:str, subtitle_list:list, file_path=None, dpi:int=300, show:bool=False):
+    plot_close()
     if len(confusion_list) <= 1: raise ValueError('If you have a confusion matrix, you can to use \'write_confusion_matrix_1\'.')
     figsize = (len(confusion_list)*3,5)
     f, axes = plt.subplots(1, len(confusion_list), figsize=figsize, sharey=True, sharex=True, tight_layout=True)
@@ -147,6 +145,7 @@ def plot_confusion_matrix_N(confusion_list:list, classes:list, title:str, subtit
     plot_close()
     
 def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=False):
+    plot_close()
     color_list = list(plt.cm.Set3.colors); del color_list[-4] # delete gray color
     color_list.extend(list(plt.cm.Pastel1.colors)); del color_list[-1]
     color_list.extend(list(plt.cm.Pastel2.colors)); del color_list[-1]
@@ -156,7 +155,7 @@ def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=
         if name in ['epoch', 'loss', 'val_loss', 'confusion', 'val_confusion']: continue
         if '_class' in name or 'time' in name: continue
         xticks.append(name)
-        values.append(score[0])
+        values.append(score[0] if type(score) == list else score)
     x = np.arange(len(xticks))
     if figsize is None: figsize = (len(x)*1.5, 5)
     plt.figure(figsize=figsize)
@@ -179,6 +178,7 @@ def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=
     plot_close()
 
 def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(15,5), show:bool=False):
+    plot_close()
     plt.figure(figsize=figsize)
 
     plt.subplot(1,2,1)
@@ -205,6 +205,7 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(15,5), show:boo
     plot_close()
     
 def show_mix_result(imgs, titles:list=['Original Data', 'Mix Data', 'Result'], cmap='viridis'):
+    plot_close()
     if len(imgs[0]) != len(titles): raise ValueError('The number of images and titles in a row must be the same.')
     nrow, ncol = len(imgs), len(titles)
     fig, axs = plt.subplots(nrows=nrow, ncols=ncol, squeeze=False, figsize=(5*ncol,3*nrow), tight_layout=True)
