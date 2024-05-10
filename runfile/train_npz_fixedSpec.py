@@ -1,5 +1,7 @@
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"  # Arrange GPU devices starting from 0
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import argparse
 import collections
@@ -19,7 +21,7 @@ import model.metric_curve_plot as module_curve_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
-from runner import Trainer
+from runner import FixedSpecTrainer as Trainer
 from utils import prepare_device, reset_device
 from utils import cal_model_parameters
 
@@ -62,7 +64,7 @@ def main(config):
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
     metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
-    curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics']] if 'curve_metrics' in config.config.keys() else None
+    curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics'].keys()] if 'curve_metrics' in config.config.keys() else None
     if curve_metric is None: print('curve_metric is not set.\n')
 
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler

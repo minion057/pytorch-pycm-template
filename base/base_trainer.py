@@ -32,7 +32,7 @@ class BaseTrainer:
         self.curve_metric_ftns = curve_metric_ftns
         self.optimizer = optimizer
         self.loss_fn_name = config['loss'] 
-        self.metrics_class_index = config['metrics'] if 'metrics' in self.config.keys() else None
+        self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
 
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']
@@ -56,7 +56,8 @@ class BaseTrainer:
 
         # Setting the save directory path
         self.checkpoint_dir = config.checkpoint_dir
-        self.output_dir = Path(config.output_dir)
+        self.output_dir = Path(config.output_dir) / 'training'
+        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
         self.output_metrics = self.output_dir / 'metrics.json'
 
         # setup visualization writer instance
@@ -74,11 +75,11 @@ class BaseTrainer:
         if config.resume is not None: self._resume_checkpoint(config.resume)
         
         # Sampling And DA
-        self.sampling = config['data_sampling'] if 'data_sampling' in self.config.keys() else None
+        self.sampling = config['data_sampling'] if 'data_sampling' in config.config.keys() else None
         if self.sampling is not None:
             self.sampling_type = str(self.sampling['type']).lower() # down or up
             self.sampling_name = str(self.sampling['name']).lower() # random, ...
-        self.cfg_da = config['data_augmentation'] if 'data_augmentation' in self.config.keys() else None
+        self.cfg_da = config['data_augmentation'] if 'data_augmentation' in config.config.keys() else None
         if self.cfg_da is not None:
             self.DA = str(self.cfg_da['type']).lower()
             self.DAargs, self.hookargs = self.cfg_da['args'], self.cfg_da['hook_args']
@@ -117,9 +118,13 @@ class BaseTrainer:
             # print logged informations to the screen
             self.logger.info('')
             self.logger.info('============ METRIC RESULT ============')
-            for key, value in log.items():
+            for idx, (key, value) in enumerate(log.items(), 1):
                 if '_class' in key or 'confusion' in key: continue
-                self.logger.info(f'    {str(key):15s}: {value}')
+                if type(value) == dict:
+                    self.logger.info(f'{idx}. {str(key):15s}')
+                    for i, (k, v) in enumerate(value.items(), 1):
+                        self.logger.info(f'\t{idx}.{i}. {str(k):15s}: {str(v):15s}')
+                else: self.logger.info(f'{idx}. {str(key):15s}: {value}')
             self.logger.info('============ METRIC RESULT ============')
             self.logger.info('')
 
@@ -154,7 +159,7 @@ class BaseTrainer:
         end = time.time()
         self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
 
-    def _save_checkpoint(self, epoch, save_best=False, filename='latest'):
+    def _save_checkpoint(self, epoch, save_best=False, filename='latest', message='Saving checkpoint'):
         """
         Saving checkpoints
 
@@ -175,11 +180,12 @@ class BaseTrainer:
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-        with open(str(self.checkpoint_dir / f'{filename}.txt'), "a") as f:
-            f.write(f'{filename}.pth -> epoch{epoch}\n')
+        if filename == 'latest':
+            with open(str(self.checkpoint_dir / f'{filename}.txt'), "a") as f:
+                f.write(f'{filename}.pth -> epoch{epoch}\n')
         filename = str(self.checkpoint_dir / f'{filename}.pth') #'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
-        self.logger.info("Saving checkpoint: {} ...{}".format(filename, '' if save_best else '\n'))
+        self.logger.info("{}: {} ...{}".format(message, filename, '' if save_best else '\n'))
         if save_best:
             best_path = str(self.checkpoint_dir / 'model_best.pth')
             torch.save(state, best_path)
@@ -241,7 +247,7 @@ class BaseTrainer:
         if self.save_performance_plot: plot_performance_N(result, self.output_dir/'metrics_graphs.png')
 
     def _save_tensorboard(self, log):
-        # Save the value per epoch. And save the value of validation.
+        # Save the value per epoch. And save the value of training andvalidation.
         if self.tensorboard:
             self.writer.set_step(log['epoch']-1)
             for key, value in log.items():

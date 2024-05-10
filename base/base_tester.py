@@ -30,13 +30,11 @@ class BaseTester:
         self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
 
         self.test_epoch = 1
-        
+
         # Setting the save directory path
         self.checkpoint_dir = config.checkpoint_dir
-        self.output_dir = Path(config.output_dir) / 'test'
-        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
-        self.output_metrics = self.output_dir / 'metrics-test.json'
-
+        self.output_dir = Path(config.output_dir) / 'test' / f'epoch{self.test_epoch}'
+        
         # setup visualization writer instance
         # log_dir is set to "[save_dir]/log/[name]/start_time" in advance when parsing in the config file.
         cfg_trainer = config['trainer']
@@ -46,8 +44,15 @@ class BaseTester:
         self.tensorboard_pred_plot = cfg_trainer['tensorboard_pred_plot']
         self.save_performance_plot = cfg_trainer['save_performance_plot']
         
-        if config.resume is not None: self._resume_checkpoint(config.resume)
+        if config.resume is not None:
+            self._resume_checkpoint(config.resume)
+            self.output_dir = Path(config.output_dir) / 'test' / f'epoch{self.test_epoch}'
         else: self.logger.warning("Warning: Pre-trained model is not use.\n")
+        
+        # Setting the save directory path
+        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
+        self.output_metrics = self.output_dir / 'metrics-test.json'
+        
 
     @abstractmethod
     def _test(self):
@@ -77,9 +82,13 @@ class BaseTester:
         # print logged informations to the screen
         self.logger.info('')
         self.logger.info('============ METRIC RESULT ============')
-        for key, value in log.items():
+        for idx, (key, value) in enumerate(log.items(), 1):
             if '_class' in key or 'confusion' in key: continue
-            self.logger.info(f'    {str(key):15s}: {value}')
+            if type(value) == dict:
+                self.logger.info(f'{idx}. {str(key):15s}')
+                for i, (k, v) in enumerate(value.items(), 1):
+                    self.logger.info(f'\t{idx}.{i}. {str(k):15s}: {str(v):15s}')
+            else: self.logger.info(f'{idx}. {str(key):15s}: {value}')
         self.logger.info('============ METRIC RESULT ============')
         self.logger.info('')     
 
@@ -97,7 +106,7 @@ class BaseTester:
         checkpoint = torch.load(resume_path, map_location=self.device)
             
         self.test_epoch = checkpoint['epoch']
-        self.output_metrics = self.output_dir / f'metrics-test-epoch{self.test_epoch}.json'
+        self.output_metrics = self.output_dir / f'metrics-test.json'
 
         # load architecture params from checkpoint.
         if checkpoint['config']['arch'] != self.config['arch']:
@@ -111,22 +120,19 @@ class BaseTester:
 
     def _save_output(self, log):
         # Save the result of metrics.
-        result = {}
-        for k, v in log.items():
-            result[k] = [v]
-        write_dict2json(result, self.output_metrics)
+        write_dict2json(log, self.output_metrics)
 
         # Save the result of confusion matrix image.
         plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Test Data', 
-                                    self.output_dir/f'confusion_matrix_test-epoch{self.test_epoch}.png')
+                                    self.output_dir/f'confusion_matrix_test.png')
 
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot:
-            file_name = f'metrics_graphs_test-epoch{self.test_epoch}.png'
-            plot_performance_1(result, self.output_dir/file_name)
+            file_name = f'metrics_graphs_test.png'
+            plot_performance_1(log, self.output_dir/file_name)
 
     def _save_tensorboard(self, log):
-        # Save the value per epoch. And save the value of validation.
+        # Save the value per epoch. And save the value of test.
         if self.tensorboard:
             self.writer.set_step(self.test_epoch, 'test')
             for key, value in log.items():

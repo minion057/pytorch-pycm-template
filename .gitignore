@@ -15,9 +15,6 @@ config/*
 # Test dir
 experiment/*
 # Custom files
-model/metric_custiom.py
-runner/*fix*.py
-*fix*.py
 *imagenet*.py
 
 .ipynb_checkpoints

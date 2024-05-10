@@ -77,10 +77,15 @@
     "metrics": {                       // list of metrics to evaluate using pycm object
         "ACC": null,                   // When calculating average metrics across all classes, it is null.
         "TPR": 1                       // When calculating metrics for a specific class, it is currently set to class 1 as an example.
+    ,
+    "curve_metrics":{                  // list of curve metrics to evaluate using scikit-learn
+        "ROC": null,                   // Drawing a typical ROC curve for each class and using both micro and macro averaging methods.
+        "FixedNegativeROC":{           // Calculating metrics based on a fixed goal (fixed_goal). Additionally, ROC curves will be drawn based on the class specified as negative.
+            "save_dir": "fixedSpec",
+            "negative_class_idx": 0,
+            "fixed_goal": [0.95, 0.97, 0.99]
+        }
     },
-    "curve_metrics":[                  // list of curve metrics to evaluate using scikit-learn
-        "ROC"  
-    ],
     "lr_scheduler": {                  // If you need a fixed learning rate, delete that part.
         "type": "StepLR",              // learning rate scheduler
         "args": {
@@ -171,9 +176,14 @@
         "ACC": null,                     // When calculating average metrics across all classes, it is null.
         "TPR": 1                         // When calculating metrics for a specific class, it is currently set to class 1 as an example.
     },
-    "curve_metrics":[                    // list of curve metrics to evaluate using scikit-learn
-        "ROC"  
-    ], 
+    "curve_metrics":{                    // list of curve metrics to evaluate using scikit-learn
+        "ROC": null,                     // Drawing a typical ROC curve for each class and using both micro and macro averaging methods.
+        "FixedNegativeROC":{             // Calculating metrics based on a fixed goal (fixed_goal). Additionally, ROC curves will be drawn based on the class specified as negative.
+            "save_dir": "fixedSpec",
+            "negative_class_idx": 0,
+            "fixed_goal": [0.95, 0.97, 0.99]
+        }
+    }, 
     "lr_scheduler": {                    // If you need a fixed learning rate, delete that part.
         "type": "StepLR",                // learning rate scheduler
         "args": {
