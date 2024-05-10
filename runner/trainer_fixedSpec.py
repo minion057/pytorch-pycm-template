@@ -118,13 +118,13 @@ class FixedSpecTrainer(Trainer):
         self.logger.info('')
         save_model_name = f'model_best_fixedSpec'
         message = 'Saving current best FixedSpec model'
+        FixedNegativeROC = self.train_FixedNegativeROC if self.do_validation else self.valid_FixedNegativeROC
         if self.threshold is None:
             self.threshold = {}
             for goal in self.FixedNegativeROC['goal_score']:
-                self.threshold[goal] = self.train_FixedNegativeROC.get_threshold(goal)
+                self.threshold[goal] = FixedNegativeROC.get_threshold(goal)
                 self._save_checkpoint(epoch, filename=f'{save_model_name}_{goal*100:.0f}', message=message)
         else:
-            FixedNegativeROC = self.train_FixedNegativeROC if self.do_validation else self.valid_FixedNegativeROC
             for goal in self.FixedNegativeROC['goal_score']:
                 if self.threshold[goal] < FixedNegativeROC.get_threshold(goal):
                     self.threshold[goal] = FixedNegativeROC.get_threshold(goal)
