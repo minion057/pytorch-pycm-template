@@ -5,11 +5,11 @@ def base_metric(ftns_name, confusion_obj:pycmCM, classes=None, positive_class_id
     use_confusion_obj = deepcopy(confusion_obj)
     if positive_class_idx is None:
         metric_name = f'{ftns_name}_Macro' if ftns_name != 'ACC' else 'Overall_ACC'
-        return eval(f'use_confusion_obj.{metric_name}')
+        score = eval(f'use_confusion_obj.{metric_name}')
     else:
         classes = list(use_confusion_obj.classes)
         score = eval(f'use_confusion_obj.{ftns_name}[classes[positive_class_idx]]')
-        return score if score != 'None' else 0.
+    return score if score != 'None' else 0.
     
 def base_class_metric(ftns_name, confusion_obj:pycmCM, classes=None):
     use_confusion_obj = deepcopy(confusion_obj)

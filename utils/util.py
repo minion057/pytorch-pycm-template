@@ -153,7 +153,7 @@ def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=
     xticks, values = [], []    
     for name, score in logs.items():
         if name in ['epoch', 'loss', 'val_loss', 'confusion', 'val_confusion']: continue
-        if '_class' in name or 'time' in name: continue
+        if '_class' in name or 'time' in name or 'auc' in name: continue
         xticks.append(name)
         values.append(score[0] if type(score) == list else score)
     x = np.arange(len(xticks))
@@ -181,7 +181,7 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(15,5), show:boo
     plot_close()
     plt.figure(figsize=figsize)
 
-    plt.subplot(1,2,1)
+    plt.subplot(1,3,1)
     plt.title('Loss'); plt.xlabel('Epochs'); plt.ylabel('Loss')
     plt.plot(logs['epoch'], logs['loss'], label='Loss')
     if 'val_loss' in list(logs.keys()): plt.plot(logs['epoch'], logs['val_loss'], label = 'Val_Loss')
@@ -189,13 +189,13 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(15,5), show:boo
     if logs['epoch'][0]!=len(logs['epoch']): plt.xlim([logs['epoch'][0],len(logs['epoch'])])
     if len(logs['epoch']) <= 10: plt.xticks(logs['epoch'])
     
-    plt.subplot(1,2,2)
+    plt.subplot(1,3,2)
     plt.title('Metrics'); plt.xlabel('Epochs'); plt.ylabel('Score')
     for name, score in logs.items():
         if name in ['epoch', 'loss', 'val_loss', 'confusion', 'val_confusion']: continue
-        if '_class' in name or 'time' in name: continue
+        if '_class' in name or 'time' in name or 'auc' in name: continue
         plt.plot(logs['epoch'], score, label=str(name))
-    plt.legend(loc='lower left', bbox_to_anchor=(0,1.15,1,0.2), ncol=4, mode='expand')
+    plt.legend(loc='lower left', bbox_to_anchor=(0,1.15,1,0.2), ncol=3, mode='expand')
     if logs['epoch'][0]!=len(logs['epoch']): plt.xlim([logs['epoch'][0],len(logs['epoch'])])
     if len(logs['epoch']) <= 10: plt.xticks(logs['epoch'])
         
