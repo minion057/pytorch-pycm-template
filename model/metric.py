@@ -9,6 +9,9 @@ except:
 from pycm import ConfusionMatrix as pycmCM
 from base import base_metric, base_class_metric
 
+""" All metrics use the one-vs-rest strategy. """
+
+
 """ Accuracy """
 def ACC(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     return base_metric('ACC', confusion_obj, classes, positive_class_idx)
@@ -38,6 +41,10 @@ def precision(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     return base_metric('PPV', confusion_obj, classes, positive_class_idx)
 def precision_class(confusion_obj:pycmCM, classes=None):
     return base_class_metric('PPV', confusion_obj, classes)
-
+    
+""" AUC (Area under the ROC curve) """
+def AUC(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    if positive_class_idx is None: raise ValueError('AUC requires positive_class_idx.')
+    return base_metric('AUC', confusion_obj, classes, positive_class_idx)
 
                   
