@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 
 class ResultVisualization:
-    def __init__(self, parent_dir, result_name, test_dirname:str='test', test_filename:str='metrics', test_file_addtional_name:str='test'):
+    def __init__(self, parent_dir, result_name,
+                 test_dirname:str='test', test_filename:str='metrics', test_file_addtional_name:str='test',
+                 positive_class_name=None):
         parent_dir = Path(parent_dir)
         self.name = result_name
         self.output_dir = parent_dir / 'output' / self.name
@@ -28,6 +30,16 @@ class ResultVisualization:
             with open(json_path, 'r') as j:
                 json_content = json.load(j)
         except Exception as inst: print(inst) 
+        
+        # 나중에 수정
+        if 'auc' in json_content.keys(): 
+            if positive_class_name is not None:
+                json_content['auc']=json_content['auc'][positive_class_name]
+                if 'val_auc' in json_content.keys(): json_content['val_auc']=json_content['val_auc'][positive_class_name]
+            else: 
+                print('Warning: The AUC scores from the training or validation dataset exist, but there are no positive classes set up to view the scores.')
+                del json_content['auc']
+                if 'val_auc' in json_content.keys(): del json_content['val_auc']
         return json_content
     
     def _get_a_category_info(self):
@@ -80,8 +92,9 @@ class ResultVisualization:
                     run_id = metrics_cate.split('-')[-1]
                     if run_cate not in metrics_dict[category][model].keys(): metrics_dict[category][model][run_cate] = {}
                     
-                    # 훈련의 output을 가져온다.
-                    train_json = sorted(metrics_path.glob('metrics*.json'))
+                    # 훈련의 output을 가져온다.  
+                    train_json = sorted((metrics_path).glob('metrics*.json'))             
+                    if len(train_json) == 0: train_json = sorted((metrics_path/'training').glob('metrics*.json'))
                     if len(train_json) != 1: raise ValueError('The JSON file containing the training results could not be found.')
                     else: train_json = train_json[-1]
                         
@@ -95,12 +108,13 @@ class ResultVisualization:
                         latest = int(latest)
                     
                     # 테스트 정보를 모두 가져온다.
-                    test_json = sorted((metrics_path/self.test_dirname).glob(f'**/{self.test_filename}*.json'))
+                    test_json = sorted((metrics_path/'test').glob(f'**/*{self.test_dirname}*/*{self.test_filename}*.json'))                    
                     if len(test_json) >= 1:
                         test_epochs = []
                         for t in test_json:
-                            test_epoch = str(t).split(self.test_dirname)[-1].split('epoch')[-1].replace('/metrics-test', '').replace('.json', '')
-                            test_epoch = test_epoch.split('_')[0]
+                            test_epoch = str(t).split('epoch')[-1].split('/')[0]
+                            # test_epoch = str(t).split(self.test_dirname)[-1].split('epoch')[-1].replace('/metrics-test', '').replace('.json', '')
+                            # test_epoch = test_epoch.split('_')[0]
                             if not test_epoch.isnumeric(): raise ValueError(f'Warring: The testing epoch is unknown. -> {t.name}')
                             test_epochs.append(int(test_epoch))
                         use_test_json = OrderedDict()
@@ -166,7 +180,7 @@ class ResultVisualization:
                 for run_cate, run_dict in model_dict.items():
                     for run_id, run_json in run_dict.items():
                         # 0. get a config
-                        basic_data = self._read_df_config(str(run_json['train']).replace('output', 'models').replace('metrics.json', 'config.json'))
+                        basic_data = self._read_df_config(str(run_json['train']).replace('output', 'models').replace('metrics.json', 'config.json').replace('/training', ''))
                         basic_data.insert(0, run_id)
                         # 1. get a train
                         tr, val, _ = self._read_df_result(run_json['train'])
@@ -201,7 +215,7 @@ class ResultVisualization:
             if mode == 'train':
                 if 'val' in k: valid[k.split('val_')[-1]] = v[-1]
                 else: train[k] = v[-1]
-            else: test[k] = v[-1]
+            else: test[k] = v
         return train, valid, test
 
     def _read_df_config(self, json_path):
