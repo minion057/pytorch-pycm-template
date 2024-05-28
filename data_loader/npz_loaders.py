@@ -16,7 +16,7 @@ class NPZDataset(BaseSplitDataset):
                 # transforms.Normalize((0.5, ), (0.5, )) # Grayscale
             ])
         super().__init__(dataset_path, mode, trsfm)
-        self.data, self.labels, self.classes = self._load_data_list(self.init_kwargs['dataset_path'])
+        self.data, self.labels, self.classes, self.data_paths, self.paths = self._load_data_list(self.init_kwargs['dataset_path'])
     
     def __getitem__(self, index):
         """
@@ -39,13 +39,18 @@ class NPZDataset(BaseSplitDataset):
         with np.load(_path, allow_pickle=True) as file:
             classes = file['class_names']
             data, labels = None, None
+            data_paths, paths = None, None
             for k in [k for k in file.files if self.init_kwargs['mode'] in k]:
                 if 'x' in k or 'data' in k: data = file[k]
                 elif 'y' in k or 'label' in k: labels = file[k]
+                elif 'path' in k: data_paths = file[k]
+            
             if data is None or labels is None:
                 raise Exception(f'Only data and labels should exist. Currently found values:{keys}')
+            if data_paths is not None: paths = file['paths']
+            else: print('Warning: No data path information available.')
         labels = torch.from_numpy(labels)
-        return data, labels, classes
+        return data, labels, classes, data_paths, paths
 
 class NPZDataLoader():
     def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):
