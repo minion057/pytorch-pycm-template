@@ -17,6 +17,7 @@ class ResultVisualization:
         self.test_dirname = test_dirname
         self.test_filename = test_filename
         self.test_file_addtional_name = test_file_addtional_name
+        self.positive_class_name = positive_class_name
         self.sheet_list = ['training', 'validation', 'test']
         
         # output 중, metric.json 경로 정보 가져오기
@@ -33,9 +34,9 @@ class ResultVisualization:
         
         # 나중에 수정
         if 'auc' in json_content.keys(): 
-            if positive_class_name is not None:
-                json_content['auc']=json_content['auc'][positive_class_name]
-                if 'val_auc' in json_content.keys(): json_content['val_auc']=json_content['val_auc'][positive_class_name]
+            if self.positive_class_name is not None:
+                json_content['auc']=json_content['auc'][self.positive_class_name]
+                if 'val_auc' in json_content.keys(): json_content['val_auc']=json_content['val_auc'][self.positive_class_name]
             else: 
                 print('Warning: The AUC scores from the training or validation dataset exist, but there are no positive classes set up to view the scores.')
                 del json_content['auc']
