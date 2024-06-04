@@ -9,16 +9,20 @@ from utils import read_json, write_json
 import shutil
 
 class ConfigParser:
-    def __init__(self, config, resume=None, modification=None, run_id=None, test_mode=False):
-        """
-        class to parse configuration json file. Handles hyperparameters for training, initializations of modules, checkpoint saving
-        and logging module.
-        :param config: Dict containing configurations, hyperparameters for training. contents of `config.json` file for example.
-        :param resume: String, path to the checkpoint being loaded.
-        :param modification: Dict keychain:value, specifying position values to be replaced from config dict.
-        :param run_id: Unique Identifier for training processes. Used to save checkpoints and training log. Timestamp is being used as default
+    def __init__(self, config, resume=None, modification=None, run_id=None, test_mode=False, processor_cores=None):
+        """ Class to parse configuration json file.
+            Handles hyperparameters for training, initializations of modules, checkpoint saving and logging module.
+        
+        Args:
+            config: (str) Dict containing configurations, hyperparameters for training. contents of `config.json` file for example.
+            resume: (str) String, path to the checkpoint being loaded.
+            modification: (list) Dict keychain:value, specifying position values to be replaced from config dict.
+            run_id: (str) Unique Identifier for training processes. Used to save checkpoints and training log. Timestamp is being used as default
+            test_mode: (bool) test mode or not.        
+            processor_cores: (int) number of processor cores.
         """
         # load config file and apply modification
+        self.processor_cores = processor_cores
         self._config = _update_config(config, modification)
         self.resume = resume
         resume_epoch = None if resume is None else Path(resume).name.split("-")[-1].split(".pth")[0] # best or int
@@ -75,7 +79,8 @@ class ConfigParser:
         for opt in options:
             args.add_argument(*opt.flags, default=None, type=opt.type)
         if not isinstance(args, tuple):
-            args = args.parse_args()
+            try: args = args.parse_args()
+            except: args = args.parse_args(args=[]) # for testing with jupyter lab
 
         if args.device is not None:
             os.environ["CUDA_VISIBLE_DEVICES"] = args.device
@@ -96,7 +101,7 @@ class ConfigParser:
 
         # parse custom cli options into dictionary
         modification = {opt.target : getattr(args, _get_opt_name(opt.flags)) for opt in options}
-        return cls(config, resume, modification, run_id, args.test)
+        return cls(config, resume, modification, run_id, args.test, args.core)
 
     def init_obj(self, name, module, *args, **kwargs):
         """
