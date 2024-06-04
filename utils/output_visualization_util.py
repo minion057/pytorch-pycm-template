@@ -2,10 +2,12 @@ from copy import deepcopy
 from base.base_resultvisualization import ResultVisualization
 
 class ResultBestVisualization(ResultVisualization):
-    def __init__(self, parent_dir, result_name, test_dirname:str='test', test_filename:str='metrics', test_file_addtional_name:str='test',
+    def __init__(self, parent_dir, result_name, 
+                 test_dirname:str='test', test_filename:str='metrics', 
+                 test_file_addtional_name:str='test', positive_class_name=None,
                  best_metric=None, comparison_metric=None, threshold:float=0.5):
         if best_metric is None: raise ValueError('best_metric is required.')
-        super().__init__(parent_dir, result_name, test_dirname, test_filename, test_file_addtional_name)
+        super().__init__(parent_dir, result_name, test_dirname, test_filename, test_file_addtional_name, positive_class_name)
         self.best_metric = best_metric
         self.comparison_metric = comparison_metric
         self.threshold = threshold

@@ -6,7 +6,7 @@ from abc import abstractmethod
 from logger import TensorboardWriter
 
 from pathlib import Path
-from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, plot_close
+from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 import time
 import datetime
@@ -145,7 +145,7 @@ class BaseTester:
             
             # 3. Confusion Matrix
             self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['confusion'], self.classes, return_plot=True))
-            plot_close()
+            close_all_plots()
 
     def _setting_time(self, start, end):        
         runtime = str(datetime.timedelta(seconds=(end - start)))

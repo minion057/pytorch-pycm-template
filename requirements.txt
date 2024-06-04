@@ -12,4 +12,4 @@ pandas==2.1
 tqdm
 pycm==4.0
 scikit-learn
-
+torchcam

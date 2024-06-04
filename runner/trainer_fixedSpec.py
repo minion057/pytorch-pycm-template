@@ -2,7 +2,7 @@ from .trainer import Trainer
 from base import FixedSpecConfusionTracker
 from copy import deepcopy
 from pathlib import Path
-from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, plot_close
+from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
 import numpy as np
 
 class FixedSpecTrainer(Trainer):
@@ -199,7 +199,7 @@ class FixedSpecTrainer(Trainer):
             # Save the reuslt of metrics graphs.
             save_dir = self.output_dir if key == self.original_result_name else self.FixedNegativeROC['output_dir']
             if self.save_performance_plot: plot_performance_N(result, save_dir/f'metrics_graphs_{key}.png')
-            plot_close()
+            close_all_plots()
             
     def _save_tensorboard(self, log):
         '''
@@ -253,4 +253,4 @@ class FixedSpecTrainer(Trainer):
                     if 'val_confusion' in value.keys():
                         self.writer.set_step(log['epoch']-1, f'valid_{key}')
                         self.writer.add_figure(tag, plot_confusion_matrix_1(value['val_confusion'], self.classes, return_plot=True))
-                    plot_close()
+                    close_all_plots()
