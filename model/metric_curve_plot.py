@@ -1,12 +1,11 @@
 from sklearn.metrics import RocCurveDisplay
 from sklearn.preprocessing import LabelBinarizer, OneHotEncoder
 from sklearn import metrics
-
 from pycm import ROCCurve
 
-from itertools import cycle
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from utils import get_color_cycle
 import numpy as np
 from copy import deepcopy
 import warnings
@@ -37,11 +36,6 @@ def onehot_encoding(label, classes):
     else: label_onehot = np.array(label)
     return label_onehot
 
-def colors():
-    colors = list(plt.cm.Set3.colors); del colors[-4] # delete gray color
-    colors.extend(list(plt.cm.Pastel1.colors)); del colors[-1]
-    colors.extend(list(plt.cm.Pastel2.colors)); del colors[-1]
-    return cycle(colors)
 
 def ROC(label, prob, classes:list, specific_class_idx=None):
     fpr, tpr, roc_auc = dict(), dict(), dict()
@@ -96,7 +90,7 @@ def ROC(label, prob, classes:list, specific_class_idx=None):
     
     # To find the best point, uncomment the relevant section and use it.
     # marker_list = cycle([k for k in Line2D.markers.keys() if k not in ['None', 'none', ' ', '']])
-    # for (key, best_idx), marker, color in zip(best_threshold_idx.items(), marker_list, colors()):
+    # for (key, best_idx), marker, color in zip(best_threshold_idx.items(), marker_list, get_color_cycle()):
     #     best_sen = tpr[key][best_idx]
     #     best_str = f'sensitivity = {best_sen:.3f}'
     #     if key not in ['macro', 'micro']:
@@ -109,14 +103,14 @@ def ROC(label, prob, classes:list, specific_class_idx=None):
     
     ax.legend(loc='upper left', bbox_to_anchor=(1, 1.02), ncol=1) # ,mode='expand', borderaxespad=0.05
     fig.tight_layout(rect=[0, 0, 1, 1])
-    return ax.figure # plot_close()
+    return ax.figure # close_all_plots()
 
 
 def ROC_class(label, prob, classes:list, specific_class_idx=None):
     label_onehot = onehot_encoding(label, classes)       
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot([0,1],[0,1], label='y=x', color='lightgray', linestyle="--")
-    for class_id, color in zip(range(len(classes)), colors()):
+    for class_id, color in zip(range(len(classes)), get_color_cycle()):
         RocCurveDisplay.from_predictions(
             label_onehot[:, class_id],
             prob[:, class_id],
@@ -130,7 +124,7 @@ def ROC_class(label, prob, classes:list, specific_class_idx=None):
         ylabel="True Positive Rate",
         title="ROC Curve",
     )
-    return fig, ax     # plot_close()
+    return fig, ax     # close_all_plots()
 """ 1. Drawing a typical ROC curve """
 
 """ 2. Drawing a Fixed specificity ROC curve """
@@ -162,5 +156,5 @@ def FixedNegativeROC(label, prob, classes:list, negative_class_idx:int=0):
     new_legend.append('y = x')
     roc_plot.legend(labels=new_legend, loc='upper left', bbox_to_anchor=(1, 1.02), ncol=1)
     roc_plot.figure.tight_layout(rect=[0, 0, 1, 1])
-    return roc_plot.figure # plot_close()
+    return roc_plot.figure # close_all_plots()
 """ 2. Drawing a Fixed specificity ROC curve """

@@ -1,7 +1,7 @@
 from .tester import Tester
 from base import FixedSpecConfusionTracker
 from copy import deepcopy
-from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, plot_close
+from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class FixedSpecTester(Tester):
     """
@@ -129,7 +129,7 @@ class FixedSpecTester(Tester):
             save_dir = self.output_dir if key == self.original_result_name else self.FixedNegativeROC['output_dir']
             if self.save_performance_plot: plot_performance_1(result, save_dir/f'metrics_graphs_{key}.png')
             
-            plot_close()
+            close_all_plots()
             
     def _save_tensorboard(self, log):
         if self.tensorboard:
@@ -151,4 +151,4 @@ class FixedSpecTester(Tester):
                     # 3. Confusion Matrix
                     self.writer.set_step(self.test_epoch, f'{self.wirter_mode}_{key}')
                     self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(value['confusion'], self.classes, return_plot=True))
-                    plot_close()
+                    close_all_plots()

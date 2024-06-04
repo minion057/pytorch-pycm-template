@@ -8,7 +8,7 @@ from logger import TensorboardWriter
 from copy import deepcopy
 
 from pathlib import Path
-from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, plot_close
+from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
 import model.metric_curve_plot as module_curve_metric
 
 import time
@@ -272,7 +272,7 @@ class BaseTrainer:
             if 'val_confusion' in log.keys():
                 self.writer.set_step(log['epoch']-1, 'valid')
                 self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['val_confusion'], self.classes, return_plot=True))
-            plot_close()
+            close_all_plots()
         
     def _save_runtime(self, runtime:str):
         if not self.output_metrics.is_file(): raise ValueError('Not found output file.')

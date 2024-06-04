@@ -2,7 +2,7 @@ from base import BaseHook
 
 import numpy as np
 import torch
-from utils import show_mix_result, plot_close
+from utils import show_mix_result, close_all_plots
 
 class CutMix(BaseHook):
     def __init__(self, beta:float=0.1, prob:float=0.5, writer=None):
@@ -60,7 +60,7 @@ class CutMix(BaseHook):
                                  mix_data[idx, 0, bbox_H1:bbox_H2, bbox_W1:bbox_W2]])
             cut_data = torch.as_tensor(np.array(cut_data))
             self.writer.add_figure(f'input_{self.type}', show_mix_result(cut_data))
-            plot_close()
+            close_all_plots()
         return mix_data
 
     def _rand_bbox(self, H, W, lam): # for mix methods

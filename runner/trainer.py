@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTrainer, MetricTracker, ConfusionTracker
-from utils import inf_loop, tb_projector_resize, plot_classes_preds, plot_close
+from utils import inf_loop, tb_projector_resize, plot_classes_preds, close_all_plots
 from utils import register_forward_hook_layer
 import numpy as np
 from copy import deepcopy
@@ -173,7 +173,7 @@ class Trainer(BaseTrainer):
             self.writer.add_figure('Prediction', plot_classes_preds(self.prediction_images, self.prediction_labels, 
                                                                     self.prediction_preds, self.prediction_probs,
                                                                     one_channel = True if data_channel == 1 else False, return_plot=True))
-        plot_close()
+        close_all_plots()
         self.prediction_images, self.prediction_labels = None, None
         self.prediction_preds, self.prediction_probs = None, None   
         
@@ -257,7 +257,7 @@ class Trainer(BaseTrainer):
             self.writer.add_figure('Prediction', plot_classes_preds(self.prediction_images, self.prediction_labels, 
                                                                     self.prediction_preds, self.prediction_probs,
                                                                     one_channel = True if data_channel == 1 else False, return_plot=True))
-        plot_close()
+        close_all_plots()
         self.prediction_images, self.prediction_labels = None, None
         self.prediction_preds, self.prediction_probs = None, None   
         

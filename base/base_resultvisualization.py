@@ -240,7 +240,7 @@ class ResultVisualization:
 
     
     # 변환한 dataframe을 기반으로 시각화 출력물 저장하기
-    def _plot_close(self):    
+    def _close_all_plots(self):    
         plt.cla()   # clear the current axes
         plt.clf()   # clear the current figure
         plt.close() # closes the current figure
@@ -329,5 +329,5 @@ class ResultVisualization:
         
         # 그래프 보여주기
         if show_result: plt.show()
-        self._plot_close()
+        self._close_all_plots()
     # 변환한 dataframe을 기반으로 시각화 출력물 저장하기
