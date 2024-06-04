@@ -1,24 +1,18 @@
-import numpy as np
 import torch
-from torchvision.transforms.functional import to_pil_image
+from torch.nn import DataParallel as DP
+from torch.nn.parallel import DistributedDataParallel as DDP
+import numpy as np
 from abc import abstractmethod
 from copy import deepcopy
 from pathlib import Path
-
 from utils import get_layers
 
 
 class BaseExplainer:
-    def __init__(self, model, config, classes, device, xai_layer_indices:list=None):
+    def __init__(self, model, config, classes, device, xai_layers:list=None):
         self.config = config
         self.device = device
         
-        # Set up your data and model layers for XAI.
-        self.classes = classes
-        
-        self.all_layers = get_layers(self.model)
-        if xai_layer_indices is None or max(xai_layer_indices) >= len(self.all_layers): self.xai_layer = self._find_last_conv_layer()
-        self.xai_layer = xai_layer_indices
         
         # load architecture params from checkpoint.
         self.model = model
@@ -30,12 +24,16 @@ class BaseExplainer:
             self.output_dir = Path(config.output_dir) / output_dir_name / f'epoch{self.test_epoch}'
         else: print("Warning: Pre-trained model is not use.\n")
         
+        # Set up your data and model layers for XAI.
+        self.classes = classes
+        
+        self.all_layers = get_layers(self.model)
+        self.xai_layers = xai_layers
+        # if xai_layers is None or len(xai_layers) >= len(self.all_layers): self.xai_layers = self._find_last_conv_layer()
+        
         # Setting the save directory path
-        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
-        
-        # Freeze the model
-        for param in self.model.parameters(): param.requires_grad_(False)
-        
+        # self.output_dir = Path('/data/jhyu/TNBC-performance/saved/')
+        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)        
         
     def _resume_checkpoint(self, resume_path):
         resume_path = str(resume_path)
@@ -61,20 +59,34 @@ class BaseExplainer:
         raise NotImplementedError
     
     @abstractmethod
-    def _get_a_explainset(self, data_loader, n_samples_per_class):
-        """
-        For your data loader, import n_samples_per_class of data and labels to perform XAI on.
-        
-        :param data_loader: your data loader.
-        :param n_samples_per_class: How much data to get from each class.
-        """
+    def _save_output(self):
         raise NotImplementedError
     
-    def _find_last_conv_layer(self): # 수정하세요
+    
+    def _freeze_and_get_layers(self, model, target_layers:list=None):
+        for layer_name, param in model.named_parameters():
+            real_layer_name = '.'.join(layer_name.split('.')[:-1])
+            if target_layers is not None and real_layer_name in target_layers: continue # Exact match
+            elif target_layers is not None and any(t in real_layer_name for t in target_layers): continue # If it matches some, i.e., if you set it to block.
+            else: param.requires_grad_(False)
+        return model
+    
+    def _find_last_conv_layer(self):
         last_conv = None
         for layer_name, module in dict(reversed(list(self.all_layers.items()))).items():
-            if type(module) == torch.nn.Conv2d: 
+            if isinstance(module, torch.nn.Conv2d):
                 last_conv = layer_name
                 break
         if last_conv is None: raise ValueError('No convolutional layer found in the model!')
-        return [last_conv]
+        last_conv = last_conv.replace('[', '.').replace(']', '')
+        return last_conv
+    
+    def _find_last_fc_layer(self):
+        last_fc = None
+        for layer_name, module in dict(reversed(list(self.all_layers.items()))).items():
+            if isinstance(module, torch.nn.Linear):
+                last_fc = layer_name
+                break
+        if last_fc is None: raise ValueError('No fully connected layer found in the model!')
+        last_fc = last_fc.replace('[', '.').replace(']', '')
+        return last_fc
