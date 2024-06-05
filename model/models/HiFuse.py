@@ -13,8 +13,9 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 import numpy as np
 from typing import Optional
-
+from copy import deepcopy
 from utils import change_kwargs, load_download_checkpoint # for pre-trained model
+
 
 def drop_path_f(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
@@ -182,12 +183,30 @@ class main_model(BaseModel): #(nn.Module):
     def forward(self, imgs):
 
         ######  Global Branch ######
-        x_s, H1, W1 = self.patch_embed(imgs) 
+        # Original
+        # x_s, H1, W1 = self.patch_embed(imgs) 
+        # x_s = self.pos_drop(x_s)
+        # x_s_1, H2, W2 = self.layers1(x_s, H1, W1)
+        # x_s_2, H3, W3 = self.layers2(x_s_1, H2, W2)
+        # x_s_3, H4, W4 = self.layers3(x_s_2, H3, W3)
+        # x_s_4, H5, W5 = self.layers4(x_s_3, H4, W4)
+        # For XAI 
+        x_s = self.patch_embed(imgs) 
+        H1, W1 = deepcopy(self.patch_embed.H), deepcopy(self.patch_embed.W)
+        self.patch_embed.H, self.patch_embed.W = None, None
         x_s = self.pos_drop(x_s)
-        x_s_1, H2, W2 = self.layers1(x_s, H1, W1)
-        x_s_2, H3, W3 = self.layers2(x_s_1, H2, W2)
-        x_s_3, H4, W4 = self.layers3(x_s_2, H3, W3)
-        x_s_4, H5, W5 = self.layers4(x_s_3, H4, W4)
+        x_s_1 = self.layers1(x_s, H1, W1)
+        H2, W2 = deepcopy(self.layers1.H), deepcopy(self.layers1.W)
+        self.layers1.H, self.layers1.W = None, None
+        x_s_2 = self.layers2(x_s_1, H2, W2)
+        H3, W3 = deepcopy(self.layers2.H), deepcopy(self.layers2.W)
+        self.layers2.H, self.layers2.W = None, None
+        x_s_3 = self.layers3(x_s_2, H3, W3)
+        H4, W4 = deepcopy(self.layers3.H), deepcopy(self.layers3.W)
+        self.layers3.H, self.layers3.W = None, None
+        x_s_4 = self.layers4(x_s_3, H4, W4)
+        H5, W5 = deepcopy(self.layers4.H), deepcopy(self.layers4.W)
+        self.layers4.H, self.layers4.W = None, None
 
         # [B,L,C] ---> [B,C,H,W]
         # Original. Input size: (224,224,3)
@@ -637,6 +656,8 @@ class BasicLayer(nn.Module):
             self.downsample = downsample(dim=dim, norm_layer=norm_layer)
         else:
             self.downsample = None
+            
+        self.H, self.W = None, None # for XAI
 
     def create_mask(self, x, H, W):
         # calculate attention mask for SW-MSA
@@ -664,20 +685,24 @@ class BasicLayer(nn.Module):
         return attn_mask
 
     def forward(self, x, H, W):
-
+        self.H, self.W = H, W # for XAI
         if self.downsample is not None:
             x = self.downsample(x, H, W)         #patch merging stage2 in [6,3136,96] out [6,784,192]
-            H, W = (H + 1) // 2, (W + 1) // 2
+            # H, W = (H + 1) // 2, (W + 1) // 2
+            self.H, self.W = (H + 1) // 2, (W + 1) // 2 # for XAI
 
-        attn_mask = self.create_mask(x, H, W)  # [nW, Mh*Mw, Mh*Mw]
+        # attn_mask = self.create_mask(x, H, W)  # [nW, Mh*Mw, Mh*Mw]
+        attn_mask = self.create_mask(x, self.H, self.W)  # for XAI
         for blk in self.blocks:                  # global block
-            blk.H, blk.W = H, W
+            # blk.H, blk.W = H, W
+            blk.H, blk.W = self.H, self.W # for XAI
             if not torch.jit.is_scripting() and self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x, attn_mask)
             else:
                 x = blk(x, attn_mask)
 
-        return x, H, W
+        # return x, H, W 
+        return x # for XAI
 
 def window_partition(x, window_size: int):
     """
@@ -726,27 +751,37 @@ class PatchEmbed(nn.Module):
         self.embed_dim = embed_dim
         self.proj = nn.Conv2d(in_c, embed_dim, kernel_size=patch_size, stride=patch_size)
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+        
+        self.H, self.W = None, None # for XAI
 
     def forward(self, x):
-        _, _, H, W = x.shape
+        # _, _, H, W = x.shape
+        _, _, self.H, self.W = x.shape # for XAI
 
         # padding
-        pad_input = (H % self.patch_size[0] != 0) or (W % self.patch_size[1] != 0)
+        # pad_input = (H % self.patch_size[0] != 0) or (W % self.patch_size[1] != 0)
+        pad_input = (self.H % self.patch_size[0] != 0) or (self.W % self.patch_size[1] != 0) # for XAI
         if pad_input:
             # to pad the last 3 dimensions,
             # (W_left, W_right, H_top,H_bottom, C_front, C_back)
-            x = F.pad(x, (0, self.patch_size[1] - W % self.patch_size[1],
-                          0, self.patch_size[0] - H % self.patch_size[0],
-                          0, 0))
+            # x = F.pad(x, (0, self.patch_size[1] - W % self.patch_size[1],
+            #               0, self.patch_size[0] - H % self.patch_size[0],
+            #               0, 0))
+            x = F.pad(x, (0, self.patch_size[1] - self.W % self.patch_size[1],
+                          0, self.patch_size[0] - self.H % self.patch_size[0],
+                          0, 0)) # for XAI
+
 
         # downsample patch_size times
         x = self.proj(x)
-        _, _, H, W = x.shape
+        # _, _, H, W = x.shape
+        _, _, self.H, self.W = x.shape # for XAI
         # flatten: [B, C, H, W] -> [B, C, HW]
         # transpose: [B, C, HW] -> [B, HW, C]
         x = x.flatten(2).transpose(1, 2)
         x = self.norm(x)
-        return x, H, W
+        # return x, H, W
+        return x # for XAI
 
 class PatchMerging(nn.Module):
     r""" Patch Merging Layer.

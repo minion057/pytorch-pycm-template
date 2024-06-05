@@ -114,14 +114,19 @@ class Stem(nn.Module):
         self.patch_size = to_2tuple(patch_size)
         self.proj = nn.Conv2d(in_dim, out_dim, kernel_size=patch_size, stride=patch_size)
         self.norm = nn.LayerNorm(out_dim, eps=1e-6)
+        
+        self.H, self.W = None, None # for XAI
 
     def forward(self, x):
-        B, C, H, W = x.shape
+        # B, C, H, W = x.shape
+        B, C, self.H, self.W = x.shape # for XAI
         x = self.proj(x)
         x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
         x = self.norm(x)
-        H, W = H // self.patch_size[0], W // self.patch_size[1]
-        return x, (H, W)
+        # H, W = H // self.patch_size[0], W // self.patch_size[1]
+        self.H, self.W = self.H // self.patch_size[0], self.W // self.patch_size[1] # for XAI
+        # return x, (H, W)
+        return x # for XAI
 
 
 class ConvStem(nn.Module):
@@ -144,16 +149,21 @@ class ConvStem(nn.Module):
             self.pos = PA(out_ch)
 
         self.norm = nn.LayerNorm(out_ch, eps=1e-6)
+        
+        self.H, self.W = None, None # for XAI
 
     def forward(self, x):
-        B, C, H, W = x.shape
+        # B, C, H, W = x.shape
+        B, C, self.H, self.W = x.shape # for XAI
         x = self.proj(x)
         if self.with_pos:
             x = self.pos(x)
         x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
         x = self.norm(x)
-        H, W = H // self.patch_size[0], W // self.patch_size[1]
-        return x, (H, W)
+        # H, W = H // self.patch_size[0], W // self.patch_size[1]
+        self.H, self.W = self.H // self.patch_size[0], self.W // self.patch_size[1] # for XAI
+        # return x, (H, W)
+        return x # for XAI
 
 
 class PatchEmbed(nn.Module):
@@ -167,16 +177,21 @@ class PatchEmbed(nn.Module):
             self.pos = PA(out_ch)
 
         self.norm = nn.LayerNorm(out_ch, eps=1e-6)
+        
+        self.H, self.W = None, None # for XAI
 
     def forward(self, x):
-        B, C, H, W = x.shape
+        # B, C, H, W = x.shape
+        B, C, self.H, self.W = x.shape # for XAI
         x = self.proj(x)
         if self.with_pos:
             x = self.pos(x)
         x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
         x = self.norm(x)
-        H, W = H // self.patch_size[0], W // self.patch_size[1]
-        return x, (H, W)
+        # H, W = H // self.patch_size[0], W // self.patch_size[1]
+        self.H, self.W = self.H // self.patch_size[0], self.W // self.patch_size[1] # for XAI
+        # return x, (H, W)
+        return x # for XAI
 
 
 class ResTV2(BaseModel): #(nn.Module):
@@ -237,27 +252,39 @@ class ResTV2(BaseModel): #(nn.Module):
 
     def forward(self, x):
         B, _, H, W = x.shape
-        x, (H, W) = self.stem(x)
-
+        # x, (H, W) = self.stem(x)
+        x = self.stem(x) # for XAI
+        H, W = self.stem.H, self.stem.W
+        self.stem.H, self.stem.W = None, None
+        
         # stage 1
         for blk in self.stage1:
             x = blk(x, H, W)
         x = x.permute(0, 2, 1).reshape(B, -1, H, W)
 
         # stage 2
-        x, (H, W) = self.patch_2(x)
+        # x, (H, W) = self.patch_2(x)
+        x = self.patch_2(x) # for XAI
+        H, W = self.patch_2.H, self.patch_2.W
+        self.patch_2.H, self.patch_2.W = None, None
         for blk in self.stage2:
             x = blk(x, H, W)
         x = x.permute(0, 2, 1).reshape(B, -1, H, W)
 
         # stage 3
-        x, (H, W) = self.patch_3(x)
+        # x, (H, W) = self.patch_3(x)
+        x = self.patch_3(x) # for XAI
+        H, W = self.patch_3.H, self.patch_3.W
+        self.patch_3.H, self.patch_3.W = None, None
         for blk in self.stage3:
             x = blk(x, H, W)
         x = x.permute(0, 2, 1).reshape(B, -1, H, W)
 
         # stage 4
-        x, (H, W) = self.patch_4(x)
+        # x, (H, W) = self.patch_4(x) 
+        x = self.patch_4(x) # for XAI
+        H, W = self.patch_4.H, self.patch_4.W
+        self.patch_4.H, self.patch_4.W = None, None
         for blk in self.stage4:
             x = blk(x, H, W)
         x = self.norm(x)
