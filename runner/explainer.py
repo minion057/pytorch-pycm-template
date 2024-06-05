@@ -89,22 +89,37 @@ class TorchcamExplainer(BaseExplainer):
                     error_message += 'For example, if you have layer.1.1.pw, layer.1 is not supported, but layer1.1 and layer.1.1.pw are supported.'
                     raise ValueError(error_message)
 
-    def _explain_init(self): # Initialize a Explainer
+    def _explain_init(self, view_final_conv_layer_result:bool=True): # Initialize a Explainer
+        if self.xai_layers is None:
+            # Because the models are the same, the target layer set for torchcam will be the same for all. 
+            # Therefore, we obtain the target information from the first extractor that is set up.
+            explainer_args = {'model':self.model, 'target_layer':None, 'enable_hooks':False, 'input_shape':self.input_shape}
+            tmp = Explainer.__dict__['GradCAM'](**explainer_args)
+            self.xai_layers = tmp.target_names
+            reset_device('cache', False)
+        
+        if view_final_conv_layer_result:
+            if self.last_conv_layer_name is None: print('No convolutional hierarchy exists in the current model.')
+            elif self.last_conv_layer_name != self.xai_layers[0] and self.xai_layers[0] not in self.last_conv_layer_name: 
+                try:
+                    tmp = deepcopy(self.xai_layers)
+                    tmp.append(self.last_conv_layer_name)
+                    self._check_xai_layers_format(tmp)
+                    self.xai_layers.append(self.last_conv_layer_name)
+                except: print('The explain_method you set does not allow you to add the last convolution by regularity.')
+            else: print('The automatically set layer is the last convolutional layer, so we don\'t add it.')
+            
         extractors = {}
         for idx, name in enumerate(self.explain_methods):
             # Create an extractor object for torchcam.
             explainer_args = {'model':self.model, 'target_layer':self.xai_layers, 'enable_hooks':False, 'input_shape':self.input_shape}
             if name in self.batch_enabled_methods: explainer_args['batch_size'] = self.batch_size
-            if name == 'CAM': explainer_args['fc_layer'] = self._find_last_fc_layer()
+            if name == 'CAM': explainer_args['fc_layer'] = self._find_last_fc_layer()            
             extractors[name] = Explainer.__dict__[name](**explainer_args)
-            if self.xai_layers is None and idx == 0:
-                # Because the models are the same, the target layer set for torchcam will be the same for all. 
-                # Therefore, we obtain the target information from the first extractor that is set up.
-                self.xai_layers = extractors[name].target_names
-            # Freeze the model (you can only freeze layers that come before your target_layer)
-            # _ = self._freeze_and_get_layers(extractors[name].model, self.xai_layers)
-        _ = self._freeze_and_get_layers(self.model, self.xai_layers)
             
+            
+            
+        _ = self._freeze_and_get_layers(self.model, self.xai_layers)
         extractors_result_template_per_data = {name:[] for name in self.explain_methods}
         extractors_result_template = {'classes':[], 'traget_layers':[], 'activation_maps':deepcopy(extractors_result_template_per_data)}
         extractors_result = OrderedDict({
@@ -113,7 +128,7 @@ class TorchcamExplainer(BaseExplainer):
         })
         return extractors, extractors_result
     
-    def explain(self, xai_layers:list=None, save_type:str=None):
+    def explain(self, xai_layers:list=None, save_type:str=None, view_final_conv_layer_result:bool=True):
         """ The logic that actually performs the XAI.
 
         Args:
@@ -126,8 +141,8 @@ class TorchcamExplainer(BaseExplainer):
         reset_device('cache', False)
         self._check_xai_layers_format(xai_layers)
         print('Run XAI using torchcam!!!')
-        self.xai_layers = xai_layers #if xai_layers is not None else [self._find_last_conv_layer()]
-        self.extractors, self.extractors_result = self._explain_init()
+        self.xai_layers = xai_layers # for ViT
+        self.extractors, self.extractors_result = self._explain_init(view_final_conv_layer_result)
         start = time.time()
         for class_idx, class_explainset in self.explainset.items():
             for data_idx, explain_data in enumerate(class_explainset['data'], 1):
@@ -140,9 +155,10 @@ class TorchcamExplainer(BaseExplainer):
                 xai_data = torch.Tensor(explain_data).to(self.device).requires_grad_(True)
                 for explain_method_idx, (explain_method_name, extractor) in tqdm(enumerate(self.extractors.items())):                    
                     xai_extractor, outputs = self._explain(xai_data=xai_data, extractor=extractor, explain_method_name=explain_method_name, explain_method_idx=explain_method_idx)
+                    reset_device('cache', False)
                     # Use the hooked data to compute activation map
                     try: cams = xai_extractor(class_idx, outputs)
-                    except: 
+                    except:
                         if self.device.type == 'cuda': 
                             print(f'\nWarring: CUDA out of memory. In {explain_method_name}, it is calculated in cpu.')
                             cpu_model = deepcopy(self.extractors[explain_method_name].model.to('cpu'))
@@ -161,6 +177,7 @@ class TorchcamExplainer(BaseExplainer):
                             self.extractors_result['results']['traget_layers'].append(target_layer)
                     xai_extractor.remove_hooks()
                     xai_extractor._hooks_enabled = False
+                    reset_device('cache', False)
         end = time.time()
         self._save_info(self._setting_time(start, end))
         
@@ -255,7 +272,7 @@ class TorchcamExplainer(BaseExplainer):
         print(f'Save... {save_name}')
         
     def generate_xai_report(self, result=None, xai_layers:list=None,
-                            title:str='XAI results.', items_per_page:int=5, basic_fig_size:tuple=(5,10), bar_size:float=0.5):
+                            title:str='XAI results.', items_per_page:int=5, basic_fig_size:tuple=(10,15), bar_size:float=0.5):
         result = deepcopy(self._check_result_existence(result))
         xai_layers = self.xai_layers if xai_layers is None else xai_layers
         if xai_layers is None: raise ValueError('xai_layers must not be None.')
@@ -280,7 +297,7 @@ class TorchcamExplainer(BaseExplainer):
         colors = [next(colors) for _ in self.classes]
         items_per_row = len(self.explain_methods)+2 # col = XAI results + Prediction probability results + image
         width, height = basic_fig_size
-        suptitle_text_size = 10 * width + 5
+        suptitle_text_size = 10 * width
         subtitle_text_size, text_size = suptitle_text_size - width * 2.5, suptitle_text_size - width * 4
         prob_x, prob_y = np.arange(len(self.classes)), list(range(0, 101, 10))
         
@@ -330,7 +347,13 @@ class TorchcamExplainer(BaseExplainer):
                     # 3. XAI Results
                     original_img = to_pil_image(result['data'][real_data_idx])
                     for col_idx, explain_method_name in enumerate(self.explain_methods, 2):
-                        # ax = axes[row_idx][col_idx] if use_items_per_page > 1 else axes[col_idx] if items_per_row > 1 else axes
+                        xai_result = result['results']['activation_maps'][explain_method_name][idx+row_idx]
+                        if len(xai_result.shape) == 1:
+                            ax = fig.add_subplot(gs[row_idx, 2+(len(self.explain_methods)//2)])
+                            ax.spines[['right', 'left', 'top', 'bottom']].set_visible(False); ax.set_xticklabels([]); ax.set_yticklabels([])
+                            ax.text(0, 0.5, f'The result of performing XAI on layer \"{xai_target_layer}\" with the correct label, {xai_class_name} class.\nThere are no activation maps.', 
+                                    horizontalalignment='center', verticalalignment='center', transform=ax.transAxes, fontsize=text_size, color='black')
+                            break
                         ax = fig.add_subplot(gs[row_idx, col_idx])
                         if col_idx == 2+(len(self.explain_methods)//2):
                             ax.text(0, -0.1, f'The result of performing XAI on layer \"{xai_target_layer}\" with the correct label, {xai_class_name} class.', 
@@ -339,13 +362,13 @@ class TorchcamExplainer(BaseExplainer):
                             explain_title = explain_method_name
                             if explain_title == 'SmoothGradCAMpp': explain_title = 'Smooth\nGradCAMpp'
                             ax.set_title(explain_title, size=subtitle_text_size, y=1.05)
-                            
-                        xai_result = result['results']['activation_maps'][explain_method_name][idx+row_idx]
+                        
                         heatmap = to_pil_image(deepcopy(xai_result), mode="F")
                         ax.imshow(overlay_mask(deepcopy(original_img), heatmap, alpha=0.5)); ax.axis('off')
                 d = pdf.infodict()
                 d['Title'], d['Author'] = title,'https://github.com/minion057/pytorch-pycm-template'
                 pdf.savefig(fig, bbox_inches='tight')
+                # plt.show()
                 close_all_plots()
         print(f'Save... {save_name}')
         

@@ -28,6 +28,7 @@ class BaseExplainer:
         self.classes = classes
         
         self.all_layers = get_layers(self.model)
+        self.last_conv_layer_name = self._find_last_conv_layer()
         self.xai_layers = xai_layers
         # if xai_layers is None or len(xai_layers) >= len(self.all_layers): self.xai_layers = self._find_last_conv_layer()
         
@@ -64,11 +65,43 @@ class BaseExplainer:
     
     
     def _freeze_and_get_layers(self, model, target_layers:list=None):
-        for layer_name, param in model.named_parameters():
-            real_layer_name = '.'.join(layer_name.split('.')[:-1])
-            if target_layers is not None and real_layer_name in target_layers: continue # Exact match
-            elif target_layers is not None and any(t in real_layer_name for t in target_layers): continue # If it matches some, i.e., if you set it to block.
-            else: param.requires_grad_(False)
+        block_layers_none, max_parts, num_parts_to_remove = False, 0, 1
+        while True:
+            if block_layers_none: 
+                error_message = 'No place found to change requires_grad to True.\n'
+                error_message += 'Performed once, and each layer has no child layers.\n'
+                error_message += 'No target_layers found, and block not found, so cannot freeze.'
+                raise ValueError(error_message)
+            if max_parts != 0 and num_parts_to_remove >= max_parts:
+                error_message = 'No place found to change requires_grad to True.\n'
+                error_message += 'Checked up to the top block, but no target layers found.\n'
+                raise ValueError(error_message)
+            
+            grad_enabled = False # Parameter to check if any part has requires_grad set to True. If False, continue the iteration.
+            for layer_name, param in model.named_parameters():
+                parts = layer_name.split('.') # Manage block hierarchies as lists by separating them from child hierarchies.
+                # 1. Maximum number of child hierarchies
+                if max_parts < len(parts): max_parts = len(parts)
+                
+                # 2. Make sure each layer has no child layers.
+                if '.' not in layer_name: block_layers_none = True
+                else: block_layers_none = False
+                
+                # 3. Run
+                # Name of the block part to check in the current hierarchy.
+                real_layer_name = '.'.join(parts[:-num_parts_to_remove])
+                block_check = any(t in real_layer_name for t in target_layers)
+                if num_parts_to_remove > 1: block_check = any('.'.join(t.split('.')[:-(num_parts_to_remove-1)]) in real_layer_name for t in target_layers)
+                # Verify that the part to check exists.
+                if target_layers is not None and real_layer_name in target_layers: # Exact match
+                    grad_enabled = True
+                    param.requires_grad_(True)
+                elif target_layers is not None and block_check: # Block match
+                    grad_enabled = True
+                    param.requires_grad_(True)
+                else: param.requires_grad_(False)
+            if target_layers is not None and not grad_enabled: num_parts_to_remove += 1
+            else: break
         return model
     
     def _find_last_conv_layer(self):
