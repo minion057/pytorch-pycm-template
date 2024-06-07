@@ -13,15 +13,15 @@ class BaseExplainer:
         self.config = config
         self.device = device
         
-        
         # load architecture params from checkpoint.
         self.model = model
         self.test_epoch = 1
-        output_dir_name = 'explanation'
-        self.output_dir = Path(config.output_dir) / output_dir_name / f'epoch{self.test_epoch}'
+        self.output_dir_name = 'explanation'
+        self.output_dir = Path(config.output_dir) / self.output_dir_name / f'epoch{self.test_epoch}'
+        # self.output_dir = Path(config.explanation_dir) / f'epoch{self.test_epoch}'
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
-            self.output_dir = Path(config.output_dir) / output_dir_name / f'epoch{self.test_epoch}'
+            self.output_dir = Path(config.output_dir) / self.output_dir_name / f'epoch{self.test_epoch}'
         else: print("Warning: Pre-trained model is not use.\n")
         
         # Set up your data and model layers for XAI.
@@ -41,7 +41,7 @@ class BaseExplainer:
         print("Loading checkpoint: {} ...".format(resume_path))
     
         checkpoint = torch.load(resume_path, map_location=self.device)
-        self.test_epoch = checkpoint['epoch'] + 1
+        self.test_epoch = checkpoint['epoch']
         
         # load architecture params from checkpoint.
         if checkpoint['config']['arch'] != self.config['arch']:

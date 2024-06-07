@@ -15,6 +15,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 
+from pathlib import Path # 나중에 삭제
+
+
 class TorchcamExplainer(BaseExplainer):
     """ XAI logic using TorchCAM. (https://github.com/frgfm/torch-cam) """
     def __init__(self, model, config, classes, device, 
@@ -43,6 +46,9 @@ class TorchcamExplainer(BaseExplainer):
         self.xai_layers = None
         
         self.explain_model_name = config['arch']['type']
+        if 'deit' in self.explain_model_name.lower(): # 나중에 삭제
+            self.output_dir = Path(str(self.output_dir).replace(self.output_dir_name, f'{self.output_dir_name}_last_conv'))
+            if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)       
         self.explainset = explainset
         self.n_samples_per_class = len(explainset[0]['index'])
         self.explain_methods = explain_methods
@@ -139,6 +145,8 @@ class TorchcamExplainer(BaseExplainer):
                                          If you don't want to use this part, you can comment out the if statement.
         """
         reset_device('cache', False)
+        if 'deit' in self.explain_model_name.lower(): # 나중에 삭제
+            xai_layers = [self.last_conv_layer_name]
         self._check_xai_layers_format(xai_layers)
         print('Run XAI using torchcam!!!')
         self.xai_layers = xai_layers # for ViT
