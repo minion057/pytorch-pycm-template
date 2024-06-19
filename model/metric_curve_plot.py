@@ -4,7 +4,7 @@ from matplotlib.gridspec import GridSpec
 import numpy as np
 from sklearn import metrics
 from pycm import ROCCurve
-from utils import onehot_encoding, label_encoding, get_color_cycle
+from utils import onehot_encoding, integer_encoding, get_color_cycle
 from itertools import combinations, permutations
 
 """ 
@@ -38,7 +38,7 @@ def ROC(labels, probs, classes:list, crv=None):
     """ 1. Drawing a ROC curve using average (macro/micro) """
     return_average_value = False if crv is None else True
     if crv is None:
-        labels, probs = label_encoding(labels, classes), np.array(probs) # only integer label
+        labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
         label_classes = np.unique(labels).tolist()
         crv = ROCCurve(actual_vector=np.array(labels), probs=np.array(probs), classes=label_classes)
     
@@ -63,7 +63,7 @@ def ROC(labels, probs, classes:list, crv=None):
 
 def ROC_OvR(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarray]=None, show_average:bool=False):
     """ 2. Drawing a ROC curve using One vs Rest """
-    labels, probs = label_encoding(labels, classes), np.array(probs) # only integer label
+    labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
     crv = ROCCurve(actual_vector=np.array(labels), probs=np.array(probs), classes=label_classes)
 
@@ -100,7 +100,7 @@ def ROC_OvR(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarr
 def ROC_OvO(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarray]=None, show_average:bool=False):
     """ 3. Drawing a ROC curve using One vs One """
     # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html#roc-curve-using-the-ovo-macro-average
-    labels, probs = label_encoding(labels, classes), np.array(probs) # only integer label
+    labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
     
     # Calculate ROC curve for each class combination

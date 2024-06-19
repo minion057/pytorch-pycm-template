@@ -1,8 +1,12 @@
+import numpy as np
 import torch
 import json
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
+from copy import deepcopy
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import RocCurveDisplay
 
 def ensure_dir(dirname):
     dirname = Path(dirname)
@@ -69,4 +73,33 @@ def tb_projector_resize(data, label_img, features):
     label_img = torch.cat((label_img, data), 0) if label_img is not None else data
     features = torch.cat((features, data.clone().view(-1, c*h*w)), 0) if features is not None else data.clone().view(-1, c*h*w) #28*28 -> 90MB
     return label_img, features
-      
+
+def check_onehot_label(item, classes):
+    item_class = np.unique(np.array(item), return_counts=True)[0]
+    if type(item) == int: return False
+    elif len(item_class) != len(classes): return False #print('class num')
+    elif 0 not in item_class and 1 not in item_class: return False #print(item_class)
+    else: return True
+
+def onehot_encoding(label, classes):
+    if type(classes) == np.ndarray: classes = classes.tolist() # for FutureWarning by numpy
+    item = label[0]
+    if not check_onehot_label(item, classes): # label to onehot
+        if item not in classes: classes = np.array([idx for idx in range(len(classes))])   
+        label, classes = np.array(label), np.array(classes)
+        if len(classes.shape)==1: classes = classes.reshape((-1, 1))
+        if len(label.shape)==1: label = label.reshape((-1, 1 if type(item) not in [list, np.ndarray] else len(item)))
+        oh = OneHotEncoder()
+        oh.fit(classes)
+        label2onehot = oh.transform(label).toarray()
+    else: label2onehot = np.array(label)
+    return label2onehot
+
+def integer_encoding(label, classes): #  by index of classes
+    if type(classes) == np.ndarray: classes = classes.tolist() # for FutureWarning by numpy
+    sorted_classes = deepcopy(classes); sorted_classes.sort()
+    item = label[0]
+    if check_onehot_label(item, classes) and type(item) in [list, np.ndarray]: label2label = np.argmax(label, axis=1)
+    elif all(np.unique(label) != sorted_classes) or sorted_classes[0] != 0: label2label = [classes.index(a) for a in label]
+    else: label2label = np.array(label)
+    return label2label
