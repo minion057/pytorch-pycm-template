@@ -11,9 +11,14 @@ def close_all_plots():
     plt.close() # closes the current figure
 
 def get_color_cycle():
-    colors = list(plt.cm.Set3.colors); del colors[-4] # delete gray color
-    colors.extend(list(plt.cm.Pastel1.colors)); del colors[-1] # delete gray color
-    colors.extend(list(plt.cm.Pastel2.colors)); del colors[-1] # delete gray color
+    colors = list(plt.cm.Set3.colors)
+    del colors[-4] # delete gray color
+    del colors[1] # delete light yellow color
+    colors.extend(list(plt.cm.Pastel1.colors))
+    del colors[-1] # delete gray color
+    del colors[-4] # delete light yellow color
+    colors.extend(list(plt.cm.Pastel2.colors))
+    del colors[-1] # delete gray color
     return cycle(colors)
     
 def plot_imshow(img, one_channel=False):
