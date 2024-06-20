@@ -47,8 +47,7 @@ class Trainer(BaseTrainer):
         self.prediction_preds, self.prediction_probs = None, None
 
         # Hook for DA
-        if self.cfg_da is not None:            
-            if self.DA == 'cutmix': self.DA_ftns = module_DA.CutMix(writer=self.writer, **self.DAargs)
+        if self.cfg_da is not None: self.DA_ftns = getattr(module_DA, self.DA)(writer=self.writer, **self.DAargs)  
             
         # Clear the gradients of all optimized variables 
         self.optimizer.zero_grad()
@@ -275,14 +274,9 @@ class Trainer(BaseTrainer):
         else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
         return loss
         
-    def _da_loss(self, output, target, logit, loss):
-        if self.DA == 'cutmix':
-            if self.DA_ftns.rand_index() is None: return loss
-            random_index = self.DA_ftns.rand_index()
-            if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
-            random_loss = self._loss(output, target[random_index], logit).item()
-            lam = self.DA_ftns.lam()
-            loss = loss*lam +  random_loss*(1.-lam)
+    def _da_loss(self, output, target, logit, loss):        
+        try: loss = self.DA_ftns.loss(self._loss, output, target, logit, loss)
+        except: print('There is no loss function set up. If you need a specific formula, configure a loss function.')
         self.DA_ftns.reset()
         return loss
     

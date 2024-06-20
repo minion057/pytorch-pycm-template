@@ -81,7 +81,7 @@ class BaseTrainer:
             self.sampling_name = str(self.sampling['name']).lower() # random, ...
         self.cfg_da = config['data_augmentation'] if 'data_augmentation' in config.config.keys() else None
         if self.cfg_da is not None:
-            self.DA = str(self.cfg_da['type']).lower()
+            self.DA = str(self.cfg_da['type'])#.lower()
             self.DAargs, self.hookargs = self.cfg_da['args'], self.cfg_da['hook_args']
             self.pre_hook = self.cfg_da['hook_args']['pre']
     

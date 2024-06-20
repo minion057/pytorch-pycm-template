@@ -46,7 +46,6 @@ class MixUp(BaseHook):
         mix_data = data.detach().clone()
         mix_data = self.lam * mix_data + (1 - self.lam) * mix_data[rand_index, :]
         
-        
         if self.writer is not None:
             img_cnt = B if B < 5 else 5
             da_data = []
@@ -60,6 +59,10 @@ class MixUp(BaseHook):
         # loss: lam * criterion(pred, target_a) + (1 - lam) * criterion(pred, target_b)
         return mix_data
     
-        
-        
-    
+    def loss(self, loss_ftns, output, target, logit, loss):
+        random_index, lam = self.rand_index(), self.lam()
+        if random_index is None: return loss
+        if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
+        random_loss = loss_ftns(output, target[random_index], logit).item()
+        loss = loss*lam +  random_loss*(1.-lam)
+        return loss
