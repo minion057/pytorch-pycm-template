@@ -36,9 +36,9 @@ class CutMix(BaseHook):
     def _run(self, data):
         # Original code: https://github.com/clovaai/CutMix-PyTorch/blob/master/train.py#L229
         size =  data.size()  # B, C, H, W
-        H, W = size[-2], size[-1] 
+        B, H, W = size[0], size[-2], size[-1] 
         
-        rand_index = np.arange(0, size[0])
+        rand_index = np.arange(0, B)
         np.random.shuffle(rand_index)
         self._data['rand_index'][self.type] = rand_index
 
@@ -52,7 +52,7 @@ class CutMix(BaseHook):
         mix_data = data.detach().clone()
         mix_data[:, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2] = mix_data[rand_index, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2]
         if self.writer is not None:
-            img_cnt = size[0] if size[0] < 5 else 5
+            img_cnt = B if B < 5 else 5
             cut_data = []
             for idx in range(img_cnt):
                 cut_data.append([data[idx, 0, bbox_H1:bbox_H2, bbox_W1:bbox_W2],

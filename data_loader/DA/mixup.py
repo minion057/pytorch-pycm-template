@@ -5,11 +5,11 @@ import torch
 from utils import show_mix_result, close_all_plots
 
 class MixUp(BaseHook):
-    def __init__(self, beta:float=0.1, prob:float=0.5, writer=None):
+    def __init__(self, alpha:float=1, prob:float=0.5, writer=None):
         self.type = 'mixup'
         super().__init__(self.type, cols=['lam', 'rand_index'], writer=writer)
-        self.beta, self.prob = beta, prob
-        self.init_lam = np.random.beta(beta, beta)
+        self.lam, self.prob = np.random.beta(alpha, alpha) if alpha > 0 else 1., prob
+        self._data['lam'][self.type] = self.lam
 
     def lam(self):
         return self._data['lam'][self.type]
@@ -35,19 +35,20 @@ class MixUp(BaseHook):
             return (use_data, )
     
     def _run(self, data):
-        # Original code: https://github.com/facebookresearch/mixup-cifar10/blob/eaff31ab397a90fbc0a4aac71fb5311144b3608b/train.py#L141
+        # Original code: https://github.com/facebookresearch/mixup-cifar10/blob/eaff31ab397a90fbc0a4aac71fb5311144b3608b/train.py#L119
         size =  data.size()  # B, C, H, W
+        B = size[0]
         
-        rand_index = np.arange(0, size[0])
+        rand_index = np.arange(0, B)
         np.random.shuffle(rand_index)        
         self._data['rand_index'][self.type] = rand_index
         
         mix_data = data.detach().clone()
-        mix_data = self.init_lam * mix_data + (1 - self.init_lam) * mix_data[rand_index, :]
-        self._data['lam'][self.type] = self.init_lam
+        mix_data = self.lam * mix_data + (1 - self.lam) * mix_data[rand_index, :]
+        
         
         if self.writer is not None:
-            img_cnt = size[0] if size[0] < 5 else 5
+            img_cnt = B if B < 5 else 5
             da_data = []
             for idx in range(img_cnt):
                 da_data.append([(data[idx]), (mix_data[rand_index, :][idx]), (mix_data[idx])])  
@@ -55,6 +56,8 @@ class MixUp(BaseHook):
             self.writer.add_figure(f'input_{self.type}', show_mix_result(da_data))
             close_all_plots()
         
+        # target_a, target_b = target, target[index]
+        # loss: lam * criterion(pred, target_a) + (1 - lam) * criterion(pred, target_b)
         return mix_data
     
         
