@@ -4,6 +4,8 @@ from matplotlib.gridspec import GridSpec
 import numpy as np
 from sklearn import metrics
 from pycm import ROCCurve
+from pycm import ConfusionMatrix as pycmCM
+from pycm.pycm_util import thresholds_calc, threshold_func
 from utils import onehot_encoding, integer_encoding, get_color_cycle
 from itertools import combinations, permutations
 
@@ -33,6 +35,14 @@ def _ROC_common_plot(ax, plot_args, title:str=None, tight_layout:bool=True):
     if title is not None: ax.set_title(title, **plot_args['title_font'])
     if tight_layout: ax.figure.tight_layout(**plot_args['ax_fig_tight_layout_args'])
     return ax
+
+def _roc_data(labels, probs, classes, pos_class_name, thresholds=None):
+    fpr, tpr, thresholds = [], [], thresholds_calc(probs) if thresholds is None else thresholds
+    for t in thresholds:
+        def lambda_fun(x): return threshold_func(x, pos_class_name, classes, t)
+        cm = pycmCM(actual_vector=labels, predict_vector=probs, threshold=lambda_fun)
+        fpr.append(cm.FPR[pos_class_name]); tpr.append(cm.TPR[pos_class_name])
+    return np.array(fpr), np.array(tpr), np.array(thresholds)
     
 def ROC(labels, probs, classes:list, crv=None):
     """ 1. Drawing a ROC curve using average (macro/micro) """
@@ -41,7 +51,7 @@ def ROC(labels, probs, classes:list, crv=None):
         labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
         label_classes = np.unique(labels).tolist()
         crv = ROCCurve(actual_vector=np.array(labels), probs=np.array(probs), classes=label_classes)
-    
+    return crv
     macro_fpr = np.linspace(0.0, 1.0, len(crv.data[0]['FPR'])) 
     macro_tpr = np.zeros_like(macro_fpr) 
     for class_idx in crv.data.keys(): 
@@ -61,7 +71,8 @@ def ROC(labels, probs, classes:list, crv=None):
     ax = _ROC_common_plot(ax, plot_args, title='ROC Curve')
     return ax.figure
 
-def ROC_OvR(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarray]=None, show_average:bool=False):
+def ROC_OvR(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarray]=None, 
+            show_average:bool=False, return_roc_result:bool=False):
     """ 2. Drawing a ROC curve using One vs Rest """
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
@@ -72,7 +83,7 @@ def ROC_OvR(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarr
     if isinstance(positive_class_idx, (int)): positive_class_idx = [positive_class_idx]
     positive_class = label_classes if positive_class_idx is None else positive_class_idx
     plot_args = _ROC_plot_setting()
-    
+    print(positive_class)
     # Customize ROC curve
     ax = crv.plot(classes=positive_class)
     if show_average:
@@ -95,9 +106,17 @@ def ROC_OvR(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarr
     # return roc curve figure
     ax.figure.set_size_inches(plot_args['figsize'])
     ax.figure.tight_layout(**plot_args['ax_fig_tight_layout_args'])
-    return ax.figure # close_all_plots()
+    if return_roc_result: 
+        roc_dict = {'pos_neg_idx':[], 'fpr':[], 'tpr':[], 'auc':list(crv.area().values())}
+        for pos_class_idx in positive_class:
+            roc_dict['pos_neg_idx'].append([pos_class_idx, None])
+            roc_dict['fpr'].append(np.flip(crv.data[pos_class_idx]['FPR'][:-1])) # 0 -> 1
+            roc_dict['tpr'].append(np.flip(crv.data[pos_class_idx]['TPR'][:-1])) # 0 -> 1
+        return roc_dict, ax.figure
+    else: return ax.figure # close_all_plots()
 
-def ROC_OvO(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarray]=None, show_average:bool=False):
+def ROC_OvO(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarray]=None, 
+            show_average:bool=False, return_roc_result:bool=False):
     """ 3. Drawing a ROC curve using One vs One """
     # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html#roc-curve-using-the-ovo-macro-average
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
@@ -111,7 +130,7 @@ def ROC_OvO(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarr
     cal_pair_list = [i for i in cal_pair_list if i[0] in positive_class or i[1] in positive_class]
     need_pair_list = need_pair_list[np.isin(need_pair_list[:, 0], positive_class)]
     
-    positive_roc_dict, negative_roc_dict = {'fpr':[], 'tpr':[], 'auc':[]}, {'fpr':[], 'tpr':[], 'auc':[]}
+    positive_roc_dict, negative_roc_dict = {'fpr':[], 'tpr':[], 'auc':[], 'threshold':[]}, {'fpr':[], 'tpr':[], 'auc':[], 'threshold':[]}
     mean_roc_dict = {'fpr':np.linspace(0.0, 1.0, 1000), 'tpr':[], 'auc':[]}
     for (pos_class_idx, neg_class_idx) in cal_pair_list:
         # roc_dict['title'].append()
@@ -121,31 +140,41 @@ def ROC_OvO(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarr
         
         pos_labels, pos_probs = pos_mask[all_mask], probs[all_idx, pos_class_idx]
         neg_labels, neg_probs = neg_mask[all_mask], probs[all_idx, neg_class_idx]
-        fpr_pos, tpr_pos, threshold_pos = metrics.roc_curve(pos_labels, pos_probs)
-        fpr_neg, tpr_neg, threshold_neg = metrics.roc_curve(neg_labels, neg_probs)
+        
+        # sklearn has many times fewer thresholds than pycm, so we use pycm to get more information. 
+        # If you want to use sklearn, replace the commented sk variables with pycm variables.
+        fpr_pos, tpr_pos, threshold_pos = _roc_data(pos_labels, pos_probs, [False, True], True)
+        fpr_neg, tpr_neg, threshold_neg = _roc_data(neg_labels, neg_probs, [False, True], True)
+        # fpr_pos_sk, tpr_pos_sk, threshold_pos_sk = metrics.roc_curve(pos_labels, pos_probs) 
+        # fpr_neg_sk, tpr_neg_sk, threshold_neg_sk = metrics.roc_curve(neg_labels, neg_probs)
         auc_pos, auc_neg = metrics.auc(fpr_pos, tpr_pos), metrics.auc(fpr_neg, tpr_neg)
         
         positive_roc_dict['fpr'].append(fpr_pos); negative_roc_dict['fpr'].append(fpr_neg)
         positive_roc_dict['tpr'].append(tpr_pos); negative_roc_dict['tpr'].append(tpr_neg)
         positive_roc_dict['auc'].append(auc_pos); negative_roc_dict['auc'].append(auc_neg)
+        positive_roc_dict['threshold'].append(threshold_pos); negative_roc_dict['threshold'].append(threshold_neg)
         
         if show_average:
             mean_roc_dict['tpr'].append(np.zeros_like(mean_roc_dict['fpr']))
-            mean_roc_dict['tpr'][-1] += np.interp(mean_roc_dict['fpr'], fpr_pos, tpr_pos)
-            mean_roc_dict['tpr'][-1] += np.interp(mean_roc_dict['fpr'], fpr_neg, tpr_neg)
+            mean_roc_dict['tpr'][-1] += np.interp(mean_roc_dict['fpr'], np.flip(fpr_pos), np.flip(tpr_pos))
+            mean_roc_dict['tpr'][-1] += np.interp(mean_roc_dict['fpr'], np.flip(fpr_neg), np.flip(tpr_neg))
+            # mean_roc_dict['tpr'][-1] += np.interp(mean_roc_dict['fpr'], fpr_pos_sk, tpr_pos_sk)
+            # mean_roc_dict['tpr'][-1] += np.interp(mean_roc_dict['fpr'], fpr_neg_sk, tpr_neg_sk)
             mean_roc_dict['tpr'][-1] /= 2
             mean_roc_dict['auc'].append(metrics.auc(mean_roc_dict['fpr'], mean_roc_dict['tpr'][-1]))
     
-    roc_dict = {'fpr':[], 'tpr':[], 'auc':[]}
+    roc_dict = {'pos_neg_idx':[], 'fpr':[], 'tpr':[], 'auc':[], 'threshold':[]}
     for (pos_class_idx, neg_class_idx) in need_pair_list:
         same_index = next((i for i, pair in enumerate(cal_pair_list) if np.array_equal(pair, [pos_class_idx, neg_class_idx])), -1)
         reverse_index = next((i for i, pair in enumerate(cal_pair_list) if np.array_equal(pair, [neg_class_idx, pos_class_idx])), -1)
         if same_index == -1 and reverse_index == -1: raise ValueError(f'Did not calculate ROC.: {classes[pos_class_idx]} vs {classes[neg_class_idx]}')
         use_index = same_index if same_index != -1 else reverse_index
         use_roc = positive_roc_dict if same_index != -1 else negative_roc_dict
+        roc_dict['pos_neg_idx'].append([pos_class_idx, neg_class_idx] if same_index != -1 else [neg_class_idx, pos_class_idx])
         roc_dict['fpr'].append(use_roc['fpr'][use_index])
         roc_dict['tpr'].append(use_roc['tpr'][use_index])
         roc_dict['auc'].append(use_roc['auc'][use_index])
+        roc_dict['threshold'].append(use_roc['threshold'][use_index])
     
     # Setting up for plot
     plot_args = _ROC_plot_setting()
@@ -172,4 +201,5 @@ def ROC_OvO(labels, probs, classes:list, positive_class_idx:[int, list, np.ndarr
         ax.legend()
 
     # return roc curve figure
-    return ax.figure # close_all_plots()
+    if return_roc_result: return roc_dict, ax.figure
+    else: return ax.figure # close_all_plots()
