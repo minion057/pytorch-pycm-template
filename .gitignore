@@ -16,8 +16,7 @@ config/*
 experiment/*
 # Custom files
 *imagenet*.py
-*custom*.py
-
+*/*custom*/*
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 
