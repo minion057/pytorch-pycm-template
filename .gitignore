@@ -16,7 +16,8 @@ config/*
 experiment/*
 # Custom files
 *imagenet*.py
-*/*custom*/*
+model/metric_custom.py
+
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 
