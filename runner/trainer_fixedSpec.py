@@ -9,9 +9,9 @@ class FixedSpecTrainer(Trainer):
     """
     Trainer class
     """
-    def __init__(self, model, criterion, metric_ftns, curve_metric_ftns, optimizer, config, classes, device,
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
                  data_loader, valid_data_loader=None, lr_scheduler=None, len_epoch=None):
-        super().__init__(model, criterion, metric_ftns, curve_metric_ftns, optimizer, config, classes, device,
+        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
                          data_loader, valid_data_loader, lr_scheduler, len_epoch)
         self.config = config
         self.device = device
@@ -39,22 +39,24 @@ class FixedSpecTrainer(Trainer):
             else: raise ValueError('Warring: FixedNegativeROC is not in the config[curve_metrics]')
         else: print('Warring: curve_metrics is not in the config')
        
-    # def _curve_metrics(self, mode='training'):
-    #     for met in self.curve_metric_ftns:
+    # def _plottable_metrics(self, mode='training'):
+    #     for met in self.plottable_metric_ftns:
     #         if mode=='training':
     #             actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
     #             probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
     #         else:
     #             actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
     #             probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
-    #         if met.__name__ == 'FixedNegativeROC': 
+            
+    #         if met.__name__ == 'FixedNegativeROC': # -> save_dir로 대체
     #             save_path = self.FixedNegativeROC['output_dir'] / f'{met.__name__}_{mode}.png'
-    #             curve_fig = met(actual_vector, probability_vector, self.classes, self.FixedNegativeROC['negative_class_idx'])
+    #             fig = met(actual_vector, probability_vector, self.classes, self.FixedNegativeROC['negative_class_idx'])
     #         else: 
     #             save_path = self.output_dir / f'{met.__name__}_{mode}.png'
-    #             curve_fig = met(actual_vector, probability_vector, self.classes)
-    #         self.writer.add_figure(met.__name__, curve_fig)
-    #         if self.save_performance_plot: curve_fig.savefig(save_path, bbox_inches='tight')
+    #             fig = met(actual_vector, probability_vector, self.classes)
+            
+    #         self.writer.add_figure(met.__name__, fig)
+    #         if self.save_performance_plot: fig.savefig(save_path, bbox_inches='tight')
         
     def _get_a_log(self, epoch):
         '''
@@ -126,7 +128,7 @@ class FixedSpecTrainer(Trainer):
             confusion_obj = FixedNegativeROC.get_confusion_obj(goal, pos_class_name, neg_class_name)
             goal_metrics[category] = {}
             for met in self.metric_ftns:# pycm version
-                met_kwargs, tag, _ = self._plot_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
+                met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
                 tag = met.__name__ if tag is None else tag
                 use_confusion_obj = deepcopy(confusion_obj)                             
                 if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)

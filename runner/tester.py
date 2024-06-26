@@ -11,8 +11,8 @@ class Tester(BaseTester):
     """
     Trainer class
     """
-    def __init__(self, model, criterion, metric_ftns, curve_metric_ftns, config, classes, device, data_loader):
-        super().__init__(model, criterion, metric_ftns, curve_metric_ftns, config, classes, device)
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader):
+        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device)
         self.config = config
         self.device = device
         
@@ -58,14 +58,16 @@ class Tester(BaseTester):
                 self.metrics.update('loss', loss.item())
                 # 4. Update the confusion matrix and input data
                 confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
-                if self.curve_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
+                if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
                 self.confusion.update(self.confusion_key, confusion_content, img_update=False)
 
                 confusion_obj = self.confusion.get_confusion_obj(self.confusion_key)
                 for met in self.metric_ftns:
-                    met_name_idx = self.metrics_class_index[met.__name__]
-                    if met_name_idx is None: self.metrics.update(met.__name__, met(confusion_obj, self.classes))
-                    else: self.metrics.update(met.__name__, met(confusion_obj, self.classes, met_name_idx))
+                    met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
+                    tag = met.__name__ if tag is None else tag
+                    use_confusion_obj = deepcopy(confusion_obj)                             
+                    if met_kwargs is None: self.metrics.update(tag, met(use_confusion_obj, self.classes))
+                    else: self.metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
                     
                 if batch_idx % self.log_step == 0:
                     self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
@@ -82,14 +84,14 @@ class Tester(BaseTester):
                     data_channel = self.prediction_images.shape[1]
                     preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())                    
                     preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
-                    use_prob = self.confusion.get_probability_vector(self.confusion_key)[-len(preds):] if self.curve_metric_ftns is not None \
+                    use_prob = self.confusion.get_probability_vector(self.confusion_key)[-len(preds):] if self.plottable_metric_ftns is not None \
                                else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
         
         # 4-2. Update the curve plot and projector
         self.writer.set_step(self.test_epoch, self.wirter_mode)
-        if self.curve_metric_ftns is not None: self._curve_metrics()
+        if self.plottable_metric_ftns is not None: self._plottable_metrics()
         if self.projector: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
         # 4-3. Upate the example of predtion
         if self.tensorboard_pred_plot:
@@ -103,12 +105,30 @@ class Tester(BaseTester):
         # 5. setting result
         return self._get_a_log()
     
-    def _curve_metrics(self):
-        for met in self.curve_metric_ftns:
-            curve_fig = met(self.confusion.get_actual_vector(self.confusion_key),
-                            self.confusion.get_probability_vector(self.confusion_key), self.classes)
-            self.writer.add_figure(met.__name__, curve_fig)
-            if self.save_performance_plot: curve_fig.savefig(self.output_dir / f'{met.__name__}_test-epoch{self.test_epoch}.png', bbox_inches='tight')
+    def _set_metric_kwargs(self, met_kwargs):
+        if 'tag' in met_kwargs: 
+            tag = met_kwargs['tag']
+            met_kwargs.pop('tag')  
+        else: tag = None
+        if 'save_dir':
+            save_dir = met_kwargs['save_dir']
+            met_kwargs.pop('save_dir') 
+        else: save_dir = None
+        return met_kwargs, tag, save_dir
+    
+    def _plottable_metrics(self):
+        for met in self.plottable_metric_ftns:
+            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
+            tag = met.__name__ if tag is None else tag
+            save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
+            if met_kwargs is None: fig = met(self.confusion.get_actual_vector(self.confusion_key),
+                                             self.confusion.get_probability_vector(self.confusion_key), self.classes)
+            else: fig = met(self.confusion.get_actual_vector(self.confusion_key),
+                            self.confusion.get_probability_vector(self.confusion_key), self.classes, **met_kwargs)
+            self.writer.add_figure(met.__name__, fig)
+            if self.save_performance_plot: 
+                if not save_dir.is_dir(): save_dir.mkdir(parents=True, exist_ok=True)
+                fig.savefig(save_dir / f'{tag}_test-epoch{self.test_epoch}.png', bbox_inches='tight')
             
     def _get_a_log(self):
         log = self.metrics.result()

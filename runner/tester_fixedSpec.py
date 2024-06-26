@@ -7,8 +7,8 @@ class FixedSpecTester(Tester):
     """
     Tester class
     """
-    def __init__(self, model, criterion, metric_ftns, curve_metric_ftns, config, classes, device, data_loader):
-        super().__init__(model, criterion, metric_ftns, curve_metric_ftns, config, classes, device, data_loader)
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader):
+        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader)
         self.config = config
         self.device = device
         
@@ -34,8 +34,8 @@ class FixedSpecTester(Tester):
             else: raise ValueError('Warring: FixedNegativeROC is not in the config[curve_metrics]') 
         else: print('Warring: curve_metrics is not in the config')
     
-    def _curve_metrics(self):
-        for met in self.curve_metric_ftns:
+    def _plottable_metrics(self):
+        for met in self.plottable_metric_ftns:
             if met.__name__ == 'FixedNegativeROC':
                 curve_fig = met(self.confusion.get_actual_vector(self.confusion_key),
                                 self.confusion.get_probability_vector(self.confusion_key), 

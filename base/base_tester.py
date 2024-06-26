@@ -15,7 +15,7 @@ class BaseTester:
     """
     Base class for all testers
     """
-    def __init__(self, model, criterion, metric_ftns, curve_metric_ftns, config, classes, device):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device):
         self.config = config
         self.logger = config.get_logger('tester', 2)
         
@@ -25,9 +25,11 @@ class BaseTester:
         self.model = model
         self.criterion = criterion
         self.metric_ftns = metric_ftns
-        self.curve_metric_ftns = curve_metric_ftns
+        self.plottable_metric_ftns = plottable_metric_ftns
         self.loss_fn_name = config['loss'] 
-        self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.metrics_kwargs = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.plottable_metrics_kwargs = config['plottable_metrics'] if 'plottable_metrics' in config.config.keys() else None
+
 
         self.test_epoch = 1
 

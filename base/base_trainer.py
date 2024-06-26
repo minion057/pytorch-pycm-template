@@ -18,7 +18,7 @@ class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, model, criterion, metric_ftns, curve_metric_ftns, optimizer, config, classes, device):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device):
         self.config = config
         self.logger = config.get_logger('trainer', config['trainer']['verbosity'])
         
@@ -28,10 +28,11 @@ class BaseTrainer:
         self.model = model
         self.criterion = criterion
         self.metric_ftns = metric_ftns
-        self.curve_metric_ftns = curve_metric_ftns
+        self.plottable_metric_ftns = plottable_metric_ftns
         self.optimizer = optimizer
         self.loss_fn_name = config['loss'] 
         self.metrics_kwargs = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.plottable_metrics_kwargs = config['plottable_metrics'] if 'plottable_metrics' in config.config.keys() else None
 
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']

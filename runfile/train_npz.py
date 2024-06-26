@@ -17,7 +17,7 @@ from torchvision import transforms
 import data_loader.transforms as module_transforms
 import model.optim as module_optim
 import model.loss as module_loss
-import model.metric_curve_plot as module_curve_metric
+import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
@@ -64,8 +64,7 @@ def main(config):
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
     metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
-    curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics'].keys()] if 'curve_metrics' in config.config.keys() else None
-    if curve_metric is None: print('curve_metric is not set.\n')
+    plottable_metric = [getattr(module_plottable_metric, met) for met in config['plottable_metrics'].keys()] if 'plottable_metrics' in config.config.keys() else None
 
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
@@ -73,7 +72,7 @@ def main(config):
     lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer) if 'lr_scheduler' in config.config.keys() else None
     if lr_scheduler is None: print('lr_scheduler is not set.\n')
 
-    trainer = Trainer(model, criterion, metrics, curve_metric, optimizer,
+    trainer = Trainer(model, criterion, metrics, plottable_metric, optimizer,
                       config=config,
                       classes=classes,
                       device=device,
