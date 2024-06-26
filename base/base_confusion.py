@@ -6,9 +6,9 @@ from pathlib import Path
 
 from sklearn.metrics import ConfusionMatrixDisplay
 from pycm import ConfusionMatrix as pycmCM
-from pycm import ROCCurve
 from pycm.pycm_util import threshold_func
 import model.metric as module_metric
+import model.metric_curve_plot as module_curve_metric
 
 import matplotlib.pyplot as plt
 
@@ -67,24 +67,26 @@ class ConfusionTracker:
         return confusion_plt
     
 class FixedSpecConfusionTracker:
-    """ The current metric uses the one-vs-rest strategy. """
-    def __init__(self, classes, goal_score:list, negative_class_idx:int, goal_digit:int=2, writer=None):
+    """ The current metric uses the one-vs-one strategy. """
+    def __init__(self, classes, goal_score:list, negative_class_indices:[int, list, np.ndarray], goal_digit:int=2, writer=None):
         self.writer = writer
         self.classes = classes
         
         self.fixed_metrics_ftns = getattr(module_metric, 'specificity')
         self.refer_metrics_ftns = getattr(module_metric, 'sensitivity')
-        self.negative_class_idx = negative_class_idx
-        self.positive_classes = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx != self.negative_class_idx}
+        self.negative_class_indices = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx == self.negative_class_idx}
+        self.positive_class_indices = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx != self.negative_class_idx}
         
         self.goal_digit = goal_digit
         self.goal_score = goal_score
-        self.index = [[], []]
+        self.index = [[], [], []]
         for goal in self.goal_score:
-            for class_name in self.positive_classes.values():
-                self.index[0].append(goal)
-                self.index[1].append(class_name)
-        self._data = pd.DataFrame(index=self.index, columns=['confusion', 'auc', 'fixed_score', 'refer_score'])
+            for pos_class_name in self.positive_class_indices.values():
+                for neg_class_name in self.negative_class_indices.values():
+                    self.index[0].append(goal)
+                    self.index[1].append(pos_class_name)
+                    self.index[2].append(neg_class_name)
+        self._data = pd.DataFrame(index=self.index, columns=['confusion', 'auc', 'fixed_score', 'refer_score', 'tag'])
         self.index = self._data.index.values
         self.reset()
     
@@ -93,6 +95,7 @@ class FixedSpecConfusionTracker:
         for goal, pos_class_name in self._data.index.values:
             self._data['confusion'][goal][pos_class_name], self._data['auc'][goal][pos_class_name] = None, 0.  
             self._data['fixed_score'][goal][pos_class_name], self._data['refer_score'][goal][pos_class_name] = float(goal), None
+            self._data['tag'][goal][pos_class_name] = ''
     
     def update(self, actual_vector, probability_vector,
                set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):
@@ -103,43 +106,51 @@ class FixedSpecConfusionTracker:
         elif type(actual_vector[0]) == 'str': actual_vector = [self.classes.index(a) for a in actual_vector]
                
         # Generating a confusion matrix with predetermined scores.
-        crv = ROCCurve(actual_vector=np.array(actual_vector), probs=np.array(probability_vector), classes=np.unique(actual_vector).tolist())
-        # ROCCurve에서는 thresholds의 인덱스 기준으로 FPR과 TPR을 반환함.
-        # threshold와 달리 FPR, TPR은 맨 뒤에 값(0)이 하나 더 삽입된 상태로 반환됨. 
-        # https://github.com/sepandhaghighi/pycm/blob/a163c07fb23fd5384f4a6049afa16241954f6545/pycm/pycm_curve.py#L198
-        # 즉, 인덱스가 뒤로 갈수록 FPR, TPR은 낮아짐
+        roc_dict, roc_fig = module_curve_metric.ROC_OvO(labels=np.array(actual_vector), probs=np.array(probability_vector), 
+                                                        classes=np.unique(actual_vector).tolist(), 
+                                                        positive_class_indices=list(self.positive_class_indices.keys()), 
+                                                        negative_class_indices=list(self.negative_class_indices.keys()),
+                                                        return_result=True)
         
         for goal in self.goal_score:
             if goal > 1 or goal <= 0: print('Warring: Goal score should be less than 1.')
             goal2fpr = 1-goal # spec+fpr = 1
-            for pos_class_idx, pos_class_name in self.positive_classes.items():
-                fpr, tpr = np.array(crv.data[pos_class_idx]['FPR'][:-1]), np.array(crv.data[pos_class_idx]['TPR'][:-1])
-                
-                # If no instances meet the target score, it will return closest_value. 
-                target_fpr, closest_fpr = round(goal2fpr, self.goal_digit), None
-                same_value_index  = np.where(np.around(fpr, self.goal_digit) == target_fpr)[0]
-                if len(same_value_index) == 0:
-                    closest_fpr = fpr[np.abs(fpr - target_fpr).argmin()]
-                    same_value_index = np.where(fpr == closest_fpr)[0]
-                same_value_index.sort()
-                best_idx = same_value_index[0] # Spec에서 가장 높은 tpr을 가진 값을 선택.
-                
-                print(f'Now goal is {goal} of {pos_class_name} ({same_value_index})')
-                print(f'-> best_idx is {best_idx} & threshold cnt is {len(crv.thresholds)} (fpr: {len(fpr)}, tpr: {len(tpr)})')
-                best_confusion = self._createConfusionMatrixobj(actual_vector, probability_vector, crv.thresholds[best_idx], pos_class_idx)
-                self._data.confusion[goal][pos_class_name] = deepcopy(best_confusion)
-                self._data.auc[goal][pos_class_name] = crv.area()[pos_class_idx]
-                self._data.refer_score[goal][pos_class_name] = tpr[best_idx]
-                
-                if img_update or set_title is not None or img_save_dir_path is not None:
-                    confusion_plt = self.createConfusionMatrix(goal, pos_class_name)
-                    if set_title is None: set_title = f'Confusion matrix - Fixed Spec: {goal}\n(Positive class: {pos_class_name})'
-                    confusion_plt.ax_.set_title(set_title)
-                use_tag = f'ConfusionMatrix_FixedSpec_{str(goal).replace("0.", "")}_PositiveClass_{pos_class_name}'
-                if self.writer is not None and img_update:
-                    self.writer.add_figure(use_tag, confusion_plt.figure_)
-                if img_save_dir_path is not None:
-                    confusion_plt.figure_.savefig(Path(img_save_dir_path) / use_tag, dpi=300, bbox_inches='tight')
+            for pos_class_idx, pos_class_name in self.positive_class_indices.items():
+                for neg_class_idx, neg_class_name in self.negative_class_indices.items():
+                    try: pos_neg_idx = roc_dict['pos_neg_idx'].index([pos_class_idx, neg_class_idx])
+                    except: raise ValueError(f'No ROC was calculated with positive class {pos_class_name} and negative class {neg_class_name}.')
+                    fpr, tpr = roc_dict['fpr'][pos_neg_idx], roc_dict['tpr'][pos_neg_idx] # 1 -> 0
+                    
+                    # If no instances meet the target score, it will return closest_value. 
+                    target_fpr, closest_fpr = round(goal2fpr, self.goal_digit), None
+                    same_value_index  = np.where(np.around(fpr, self.goal_digit) == target_fpr)[0]
+                    if len(same_value_index) == 0:
+                        closest_fpr = fpr[np.abs(fpr - target_fpr).argmin()]
+                        same_value_index = np.where(fpr == closest_fpr)[0]
+                    # Select the value with the highest TPR at the same specificity. (The earlier the index, the higher the score).
+                    same_value_index.sort()
+                    best_idx = same_value_index[0]
+                    print(f'Now goal is {goal} of {pos_class_name} ({same_value_index})')
+                    print(f"-> best_idx is {best_idx} & threshold cnt is {len(roc_dict['thresholds'])} (fpr: {len(roc_dict['fpr'])}, tpr: {len(roc_dict['tpr'])})")
+                    
+                    all_mask = np.logical_or(labels == pos_class_idx, labels == neg_class_idx)
+                    all_idx, use_classes = np.flatnonzero(all_mask), [False, True]
+                    best_confusion = self._createConfusionMatrixobj(pos_mask[all_mask], probs[all_idx, pos_class_idx], roc_dict['thresholds'][best_idx], pos_class_idx)
+                    self._data.confusion[goal][pos_class_name][neg_class_name] = deepcopy(best_confusion)
+                    self._data.auc[goal][pos_class_name][neg_class_name] = crv.area()[pos_class_idx]
+                    self._data.refer_score[goal][pos_class_name][neg_class_name] = tpr[best_idx]
+                    self._data.tag[goal][pos_class_name][neg_class_name] = f'FixedSpec-{str(goal).replace("0.", "")}_Positive-{pos_class_name}_Negative-{neg_class_name}'
+                    
+                    if img_update or set_title is not None or img_save_dir_path is not None:
+                        confusion_plt = self.createConfusionMatrix(goal, pos_class_name)
+                        if set_title is None: 
+                            set_title = f'Confusion matrix - Fixed Spec: {goal}\n(Positive class: {pos_class_name} VS Negative class: {neg_class_name})'
+                        confusion_plt.ax_.set_title(set_title)
+                    use_tag = f'ConfusionMatrix:{self.get_tag(goal, pos_class_name, neg_class_name)}'
+                    if self.writer is not None and img_update:
+                        self.writer.add_figure(use_tag, confusion_plt.figure_)
+                    if img_save_dir_path is not None:
+                        confusion_plt.figure_.savefig(Path(img_save_dir_path) / use_tag, dpi=300, bbox_inches='tight')
 
     def _createConfusionMatrixobj(self, actual_vector, probability_vector, threshold, positive_class_idx):
         actual_classes = np.unique(actual_vector).tolist()
@@ -147,24 +158,26 @@ class FixedSpecConfusionTracker:
         def lambda_fun(x): return threshold_func(x, positive_class, actual_classes, threshold)
         return pycmCM(actual_vector, probability_vector, threshold=lambda_fun)    
     
-    def get_confusion_obj(self, goal, pos_class_name):
-        return self._data.confusion[goal][pos_class_name]
-    def get_auc(self, goal, pos_class_name):
-        return self._data.auc[goal][pos_class_name]
-    def get_fixed_score(self, goal, pos_class_name):
-        return self._data.fixed_score[goal][pos_class_name]
-    def get_refer_score(self, goal, pos_class_name):
-        return self._data.refer_score[goal][pos_class_name]
+    def get_confusion_obj(self, goal, pos_class_name, neg_class_name):
+        return self._data.confusion[goal][pos_class_name][neg_class_name]
+    def get_auc(self, goal, pos_class_name, neg_class_name):
+        return self._data.auc[goal][pos_class_name][neg_class_name]
+    def get_fixed_score(self, goal, pos_class_name, neg_class_name):
+        return self._data.fixed_score[goal][pos_class_name][neg_class_name]
+    def get_refer_score(self, goal, pos_class_name, neg_class_name):
+        return self._data.refer_score[goal][pos_class_name][neg_class_name]
+    def get_tag(self, goal, pos_class_name, neg_class_name):
+        return self._data.tag[goal][pos_class_name][neg_class_name]
     def result(self):
         result_data = deepcopy(self._data)
-        for goal, pos_class_name in result_data.index.values:
-            if result_data['confusion'][goal][pos_class_name] is not None:
-                result_data['confusion'][goal][pos_class_name] = result_data['confusion'][goal][pos_class_name].to_array().tolist()
-            else: 
-                result_data['confusion'][goal][pos_class_name] = None
+        for goal, pos_class_name, neg_class_name  in result_data.index.values:
+            if result_data['confusion'][goal][pos_class_name][neg_class_name] is not None:
+                result_data['confusion'][goal][pos_class_name][neg_class_name] = result_data['confusion'][goal][pos_class_name][neg_class_name].to_array().tolist()
+            else: result_data['confusion'][goal][pos_class_name][neg_class_name] = None
         return dict(result_data)
     
-    def createConfusionMatrix(self, goal, pos_class_name): 
-        disp = ConfusionMatrixDisplay(self._data.confusion[goal][pos_class_name].to_array(), display_labels=self.classes)
+    def createConfusionMatrix(self, goal, pos_class_name, neg_class_name): 
+        cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name).to_array()
+        disp = ConfusionMatrixDisplay(cm, display_labels=self.classes)
         confusion_plt = disp.plot(cmap=plt.cm.binary)
         return confusion_plt

@@ -6,6 +6,7 @@ from utils import inf_loop, tb_projector_resize, plot_classes_preds, close_all_p
 from utils import register_forward_hook_layer
 import numpy as np
 from copy import deepcopy
+import matplotlib.pyplot as plt
 
 import data_loader.data_augmentation as module_DA
 import data_loader.data_sampling as module_sampling
@@ -52,6 +53,17 @@ class Trainer(BaseTrainer):
         # Clear the gradients of all optimized variables 
         self.optimizer.zero_grad()
 
+    def _plot_metric_kwargs(self, met_kwargs):
+        if 'tag' in met_kwargs: 
+            tag = met_kwargs['tag']
+            met_kwargs.pop('tag')  
+        else: tag = None
+        if 'save_dir':
+            save_dir = met_kwargs['save_dir']
+            met_kwargs.pop('save_dir') 
+        else: save_dir = None
+        return met_kwargs, tag, save_dir
+        
     def _curve_metrics(self, mode='training'):
         for met in self.curve_metric_ftns:
             if mode=='training':
@@ -60,9 +72,13 @@ class Trainer(BaseTrainer):
             else:
                 actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
                 probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
-            curve_fig = met(actual_vector, probability_vector, self.classes)
-            self.writer.add_figure(met.__name__, curve_fig)
-            if self.save_performance_plot: curve_fig.savefig(self.output_dir / f'{met.__name__}_{mode}.png', bbox_inches='tight')
+                
+            met_kwargs, tag, save_dir = self._plot_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
+            tag = met.__name__ if tag is None else tag
+            save_dir = self.output_dir / 'curve_metrics' if save_dir is None else self.output_dir / save_dir
+            curve_fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
+            self.writer.add_figure(tag, curve_fig)
+            if self.save_performance_plot: curve_fig.savefig(save_dir / f'{tag}_{mode}.png', bbox_inches='tight')
             
     def _get_a_log(self, epoch):        
         log = self.train_metrics.result()        
@@ -131,10 +147,11 @@ class Trainer(BaseTrainer):
             
             confusion_obj = self.train_confusion.get_confusion_obj(self.confusion_key)
             for met in self.metric_ftns:# pycm version
-                met_name_idx = self.metrics_class_index[met.__name__]
-                use_confusion_obj = deepcopy(confusion_obj)
-                if met_name_idx is None: self.train_metrics.update(met.__name__, met(use_confusion_obj, self.classes))
-                else: self.train_metrics.update(met.__name__, met(use_confusion_obj, self.classes, met_name_idx))
+                met_kwargs, tag, _ = self._plot_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
+                tag = met.__name__ if tag is None else tag
+                use_confusion_obj = deepcopy(confusion_obj)                             
+                if met_kwargs is None: self.train_metrics.update(tag, met(use_confusion_obj, self.classes))
+                else: self.train_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
             
             # 5-3-1. Projector
             # The data concerning the projector is collected with each batch and will be updated after all batches are completed.
@@ -159,7 +176,6 @@ class Trainer(BaseTrainer):
                            else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                 self.prediction_preds = [self.classes[lab] for lab in preds]
                 self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
-            
             if batch_idx == self.len_epoch: break
         
         if self.cfg_da is not None: hook.remove()
@@ -222,11 +238,11 @@ class Trainer(BaseTrainer):
                     
                 confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
                 for met in self.metric_ftns:# pycm version
-                    met_name_idx = self.metrics_class_index[met.__name__]
-                    use_confusion_obj = deepcopy(confusion_obj)
-                    if met_name_idx is None: self.valid_metrics.update(met.__name__, met(use_confusion_obj, self.classes))
-                    else: self.valid_metrics.update(met.__name__, met(use_confusion_obj, self.classes, met_name_idx))
-                
+                    met_kwargs, tag, _ = self._plot_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
+                    tag = met.__name__ if tag is None else tag
+                    use_confusion_obj = deepcopy(confusion_obj)                             
+                    if met_kwargs is None: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes))
+                    else: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))               
                     
                 if batch_idx % self.log_step == 0: self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
                 

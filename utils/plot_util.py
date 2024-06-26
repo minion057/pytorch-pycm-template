@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 from torchvision.transforms.functional import to_pil_image
 from sklearn.metrics import ConfusionMatrixDisplay
@@ -155,3 +156,55 @@ def show_mix_result(imgs, titles:list=['Original Data', 'Mix Data', 'Result'], c
             axs[idx, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
             if idx==0: axs[0, i].set_title(titles[i], size=15)
     return fig
+
+def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, np.ndarray],
+            metric_name:str, CI:int, binom_method:str, show_bound_text:bool=True,
+            file_path=None, show:bool=False, return_plot:bool=True):
+    if len(means) != len(bounds) != len(classes): raise ValueError('All three lists (means, bounds, and classes) must be the same length.')
+    if all(0 <= x <= 1 for x in means):
+        means = np.array(means)*100
+        if not all(0 <= x <= 100 for x in means): raise ValueError('The values in the list (means) are outside the range between 0 and 100.')
+    if all((0 <= l <= 1 or 0 <= u <= 1) for l, u in bounds):
+        bounds = np.array(bounds)*100 # [[l*100, u*100] for l, u in bounds]
+        if not all((0 <= l <= 100 or 0 <= u <= 100) for l, u in bounds): raise ValueError('The values in the list (bounds) are outside the range between 0 and 100.')
+    errors = [[], []]
+    for score, (lower, upper) in zip(means, bounds):
+        errors[0].append(score - lower)
+        errors[1].append(upper - score)
+    errors = np.array(errors)
+    
+    colors, palette = [], ['#D7E1EE', '#B1C9F5', '#6F8CE7', '#8B8BB7'] # ['lightsteelblue', 'cornflowerblue', 'royalblue', 'midnightblue']
+    legend_kwargs = {
+        'loc':'upper left', 'bbox_to_anchor':(1, 1.02), 'ncol':1,
+        'handles':[mpatches.Patch(color=color) for color in palette],
+        'labels':[f'{"0%":4} < {metric_name} < 25%', f'25% < {metric_name} ≤ 50%', f'50% < {metric_name} ≤ 75%', f'75% < {metric_name} ≤ 100%']
+    }
+    for score in means:
+        if 0 <= score <= 25: colors.append(palette[0])
+        elif 25 < score <= 50: colors.append(palette[1])
+        elif 50 < score <= 75: colors.append(palette[2])
+        else: colors.append(palette[3])
+    
+    close_all_plots()
+    fig = plt.figure(figsize=(2*len(means), 5))
+    plt.bar([str(c) for c in classes], means, width=0.35, color=colors)
+    plt.errorbar([str(c) for c in classes], means, yerr=errors, color='k', capsize=5, fmt=' ', label=f'Mean {metric_name} (±{CI}% CI)')
+    plt.legend(); plt.ylim(0, 100)
+    plot_styles, plot_labels = plt.gca().get_legend().legendHandles, [t.get_text() for t in plt.gca().get_legend().get_texts()]
+    legend_kwargs['handles'], legend_kwargs['labels'] = plot_styles + legend_kwargs['handles'], plot_labels + legend_kwargs['labels']
+    plt.legend(**legend_kwargs)
+    plt.title(f'Confidence Interval ({binom_method})', size=17, pad=20)
+    plt.ylabel(metric_name, fontsize=15)
+    plt.xticks(rotation=55, ha='right', fontsize=12)
+    if show_bound_text:
+        ci_bound_args = {'ha':'center', 'color':'crimson', 'weight':'bold', 'fontsize':9}
+        for x, (score, (down_point, up_point)) in enumerate(zip(means, bounds)):
+            plt.text(x, score+4, f'{score:.2f}%', va="top", color='dimgray', **{k:v for k,v in ci_bound_args.items() if k!='color'})
+            plt.text(x, down_point-2, f'{down_point:.2f}%', va="top", **ci_bound_args)
+            plt.text(x, up_point+2, f'{up_point:.2f}%', va="bottom", **ci_bound_args)
+    plt.tight_layout(rect=[0, 0, 1, 1])
+    
+    if file_path is not None: plt.savefig(file_path)
+    if return_plot: return fig
+    if show: plt.show()  
+    close_all_plots()

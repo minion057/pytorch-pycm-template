@@ -22,40 +22,39 @@ class FixedSpecTrainer(Trainer):
 
         curve_metrics = self.config.config['curve_metrics'] if 'curve_metrics' in self.config.config.keys() else  None
         self.FixedNegativeROC, self.original_result_name  = None, 'maxprob'
-        self.auc = {class_name:None for class_name in self.classes}
         if curve_metrics is not None:
             if 'FixedNegativeROC' in curve_metrics.keys(): 
                 self.FixedNegativeROC ={
                     'goal_score':curve_metrics['FixedNegativeROC']['fixed_goal'],
-                    'negative_class_idx':curve_metrics['FixedNegativeROC']['negative_class_idx'],
+                    'negative_class_indices':curve_metrics['FixedNegativeROC']['negative_class_indices'],
                     'output_dir': self.output_dir / f"{curve_metrics['FixedNegativeROC']['save_dir']}",
                 }
-                self.goal_for_auc = self.FixedNegativeROC['goal_score'][0]
                 self.FixedNegativeROC['output_metrics'] = self.FixedNegativeROC['output_dir'] / 'metrics.json'
                 if not self.FixedNegativeROC['output_dir'].is_dir(): self.FixedNegativeROC['output_dir'].mkdir(parents=True, exist_ok=True)
                 self.train_FixedNegativeROC = FixedSpecConfusionTracker(goal_score=self.FixedNegativeROC['goal_score'],  classes=self.classes,
                                                                         negative_class_idx=self.FixedNegativeROC['negative_class_idx'])
                 self.valid_FixedNegativeROC = FixedSpecConfusionTracker(goal_score=self.FixedNegativeROC['goal_score'], classes=self.classes,
                                                                         negative_class_idx=self.FixedNegativeROC['negative_class_idx'])
+                self.auc = {f'{pos_class_name} VS {neg_class_name}':None for goal, pos_class_name, neg_class_name in self.train_FixedNegativeROC.index}
             else: raise ValueError('Warring: FixedNegativeROC is not in the config[curve_metrics]')
         else: print('Warring: curve_metrics is not in the config')
        
-    def _curve_metrics(self, mode='training'):
-        for met in self.curve_metric_ftns:
-            if mode=='training':
-                actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
-                probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
-            else:
-                actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
-                probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
-            if met.__name__ == 'FixedNegativeROC': 
-                save_path = self.FixedNegativeROC['output_dir'] / f'{met.__name__}_{mode}.png'
-                curve_fig = met(actual_vector, probability_vector, self.classes, self.FixedNegativeROC['negative_class_idx'])
-            else: 
-                save_path = self.output_dir / f'{met.__name__}_{mode}.png'
-                curve_fig = met(actual_vector, probability_vector, self.classes)
-            self.writer.add_figure(met.__name__, curve_fig)
-            if self.save_performance_plot: curve_fig.savefig(save_path, bbox_inches='tight')
+    # def _curve_metrics(self, mode='training'):
+    #     for met in self.curve_metric_ftns:
+    #         if mode=='training':
+    #             actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
+    #             probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
+    #         else:
+    #             actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
+    #             probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
+    #         if met.__name__ == 'FixedNegativeROC': 
+    #             save_path = self.FixedNegativeROC['output_dir'] / f'{met.__name__}_{mode}.png'
+    #             curve_fig = met(actual_vector, probability_vector, self.classes, self.FixedNegativeROC['negative_class_idx'])
+    #         else: 
+    #             save_path = self.output_dir / f'{met.__name__}_{mode}.png'
+    #             curve_fig = met(actual_vector, probability_vector, self.classes)
+    #         self.writer.add_figure(met.__name__, curve_fig)
+    #         if self.save_performance_plot: curve_fig.savefig(save_path, bbox_inches='tight')
         
     def _get_a_log(self, epoch):
         '''
@@ -96,11 +95,13 @@ class FixedSpecTrainer(Trainer):
             for key, value in val_log.items(): log[key].update(**{'val_'+k : v for k, v in value.items()})
         
         # AUC Result
-        log['auc'] = {}
+        log['auc'], use_goal = {}, []
         if self.do_validation: log['val_auc'] = {}
-        for pos_class_idx, pos_class_name in self.train_FixedNegativeROC.positive_classes.items():
-            log['auc'][pos_class_name] = self.train_FixedNegativeROC.get_auc(self.goal_for_auc, pos_class_name)
-            if self.do_validation: log['val_auc'][pos_class_name] = self.valid_FixedNegativeROC.get_auc(self.goal_for_auc, pos_class_name)
+        for goal, pos_class_name, neg_class_name in self.train_FixedNegativeROC.index:
+            if goal in use_goal: continue
+            use_goal.append(goal)
+            log['auc'][pos_class_name] = self.train_FixedNegativeROC.get_auc(goal, pos_class_name, neg_class_name)
+            if self.do_validation: log['val_auc'][pos_class_name] = self.valid_FixedNegativeROC.get_auc(goal, pos_class_name, neg_class_name)
         
         # model save and reset
         self._save_FixedBestModel(epoch)
@@ -120,17 +121,17 @@ class FixedSpecTrainer(Trainer):
         goal_metrics = {}
         # 1. AUC: Pass
         # 2. Metrics
-        for goal, pos_class_name in FixedNegativeROC.index:
-            use_key = f'fixedSpec_{goal*100:.0f}_Positive_{pos_class_name}'
-            goal_metrics[use_key] = {}
-            confusion_obj = FixedNegativeROC.get_confusion_obj(goal, pos_class_name)
-            
+        for goal, pos_class_name, neg_class_name in FixedNegativeROC.index:
+            category = FixedNegativeROC.get_tag(goal, pos_class_name, neg_class_name)
+            confusion_obj = FixedNegativeROC.get_confusion_obj(goal, pos_class_name, neg_class_name)
+            goal_metrics[category] = {}
             for met in self.metric_ftns:# pycm version
-                met_name_idx = self.metrics_class_index[met.__name__]
-                if met_name_idx is None: goal_metrics[use_key][met.__name__] = met(confusion_obj, self.classes)
-                else: goal_metrics[use_key][met.__name__] = met(confusion_obj, self.classes, met_name_idx)
-                
-            goal_metrics[use_key][self.confusion_key] = confusion_obj.to_array().tolist()
+                met_kwargs, tag, _ = self._plot_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
+                tag = met.__name__ if tag is None else tag
+                use_confusion_obj = deepcopy(confusion_obj)                             
+                if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)
+                else: goal_metrics[category][tag] = met(use_confusion_obj, self.classes, **met_kwargs)                
+            goal_metrics[category][self.confusion_key] = confusion_obj.to_array().tolist()
         return goal_metrics
     
     def _save_FixedBestModel(self, epoch): 
@@ -139,11 +140,14 @@ class FixedSpecTrainer(Trainer):
         save_model_name = f'model_best_AUC_Positive'
         message = 'Saving current best AUC model'
         FixedNegativeROC = self.train_FixedNegativeROC if self.do_validation else self.valid_FixedNegativeROC
-        for pos_class_idx, pos_class_name in FixedNegativeROC.positive_classes.items():
-            auc_area = FixedNegativeROC.get_auc(self.goal_for_auc, pos_class_name)            
-            if self.auc[pos_class_name] is None or self.auc[pos_class_name] < auc_area:
-                self.auc[pos_class_name] = auc_area
-                self._save_checkpoint(epoch, filename=f'{save_model_name}_{pos_class_name}', message=message)
+        use_goal = []
+        for goal, pos_class_name, neg_class_name in FixedNegativeROC.index:
+            if goal in use_goal: continue
+            use_goal.append(goal)
+            auc_area = FixedNegativeROC.get_auc(goal, pos_class_name, neg_class_name)
+            if self.auc[f'{pos_class_name} VS {neg_class_name}'] is None or self.auc[f'{pos_class_name} VS {neg_class_name}'] < auc_area:
+                self.auc[f'{pos_class_name} VS {neg_class_name}'] = auc_area
+                self._save_checkpoint(epoch, filename=f'{save_model_name}_{pos_class_name}VS{neg_class_name}', message=message)
     
     def _save_output(self, log):
         '''
