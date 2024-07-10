@@ -100,9 +100,11 @@ class ConfigParser:
             # update new config for fine-tuning
             config.update(read_json(args.config))
 
+        try: core = args.core
+        except: core=None
         # parse custom cli options into dictionary
         modification = {opt.target : getattr(args, _get_opt_name(opt.flags)) for opt in options}
-        return cls(config, resume, modification, run_id, args.test, args.core)
+        return cls(config, resume, modification, run_id, args.test, core)
 
     def init_obj(self, name, module, *args, **kwargs):
         """
