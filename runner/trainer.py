@@ -51,47 +51,7 @@ class Trainer(BaseTrainer):
             
         # Clear the gradients of all optimized variables 
         self.optimizer.zero_grad()
-
-    def _set_metric_kwargs(self, met_kwargs):
-        if 'tag' in met_kwargs: 
-            tag = met_kwargs['tag']
-            met_kwargs.pop('tag')  
-        else: tag = None
-        if 'save_dir':
-            save_dir = met_kwargs['save_dir']
-            met_kwargs.pop('save_dir') 
-        else: save_dir = None
-        return met_kwargs, tag, save_dir
         
-    def _plottable_metrics(self, mode='training'):
-        for met in self.plottable_metric_ftns:
-            if mode=='training':
-                actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
-                probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
-            else:
-                actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
-                probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
-                
-            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
-            tag = met.__name__ if tag is None else tag
-            save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
-            fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
-            self.writer.add_figure(tag, fig)
-            if self.save_performance_plot: 
-                if not save_dir.is_dir(): ensure_dir(save_dir, True)
-                fig.savefig(save_dir / f'{tag}_{mode}.png', bbox_inches='tight')
-            
-    def _get_a_log(self, epoch):        
-        log = self.train_metrics.result()        
-        log_confusion = self.train_confusion.result()
-
-        if self.do_validation:
-            val_log, val_confusion = self._valid_epoch(epoch) # Validation Result
-            log.update(**{'val_'+k : v for k, v in val_log.items()})
-            log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
-        log.update(log_confusion)           
-        return log
-    
     def _train_epoch(self, epoch):
         """
         Training logic for an epoch
@@ -299,6 +259,55 @@ class Trainer(BaseTrainer):
         self.DA_ftns.reset()
         return loss
     
+    def _sampling(self, data, target):
+        if 'down' in self.sampling_type:
+            if 'random' in self.sampling_name: return module_sampling.random_downsampling(data, target)
+        elif 'up' in self.sampling_type:
+            # data, target = self._upsampling(data, target)
+            pass
+        else: TypeError('The applicable types are up or down.')
+        
+    def _plottable_metrics(self, mode='training'):
+        for met in self.plottable_metric_ftns:
+            if mode=='training':
+                actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
+                probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
+            else:
+                actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
+                probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
+                
+            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
+            tag = met.__name__ if tag is None else tag
+            save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
+            fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
+            self.writer.add_figure(tag, fig)
+            if self.save_performance_plot: 
+                if not save_dir.is_dir(): ensure_dir(save_dir, True)
+                fig.savefig(save_dir / f'{tag}_{mode}.png', bbox_inches='tight')
+        
+    def _set_metric_kwargs(self, met_kwargs):
+        if met_kwargs is None: return None, None, None
+        if 'tag' in met_kwargs: 
+            tag = met_kwargs['tag']
+            met_kwargs.pop('tag')  
+        else: tag = None
+        if 'save_dir':
+            save_dir = met_kwargs['save_dir']
+            met_kwargs.pop('save_dir') 
+        else: save_dir = None
+        return met_kwargs, tag, save_dir
+        
+    def _get_a_log(self, epoch):        
+        log = self.train_metrics.result()        
+        log_confusion = self.train_confusion.result()
+
+        if self.do_validation:
+            val_log, val_confusion = self._valid_epoch(epoch) # Validation Result
+            log.update(**{'val_'+k : v for k, v in val_log.items()})
+            log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
+        log.update(log_confusion)           
+        return log
+            
     def _progress(self, batch_idx):
         if hasattr(self.data_loader, 'n_samples'):
             current = batch_idx * self.data_loader.batch_size
@@ -311,12 +320,3 @@ class Trainer(BaseTrainer):
         current_str = str(current) if str_diff == 0 else ' '*str_diff+str(current)
         percentage = f'{100.0 * (current/total):.0f}' 
         return f'[{current_str}/{total} ({percentage:2s})%]'
-    
-    def _sampling(self, data, target):
-        if 'down' in self.sampling_type:
-            if 'random' in self.sampling_name: return module_sampling.random_downsampling(data, target)
-        elif 'up' in self.sampling_type:
-            # data, target = self._upsampling(data, target)
-            pass
-        else: TypeError('The applicable types are up or down.')
-        
