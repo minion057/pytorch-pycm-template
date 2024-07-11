@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-
+from matplotlib.gridspec import GridSpec
 from torchvision.transforms.functional import to_pil_image
 from sklearn.metrics import ConfusionMatrixDisplay
 from itertools import cycle
@@ -208,3 +208,104 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
     if return_plot: return fig
     if show: plt.show()  
     close_all_plots()
+    
+def _ROC_plot_setting():
+    return {
+        'label_fontsize':10,
+        'title_font':{'fontsize':16, 'pad':10},
+        'figsize':(8,5),
+        'precision':3,
+        'baseline_plot_data':([0,1],[0,1]),
+        'baseline_plot_args':{'color':'lightgrey', 'linestyle':'--', 'label':'y = x'},
+        'macro_plot_args':{'color':'midnightblue', 'linestyle':':', 'linewidth':2},
+        'micro_plot_args':{'color':'blueviolet', 'linestyle':':', 'linewidth':2},
+        'roc_plot_args':{'linewidth':2},
+        'legend_args':{'loc':'upper left', 'bbox_to_anchor':(1, 1.02), 'ncol':1},
+        'ax_fig_tight_layout_args':{'rect':[0, 0, 1, 1]},
+    }
+    
+def _ROC_common_plot(ax, plot_args, title:str=None, tight_layout:bool=True):
+    ax.plot(*plot_args['baseline_plot_data'], **plot_args['baseline_plot_args'])
+    ax.set_ylabel('Sensitivity', fontsize=plot_args['label_fontsize'])
+    ax.set_xlabel(f'1 - Specificity', fontsize=plot_args['label_fontsize'])
+    ax.legend(**plot_args['legend_args'])
+    if title is not None: ax.set_title(title, **plot_args['title_font'])
+    if tight_layout: ax.figure.tight_layout(**plot_args['ax_fig_tight_layout_args'])
+    return ax
+
+def plot_ROC(macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area,
+             file_path=None, return_plot:bool=False, show:bool=False):
+    close_all_plots()
+    plot_args = _ROC_plot_setting()
+    fig, ax = plt.subplots(figsize=plot_args['figsize'])
+    ax.plot(macro_fpr, macro_tpr, label=f"macro-average (AUC = {macro_area:.{plot_args['precision']}f})", **plot_args['macro_plot_args'])
+    ax.plot(micro_fpr, micro_tpr, label=f"micro-average (AUC = {micro_area:.{plot_args['precision']}f})", **plot_args['micro_plot_args'])
+    ax = _ROC_common_plot(ax, plot_args, title='ROC Curve')
+    if file_path is not None: ax.figure.savefig(file_path)
+    if return_plot: return ax.figure
+    if show: plt.show()  
+    close_all_plots()
+
+def plot_ROC_OvR(ax, 
+                 macro_fpr=None, macro_tpr=None, micro_fpr=None, micro_tpr=None, macro_area=None, micro_area=None,
+                 file_path=None, return_plot:bool=False, show:bool=False):
+    plot_args = _ROC_plot_setting()
+    if not all(value is None for value in [macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area]):
+        ax.plot(macro_fpr, macro_tpr, label=f"macro-average (AUC = {macro_area:.{plot_args['precision']}f})", **plot_args['macro_plot_args'])
+        ax.plot(micro_fpr, micro_tpr, label=f"micro-average (AUC = {micro_area:.{plot_args['precision']}f})", **plot_args['micro_plot_args'])
+    ax = _ROC_common_plot(ax, plot_args, title='ROC Curve (One vs Rest)', tight_layout=False)
+    ax.figure.suptitle('')
+    
+    # Customize legend
+    plot_styles, plot_labels = ax.get_legend_handles_labels()
+    plot_styles = plot_styles[-3:-1] + plot_styles[:-3] + [plot_styles[-1]]
+    plot_labels = plot_labels[-3:-1] + plot_labels[:-3] + [plot_labels[-1]]
+    for idx, plot_label in enumerate(plot_labels):
+        if plot_label.isdigit():
+            class_idx = int(plot_label)
+            plot_labels[idx] = f"{classes[class_idx]} (AUC = {crv.area()[class_idx]:.{plot_args['precision']}f})"
+    ax.legend(handles=plot_styles, labels=plot_labels, **plot_args['legend_args'])
+    
+    # return roc curve figure
+    ax.figure.set_size_inches(plot_args['figsize'])
+    ax.figure.tight_layout(**plot_args['ax_fig_tight_layout_args'])
+    if file_path is not None: ax.figure.savefig(file_path)
+    if return_plot: return ax.figure
+    if show: plt.show()  
+    close_all_plots()
+    
+def plot_ROC_OvO(classes, pos_neg_pair_indices, fpr, tpr, auc_area,
+                 macro_pair_indices=None, macro_fpr=None, macro_tpr=None, macro_auc_area=None, 
+                 file_path=None, return_plot:bool=False, show:bool=False):
+    close_all_plots()
+    # Setting up for plot
+    plot_args = _ROC_plot_setting()
+    width, height = plot_args['figsize']
+    show_average = all(value is None for value in [macro_pair_indices, macro_fpr, macro_tpr, macro_auc_area])
+    if show_average: width = height+1
+    row, col = 1, 2 if show_average else 1
+    fig = plt.figure(figsize=(col*width, row*height), layout="constrained")
+    gs = GridSpec(row, col, figure=fig, wspace=0.05, hspace=0.2)
+                
+    # Customize ROC curve
+    common_plot_args = {'title':'ROC Curve (One vs One)', 'tight_layout':False}
+    ax, colors = fig.add_subplot(gs[0, 0]), get_color_cycle()
+    for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(pos_neg_pair_indices, colors)):
+        plot_label = f'{classes[pos_class_idx]} vs {classes[neg_class_idx]} (AUC = {auc_area[idx]:.{plot_args["precision"]}f})'
+        ax.plot(fpr[idx], tpr[idx], label=plot_label, color=color)
+    ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
+    if show_average:
+        ax.legend()
+        ax = fig.add_subplot(gs[0, 1])
+        for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(macro_pair_indices, colors)):
+            plot_label = f'macro-average {classes[pos_class_idx]} and {classes[neg_class_idx]} (AUC = {macro_auc_area[idx]:.{plot_args["precision"]}f})'
+            ax.plot(macro_fpr, macro_tpr[idx], label=plot_label, color=color)
+        ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
+        ax.legend()
+        
+    # return roc curve figure
+    if file_path is not None: ax.figure.savefig(file_path)
+    if return_plot: return ax.figure
+    if show: plt.show()  
+    close_all_plots()
+    

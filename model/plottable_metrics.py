@@ -1,12 +1,10 @@
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-
 import numpy as np
 from sklearn import metrics
 from pycm import ROCCurve
 from pycm import ConfusionMatrix as pycmCM
 from pycm.pycm_util import thresholds_calc, threshold_func
-from utils import close_all_plots, onehot_encoding, integer_encoding, get_color_cycle, plot_CI
+from utils import onehot_encoding, integer_encoding
+from utils import plot_CI, plot_ROC, plot_ROC_OvR, plot_ROC_OvO
 from itertools import combinations, permutations
 from copy import deepcopy
 
@@ -34,32 +32,8 @@ def CI_wilson_class(confusion_obj:pycmCM, classes=None,
 
 
 """ 
-Curve metric (i.g., ROC, PV) -> ROC plot 그리는 부분도 plot util.py에 옮기기
+Curve metric (i.g., ROC, PV)
 """
-def _ROC_plot_setting():
-    return {
-        'label_fontsize':10,
-        'title_font':{'fontsize':16, 'pad':10},
-        'figsize':(8,5),
-        'precision':3,
-        'baseline_plot_data':([0,1],[0,1]),
-        'baseline_plot_args':{'color':'lightgrey', 'linestyle':'--', 'label':'y = x'},
-        'macro_plot_args':{'color':'midnightblue', 'linestyle':':', 'linewidth':2},
-        'micro_plot_args':{'color':'blueviolet', 'linestyle':':', 'linewidth':2},
-        'roc_plot_args':{'linewidth':2},
-        'legend_args':{'loc':'upper left', 'bbox_to_anchor':(1, 1.02), 'ncol':1},
-        'ax_fig_tight_layout_args':{'rect':[0, 0, 1, 1]},
-    }
-    
-def _ROC_common_plot(ax, plot_args, title:str=None, tight_layout:bool=True):
-    ax.plot(*plot_args['baseline_plot_data'], **plot_args['baseline_plot_args'])
-    ax.set_ylabel('Sensitivity', fontsize=plot_args['label_fontsize'])
-    ax.set_xlabel(f'1 - Specificity', fontsize=plot_args['label_fontsize'])
-    ax.legend(**plot_args['legend_args'])
-    if title is not None: ax.set_title(title, **plot_args['title_font'])
-    if tight_layout: ax.figure.tight_layout(**plot_args['ax_fig_tight_layout_args'])
-    return ax
-
 def _roc_data(labels, probs, classes, pos_class_name, thresholds=None):
     fpr, tpr, thresholds = [], [], thresholds_calc(probs) if thresholds is None else thresholds
     for t in thresholds:
@@ -86,18 +60,11 @@ def ROC(labels, probs, classes:list, crv=None):
     micro_fpr, micro_tpr, _thresholds = metrics.roc_curve(labels2onehot.ravel(), probs.ravel())
     macro_area, micro_area = metrics.auc(macro_fpr, macro_tpr), metrics.auc(micro_fpr, micro_tpr)
     if return_average_value: return macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area
-    
-    plot_args = _ROC_plot_setting()
-    fig, ax = plt.subplots(figsize=plot_args['figsize'])
-    ax.plot(macro_fpr, macro_tpr, label=f"macro-average (AUC = {macro_area:.{plot_args['precision']}f})", **plot_args['macro_plot_args'])
-    ax.plot(micro_fpr, micro_tpr, label=f"micro-average (AUC = {micro_area:.{plot_args['precision']}f})", **plot_args['micro_plot_args'])
-    ax = _ROC_common_plot(ax, plot_args, title='ROC Curve')
-    return ax.figure
+    return plot_ROC(macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area, return_plot=True)
 
 def ROC_OvR(labels, probs, classes:list, positive_class_indices:[int, list, np.ndarray]=None, 
             show_average:bool=False, return_result:bool=False):
     """ 2. Drawing a ROC curve using One vs Rest """
-    close_all_plots()
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
     crv = ROCCurve(actual_vector=np.array(labels), probs=np.array(probs), classes=label_classes)
@@ -107,30 +74,14 @@ def ROC_OvR(labels, probs, classes:list, positive_class_indices:[int, list, np.n
         raise TypeError("positive_class_indices must be an int, list, or np.ndarray")
     if isinstance(positive_class_indices, (int)): positive_class_indices = [positive_class_indices]
     positive_class = label_classes if positive_class_indices is None else positive_class_indices
-    plot_args = _ROC_plot_setting()
-    print(positive_class)
+    
     # Customize ROC curve
-    ax = crv.plot(classes=positive_class)
+    plot_kwargs = {'ax':crv.plot(classes=positive_class), 'return_plot':True}
     if show_average:
         macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area = ROC(labels, probs, classes, crv)
-        ax.plot(macro_fpr, macro_tpr, label=f"macro-average (AUC = {macro_area:.{plot_args['precision']}f})", **plot_args['macro_plot_args'])
-        ax.plot(micro_fpr, micro_tpr, label=f"micro-average (AUC = {micro_area:.{plot_args['precision']}f})", **plot_args['micro_plot_args'])
-    ax = _ROC_common_plot(ax, plot_args, title='ROC Curve (One vs Rest)', tight_layout=False)
-    ax.figure.suptitle('')
-    
-    # Customize legend
-    plot_styles, plot_labels = ax.get_legend_handles_labels()
-    plot_styles = plot_styles[-3:-1] + plot_styles[:-3] + [plot_styles[-1]]
-    plot_labels = plot_labels[-3:-1] + plot_labels[:-3] + [plot_labels[-1]]
-    for idx, plot_label in enumerate(plot_labels):
-        if plot_label.isdigit():
-            class_idx = int(plot_label)
-            plot_labels[idx] = f"{classes[class_idx]} (AUC = {crv.area()[class_idx]:.{plot_args['precision']}f})"
-    ax.legend(handles=plot_styles, labels=plot_labels, **plot_args['legend_args'])
-    
-    # return roc curve figure
-    ax.figure.set_size_inches(plot_args['figsize'])
-    ax.figure.tight_layout(**plot_args['ax_fig_tight_layout_args'])
+        plot_kwargs.update({'macro_fpr':macro_fpr, 'macro_tpr':macro_tpr, 'macro_area':macro_area,
+                            'micro_fpr':micro_fpr, 'micro_tpr':micro_tpr, 'micro_area':micro_area})
+    fig = plot_ROC_OvR(**plot_kwargs)
     if return_result: 
         roc_dict = {'pos_neg_idx':[], 'fpr':[], 'tpr':[], 'auc':[], 'threshold':[], 'actual':[], 'prob':[]}
         for pos_class_idx in positive_class:
@@ -141,15 +92,14 @@ def ROC_OvR(labels, probs, classes:list, positive_class_indices:[int, list, np.n
             roc_dict['threshold'].append(crv.thresholds)
             roc_dict['actual'].append(crv.actual_vector)
             roc_dict['prob'].append(crv.probs)
-        return {k:np.array(v) for k, v in roc_dict.items()}, ax.figure
-    else: return ax.figure # close_all_plots()
+        return {k:np.array(v) for k, v in roc_dict.items()}, fig
+    else: return fig
 
 def ROC_OvO(labels, probs, classes:list, 
             positive_class_indices:[int, list, np.ndarray]=None, negative_class_indices:[int, list, np.ndarray]=None,
             show_average:bool=False, return_result:bool=False):
     """ 3. Drawing a ROC curve using One vs One """
     # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html#roc-curve-using-the-ovo-macro-average
-    close_all_plots()
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
     
@@ -177,7 +127,6 @@ def ROC_OvO(labels, probs, classes:list,
     positive_roc_dict, negative_roc_dict = deepcopy(roc_dict), deepcopy(roc_dict)
     mean_roc_dict = {'fpr':np.linspace(0.0, 1.0, 1000), 'tpr':[], 'auc':[]}
     for (pos_class_idx, neg_class_idx) in cal_pair_list:
-        # roc_dict['title'].append()
         pos_mask, neg_mask = labels == pos_class_idx, labels == neg_class_idx
         all_mask = np.logical_or(pos_mask, neg_mask)
         all_idx = np.flatnonzero(all_mask)
@@ -224,30 +173,10 @@ def ROC_OvO(labels, probs, classes:list,
         roc_dict['actual'].append(use_roc['actual'][use_index])
         roc_dict['prob'].append(use_roc['prob'][use_index])
     
-    # Setting up for plot
-    plot_args = _ROC_plot_setting()
-    width, height = plot_args['figsize']
-    if show_average: width = height+1
-    row, col = 1, 2 if show_average else 1
-    fig = plt.figure(figsize=(col*width, row*height), layout="constrained")
-    gs = GridSpec(row, col, figure=fig, wspace=0.05, hspace=0.2)
-                
-    # Customize ROC curve
-    common_plot_args = {'title':'ROC Curve (One vs One)', 'tight_layout':False}
-    ax, colors = fig.add_subplot(gs[0, 0]), get_color_cycle()
-    for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(need_pair_list, colors)):
-        plot_label = f'{classes[pos_class_idx]} vs {classes[neg_class_idx]} (AUC = {roc_dict["auc"][idx]:.{plot_args["precision"]}f})'
-        ax.plot(roc_dict['fpr'][idx], roc_dict['tpr'][idx], label=plot_label, color=color)
-    ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
+    plot_kwargs = {'classes': classes, 'fpr': roc_dict['fpr'], 'tpr': roc_dict['tpr'], 'auc': roc_dict['auc'], 'return_plot': True}
     if show_average:
-        ax.legend()
-        ax = fig.add_subplot(gs[0, 1])
-        for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(cal_pair_list, colors)):
-            plot_label = f'macro-average {classes[pos_class_idx]} and {classes[neg_class_idx]} (AUC = {mean_roc_dict["auc"][idx]:.{plot_args["precision"]}f})'
-            ax.plot(mean_roc_dict['fpr'], mean_roc_dict['tpr'][idx], label=plot_label, color=color)
-        ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
-        ax.legend()
-
+        plot_kwargs.update({'mean_fpr': mean_roc_dict['fpr'], 'mean_tpr': mean_roc_dict['tpr'], 'mean_auc': mean_roc_dict['auc']})
+    fig = plot_ROC_OvO(**plot_kwargs)
     # return roc curve figure
-    if return_result: return roc_dict, ax.figure
-    else: return ax.figure # close_all_plots()
+    if return_result: return roc_dict, fig
+    else: return fig
