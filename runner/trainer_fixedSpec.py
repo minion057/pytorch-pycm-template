@@ -2,7 +2,7 @@ from .trainer import Trainer
 from base import FixedSpecConfusionTracker
 from copy import deepcopy
 from pathlib import Path
-from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
+from utils import ensure_dir, read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
 import numpy as np
 
 class FixedSpecTrainer(Trainer):
@@ -17,27 +17,28 @@ class FixedSpecTrainer(Trainer):
         self.device = device
 
         # Removing duplicate AUC calculation since the trainer already computes it.
-        for met in self.metric_ftns:
-            if met.__name__.lower() == 'auc': self.metric_ftns.remove(met)
+        # for met in self.metric_ftns:
+        #     if met.__name__.lower() == 'auc': self.metric_ftns.remove(met)
+        self.ROCNameForFixedSpec = 'ROC_OvO'
 
-        curve_metrics = self.config.config['curve_metrics'] if 'curve_metrics' in self.config.config.keys() else  None
-        self.FixedNegativeROC, self.original_result_name  = None, 'maxprob'
-        if curve_metrics is not None:
-            if 'FixedNegativeROC' in curve_metrics.keys(): 
-                self.FixedNegativeROC ={
-                    'goal_score':curve_metrics['FixedNegativeROC']['fixed_goal'],
-                    'negative_class_indices':curve_metrics['FixedNegativeROC']['negative_class_indices'],
-                    'output_dir': self.output_dir / f"{curve_metrics['FixedNegativeROC']['save_dir']}",
+        self.ROCForFixedSpecParams, self.original_result_name  = None, 'maxprob'
+        if self.plottable_metrics_kwargs is not None:
+            if self.ROCNameForFixedSpec in self.plottable_metrics_kwargs.keys(): 
+                self.ROCForFixedSpecParams ={
+                    'goal_score':self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['fixed_goal'],
+                    'negative_class_indices':self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['negative_class_indices'],
+                    'output_dir': self.output_dir / f"{self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['save_dir']}",
                 }
-                self.FixedNegativeROC['output_metrics'] = self.FixedNegativeROC['output_dir'] / 'metrics.json'
-                if not self.FixedNegativeROC['output_dir'].is_dir(): self.FixedNegativeROC['output_dir'].mkdir(parents=True, exist_ok=True)
-                self.train_FixedNegativeROC = FixedSpecConfusionTracker(goal_score=self.FixedNegativeROC['goal_score'],  classes=self.classes,
-                                                                        negative_class_idx=self.FixedNegativeROC['negative_class_idx'])
-                self.valid_FixedNegativeROC = FixedSpecConfusionTracker(goal_score=self.FixedNegativeROC['goal_score'], classes=self.classes,
-                                                                        negative_class_idx=self.FixedNegativeROC['negative_class_idx'])
-                self.auc = {f'{pos_class_name} VS {neg_class_name}':None for goal, pos_class_name, neg_class_name in self.train_FixedNegativeROC.index}
-            else: raise ValueError('Warring: FixedNegativeROC is not in the config[curve_metrics]')
-        else: print('Warring: curve_metrics is not in the config')
+                
+                self.ROCForFixedSpecParams['output_metrics'] = self.ROCForFixedSpecParams['output_dir'] / 'metrics.json'
+                if not self.ROCForFixedSpecParams['output_dir'].is_dir(): ensure_dir(self.ROCForFixedSpecParams['output_dir'], True)
+                self.train_ROCForFixedSpec = FixedSpecConfusionTracker(goal_score=self.ROCForFixedSpecParams['goal_score'], classes=self.classes,
+                                                                       negative_class_indices=self.ROCForFixedSpecParams['negative_class_indices'])
+                self.valid_ROCForFixedSpec = FixedSpecConfusionTracker(goal_score=self.ROCForFixedSpecParams['goal_score'], classes=self.classes,
+                                                                       negative_class_indices=self.ROCForFixedSpecParams['negative_class_indices'])
+                self.auc = {f'{pos_class_name} VS {neg_class_name}':None for goal, pos_class_name, neg_class_name in self.train_ROCForFixedSpec.index}
+            else: raise ValueError('Warring: FixedNegativeROC is not in the config[plottable_metrics_kwargs]')
+        else: raise ValueError('Warring: plottable_metrics_kwargs is not in the config')
         
     def _get_a_log(self, epoch):
         '''
@@ -80,26 +81,26 @@ class FixedSpecTrainer(Trainer):
         # AUC Result
         log['auc'], use_goal = {}, []
         if self.do_validation: log['val_auc'] = {}
-        for goal, pos_class_name, neg_class_name in self.train_FixedNegativeROC.index:
+        for goal, pos_class_name, neg_class_name in self.train_ROCForFixedSpec.index:
             if goal in use_goal: continue
             use_goal.append(goal)
-            log['auc'][pos_class_name] = self.train_FixedNegativeROC.get_auc(goal, pos_class_name, neg_class_name)
-            if self.do_validation: log['val_auc'][pos_class_name] = self.valid_FixedNegativeROC.get_auc(goal, pos_class_name, neg_class_name)
+            log['auc'][pos_class_name] = self.train_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
+            if self.do_validation: log['val_auc'][pos_class_name] = self.valid_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
         
         # model save and reset
         self._save_FixedBestModel(epoch)
-        self.train_FixedNegativeROC.reset()
-        self.valid_FixedNegativeROC.reset()
+        self.train_ROCForFixedSpec.reset()
+        self.valid_ROCForFixedSpec.reset()
         return log
     
     def _FixedNegativeROCResult(self, mode='training'):    
         if mode=='training':
-            FixedNegativeROC = self.train_FixedNegativeROC
-            self.train_FixedNegativeROC.update(self.train_confusion.get_actual_vector(self.confusion_key),
+            FixedNegativeROC = self.train_ROCForFixedSpec
+            self.train_ROCForFixedSpec.update(self.train_confusion.get_actual_vector(self.confusion_key),
                                                self.train_confusion.get_probability_vector(self.confusion_key), img_update=False)
         else:
-            FixedNegativeROC = self.valid_FixedNegativeROC
-            self.valid_FixedNegativeROC.update(self.valid_confusion.get_actual_vector(self.confusion_key),
+            FixedNegativeROC = self.valid_ROCForFixedSpec
+            self.valid_ROCForFixedSpec.update(self.valid_confusion.get_actual_vector(self.confusion_key),
                                                self.valid_confusion.get_probability_vector(self.confusion_key), img_update=False)
         goal_metrics = {}
         # 1. AUC: Pass
@@ -122,7 +123,7 @@ class FixedSpecTrainer(Trainer):
         self.logger.info('')
         save_model_name = f'model_best_AUC_Positive'
         message = 'Saving current best AUC model'
-        FixedNegativeROC = self.train_FixedNegativeROC if self.do_validation else self.valid_FixedNegativeROC
+        FixedNegativeROC = self.train_ROCForFixedSpec if self.do_validation else self.valid_ROCForFixedSpec
         use_goal = []
         for goal, pos_class_name, neg_class_name in FixedNegativeROC.index:
             if goal in use_goal: continue
@@ -156,7 +157,7 @@ class FixedSpecTrainer(Trainer):
                 if 'val_confusion' in list(val.keys()):
                     plot_confusion_matrix_1(val['val_confusion'], self.classes, 'Confusion Matrix: Validation Data', self.output_dir/'confusion_matrix_validation.png')
                 save_metrics_path = self.output_metrics
-            else: save_metrics_path = Path(str(self.FixedNegativeROC['output_metrics']).replace('.json', f'_{key}.json'))
+            else: save_metrics_path = Path(str(self.ROCForFixedSpecParams['output_metrics']).replace('.json', f'_{key}.json'))
             
             # Save the result of metrics.
             if save_metrics_path.is_file():
@@ -184,7 +185,7 @@ class FixedSpecTrainer(Trainer):
             write_dict2json(result, save_metrics_path)
 
             # Save the reuslt of metrics graphs.
-            save_dir = self.output_dir if key == self.original_result_name else self.FixedNegativeROC['output_dir']
+            save_dir = self.output_dir if key == self.original_result_name else self.ROCForFixedSpecParams['output_dir']
             if self.save_performance_plot: plot_performance_N(result, save_dir/f'metrics_graphs_{key}.png')
             close_all_plots()
             

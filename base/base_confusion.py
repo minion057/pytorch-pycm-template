@@ -8,8 +8,7 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from pycm import ConfusionMatrix as pycmCM
 from pycm.pycm_util import threshold_func
 import model.metric as module_metric
-import model.metric_curve_plot as module_curve_metric
-
+import model.plottable_metrics  as module_plottable_metric
 import matplotlib.pyplot as plt
 
 class ConfusionTracker:
@@ -106,7 +105,7 @@ class FixedSpecConfusionTracker:
         elif type(actual_vector[0]) == 'str': actual_vector = [self.classes.index(a) for a in actual_vector]
                
         # Generating a confusion matrix with predetermined scores.
-        roc_dict, roc_fig = module_curve_metric.ROC_OvO(labels=np.array(actual_vector), probs=np.array(probability_vector), 
+        roc_dict, roc_fig = module_plottable_metric.ROC_OvO(labels=np.array(actual_vector), probs=np.array(probability_vector), 
                                                         classes=np.unique(actual_vector).tolist(), 
                                                         positive_class_indices=list(self.positive_class_indices.keys()), 
                                                         negative_class_indices=list(self.negative_class_indices.keys()),
