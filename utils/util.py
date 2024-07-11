@@ -29,10 +29,10 @@ def write_dict2json(content, file_path):
     with open(file_path, 'w', encoding='utf-8') as handle:
         json.dump(content, handle, ensure_ascii=False, indent='\t')
 
-def convert_keys_to_string(d):
-    if not isinstance(d, dict): return d
+def convert_keys_to_string(content:dict):
+    if not isinstance(content, dict): return content
     new_dict = {}
-    for key, value in d.items():
+    for key, value in content.items():
         # Convert key to string
         new_key = str(key)
         
