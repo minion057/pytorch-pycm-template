@@ -70,7 +70,7 @@ class Trainer(BaseTrainer):
             hook = register_forward_hook_layer(self.model, self.DA_ftns.forward_pre_hook if self.pre_hook else self.DA_ftns.forward_hook, **self.hookargs)
         
         for batch_idx, (data, target) in enumerate(self.data_loader):
-            batch_num = (epoch - 1) * self.len_epoch + batch_idx
+            batch_num = (epoch - 1) * self.len_epoch + batch_idx + 1
             self.writer.set_step(batch_num, 'batch_train')
                 
             # 1. To move Torch to the GPU or CPU
@@ -144,7 +144,7 @@ class Trainer(BaseTrainer):
         
         if self.cfg_da is not None: hook.remove()
         # 5-3-2. Update the curve plot and projector
-        self.writer.set_step(epoch-1)
+        self.writer.set_step(epoch)
         if self.plottable_metric_ftns is not None: self._plottable_metrics(mode='training')
         if self.train_projector and epoch == 1: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
         # 5-3-3. Upate the example of predtion
@@ -158,7 +158,7 @@ class Trainer(BaseTrainer):
         
         # 6. Upate the lr scheduler
         if self.lr_scheduler is not None:
-            self.writer.set_step(epoch-1)
+            self.writer.set_step(epoch)
             self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
             if self.lr_scheduler_name == 'ReduceLROnPlateau': self.lr_scheduler.step(val_log['loss'])
             else: self.lr_scheduler.step()
@@ -181,7 +181,7 @@ class Trainer(BaseTrainer):
         
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
-                batch_num = (epoch - 1) * len(self.valid_data_loader) + batch_idx
+                batch_num = (epoch - 1) * len(self.valid_data_loader) + batch_idx + 1
                 self.writer.set_step(batch_num, 'batch_valid')
                 
                 # 1. To move Torch to the GPU or CPU
@@ -232,7 +232,7 @@ class Trainer(BaseTrainer):
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
                     
         # 4-2. Update the curve plot and projector
-        self.writer.set_step(epoch-1, 'valid')
+        self.writer.set_step(epoch, 'valid')
         if self.plottable_metric_ftns is not None: self._plottable_metrics(mode='validation')
         if self.valid_projector and epoch == 1: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
         # 4-3. Upate the example of predtion

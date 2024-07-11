@@ -41,7 +41,7 @@ class Tester(BaseTester):
         data_channel = None
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(tqdm(self.data_loader)):
-                batch_num = batch_idx
+                batch_num = batch_idx + 1
                 
                 # 1. To move Torch to the GPU or CPU
                 data, target = data.to(self.device), target.to(self.device)

@@ -203,7 +203,7 @@ class FixedSpecTrainer(Trainer):
         # Save the value per epoch. And save the value of training and validation.
         if self.tensorboard:
             for key, value in log.items():
-                self.writer.set_step(log['epoch']-1)
+                self.writer.set_step(log['epoch'])
                 if key in ['epoch', 'confusion', 'val_confusion']: continue
                 if 'val_' in key or 'time' in key: continue
                 if type(value) != dict: # loss
@@ -234,10 +234,10 @@ class FixedSpecTrainer(Trainer):
                             else: self.writer.add_scalars(new_key, {str(k):v for k, v in new_value.items()})
             
                     # 3. Confusion Matrix
-                    self.writer.set_step(log['epoch']-1, f'train_{key}')
+                    self.writer.set_step(log['epoch'], f'train_{key}')
                     tag = f'ConfusionMatrix'
                     self.writer.add_figure(tag, plot_confusion_matrix_1(value['confusion'], self.classes, return_plot=True))
                     if 'val_confusion' in value.keys():
-                        self.writer.set_step(log['epoch']-1, f'valid_{key}')
+                        self.writer.set_step(log['epoch'], f'valid_{key}')
                         self.writer.add_figure(tag, plot_confusion_matrix_1(value['val_confusion'], self.classes, return_plot=True))
                     close_all_plots()

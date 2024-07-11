@@ -250,7 +250,7 @@ class BaseTrainer:
     def _save_tensorboard(self, log):
         # Save the value per epoch. And save the value of training andvalidation.
         if self.tensorboard:
-            self.writer.set_step(log['epoch']-1)
+            self.writer.set_step(log['epoch'])
             for key, value in log.items():
                 if key in ['epoch', 'confusion', 'val_confusion']: continue
                 if 'val_' in key or 'time' in key: continue
@@ -271,7 +271,7 @@ class BaseTrainer:
             # 3. Confusion Matrix
             self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['confusion'], self.classes, return_plot=True))
             if 'val_confusion' in log.keys():
-                self.writer.set_step(log['epoch']-1, 'valid')
+                self.writer.set_step(log['epoch'], 'valid')
                 self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['val_confusion'], self.classes, return_plot=True))
             close_all_plots()
         
