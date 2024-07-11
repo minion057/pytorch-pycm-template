@@ -38,25 +38,6 @@ class FixedSpecTrainer(Trainer):
                 self.auc = {f'{pos_class_name} VS {neg_class_name}':None for goal, pos_class_name, neg_class_name in self.train_FixedNegativeROC.index}
             else: raise ValueError('Warring: FixedNegativeROC is not in the config[curve_metrics]')
         else: print('Warring: curve_metrics is not in the config')
-       
-    # def _plottable_metrics(self, mode='training'):
-    #     for met in self.plottable_metric_ftns:
-    #         if mode=='training':
-    #             actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
-    #             probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
-    #         else:
-    #             actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
-    #             probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
-            
-    #         if met.__name__ == 'FixedNegativeROC': # -> save_dir로 대체
-    #             save_path = self.FixedNegativeROC['output_dir'] / f'{met.__name__}_{mode}.png'
-    #             fig = met(actual_vector, probability_vector, self.classes, self.FixedNegativeROC['negative_class_idx'])
-    #         else: 
-    #             save_path = self.output_dir / f'{met.__name__}_{mode}.png'
-    #             fig = met(actual_vector, probability_vector, self.classes)
-            
-    #         self.writer.add_figure(met.__name__, fig)
-    #         if self.save_performance_plot: fig.savefig(save_path, bbox_inches='tight')
         
     def _get_a_log(self, epoch):
         '''

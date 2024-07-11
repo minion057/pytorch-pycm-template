@@ -31,7 +31,6 @@ def write_dict2json(content, file_path):
 
 def convert_keys_to_string(d):
     if not isinstance(d, dict): return d
-
     new_dict = {}
     for key, value in d.items():
         # Convert key to string

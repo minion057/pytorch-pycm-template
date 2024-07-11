@@ -66,7 +66,9 @@ def main(config):
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
     metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
-    plottable_metric = [getattr(module_plottable_metric, met) for met in config['plottable_metrics'].keys()] if 'plottable_metrics' in config.config.keys() else None
+    plottable_metric = None
+    if 'plottable_metrics' in config.config.keys():
+        plottable_metric = [getattr(module_plottable_metric, met) for met in config['plottable_metrics'].keys()]
     
     tester = Tester(model, criterion, metrics, plottable_metric,
                     config=config,

@@ -84,8 +84,9 @@ class Tester(BaseTester):
                     data_channel = self.prediction_images.shape[1]
                     preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())                    
                     preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
-                    use_prob = self.confusion.get_probability_vector(self.confusion_key)[-len(preds):] if self.plottable_metric_ftns is not None \
-                               else [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
+                    if self.plottable_metric_ftns is not None:
+                        use_prob = self.confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
+                    else: use_prob = [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
         

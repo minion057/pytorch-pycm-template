@@ -2,14 +2,12 @@ import torch
 from torch.nn import DataParallel as DP
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from abc import abstractmethod
-from logger import TensorboardWriter
-
-from pathlib import Path
-from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
-
 import time
 import datetime
+from abc import abstractmethod
+from logger import TensorboardWriter
+from pathlib import Path
+from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class BaseTester:
     """
