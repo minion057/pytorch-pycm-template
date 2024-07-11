@@ -104,24 +104,32 @@ def ROC_OvO(labels, probs, classes:list,
     label_classes = np.unique(labels).tolist()
     
     # Calculate ROC curve for each class combination
-    if not isinstance(positive_class_indices, (int, list, np.ndarray)) and positive_class_indices is not None: raise TypeError("positive_class_indices must be an int, list, or np.ndarray")
-    if not isinstance(negative_class_indices, (int, list, np.ndarray)) and negative_class_indices is not None: raise TypeError("negative_class_indices must be an int, list, or np.ndarray")
-    if isinstance(positive_class_indices, (int)): positive_class_indices = [positive_class_indices]
-    if isinstance(negative_class_indices, (int)): negative_class_indices = [negative_class_indices]
-    if positive_class_indices is not None and len(np.where(np.array(positive_class_indices)>=len(classes))[0]) != 0: 
-        raise ValueError('The positive_class_indices cannot be outside of its length of a class.')
+    if positive_class_indices is None and negative_class_indices is None: 
+        raise ValueError("positive_class_indices and negative_class_indices cannot be None at the same time.")
+    if positive_class_indices is not None:
+        if not isinstance(positive_class_indices, (int, list, np.ndarray)): 
+            raise TypeError("positive_class_indices must be an int, list, or np.ndarray")
+        if isinstance(positive_class_indices, (int)): positive_class_indices = [positive_class_indices]
+        if len(np.where(np.array(positive_class_indices)>=len(classes))[0]) != 0: 
+            raise ValueError('The positive_class_indices cannot be outside of its length of a class.')
+    else: positive_class_indices = deepcopy(label_classes)
     if negative_class_indices is not None:
-        if len(np.where(np.array(negative_class_indices)>=len(classes))[0]) != 0: raise ValueError('The negative_class_indices cannot be outside of its length of a class.')
-        pos_neg_same_index = [index for index, element in enumerate(negative_class_indices) if element in positive_class_indices]
-        if pos_neg_same_index != []: raise ValueError(f'The class to be set negative cannot be the same as the class to be set positive.: {np.array(classes)[pos_neg_same_index]}')    
+        if not isinstance(negative_class_indices, (int, list, np.ndarray)): 
+            raise TypeError("negative_class_indices must be an int, list, or np.ndarray")
+        if isinstance(negative_class_indices, (int)): negative_class_indices = [negative_class_indices]
+        if len(np.where(np.array(negative_class_indices)>=len(classes))[0]) != 0: 
+            raise ValueError('The negative_class_indices cannot be outside of its length of a class.')
+        # Can count all classes, so comment out the two lines below.
+        # pos_neg_same_index = [index for index, element in enumerate(negative_class_indices) if element in positive_class_indices]
+        # if pos_neg_same_index != []: raise ValueError(f'The class to be set negative cannot be the same as the class to be set positive.: {np.array(classes)[pos_neg_same_index]}')    
+    else: negative_class_indices = deepcopy(label_classes)
     
-    positive_class = label_classes if positive_class_indices is None else positive_class_indices
-    nagative_class = negative_class_indices
     cal_pair_list, need_pair_list = np.array(list(combinations(label_classes, 2))), np.array(list(permutations(label_classes, 2)))
-    cal_pair_list = [i for i in cal_pair_list if i[0] in positive_class or i[1] in positive_class]
-    if negative_class_indices is not None: cal_pair_list = [i for i in cal_pair_list if i[0] in nagative_class or i[1] in nagative_class]
-    need_pair_list = need_pair_list[np.isin(need_pair_list[:, 0], positive_class)]
-    if negative_class_indices is not None: need_pair_list = need_pair_list[np.isin(need_pair_list[:, 1], nagative_class)]
+    cal_pair_list = [i for i in cal_pair_list if i[0] in positive_class_indices or i[1] in positive_class_indices]
+    cal_pair_list = [i for i in cal_pair_list if i[0] in negative_class_indices or i[1] in negative_class_indices]
+    need_pair_list = need_pair_list[np.isin(need_pair_list[:, 0], positive_class_indices)]
+    need_pair_list = need_pair_list[np.isin(need_pair_list[:, 1], negative_class_indices)]
+    if cal_pair_list == [] or need_pair_list == []: raise ValueError('No ROC curve can be drawn.')
     
     roc_dict = {'fpr':[], 'tpr':[], 'auc':[], 'threshold':[], 'actual':[], 'prob':[]}
     positive_roc_dict, negative_roc_dict = deepcopy(roc_dict), deepcopy(roc_dict)
@@ -165,7 +173,7 @@ def ROC_OvO(labels, probs, classes:list,
         if same_index == -1 and reverse_index == -1: raise ValueError(f'Did not calculate ROC.: {classes[pos_class_idx]} vs {classes[neg_class_idx]}')
         use_index = same_index if same_index != -1 else reverse_index
         use_roc = positive_roc_dict if same_index != -1 else negative_roc_dict
-        roc_dict['pos_neg_idx'].append([pos_class_idx, neg_class_idx] if same_index != -1 else [neg_class_idx, pos_class_idx])
+        roc_dict['pos_neg_idx'].append([pos_class_idx, neg_class_idx])
         roc_dict['fpr'].append(use_roc['fpr'][use_index])
         roc_dict['tpr'].append(use_roc['tpr'][use_index])
         roc_dict['auc'].append(use_roc['auc'][use_index])
