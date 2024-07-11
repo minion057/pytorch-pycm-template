@@ -33,15 +33,7 @@ def CI_wilson_class(confusion_obj:pycmCM, classes=None,
 
 """ 
 Curve metric (i.g., ROC, PV)
-"""
-def _roc_data(labels, probs, classes, pos_class_name, thresholds=None):
-    fpr, tpr, thresholds = [], [], thresholds_calc(probs) if thresholds is None else thresholds
-    for t in thresholds:
-        def lambda_fun(x): return threshold_func(x, pos_class_name, classes, t)
-        cm = pycmCM(actual_vector=labels, predict_vector=probs, threshold=lambda_fun)
-        fpr.append(cm.FPR[pos_class_name]); tpr.append(cm.TPR[pos_class_name])
-    return np.array(fpr), np.array(tpr), np.array(thresholds)
-    
+"""    
 def ROC(labels, probs, classes:list, crv=None):
     """ 1. Drawing a ROC curve using average (macro/micro) """
     return_average_value = False if crv is None else True
@@ -98,6 +90,14 @@ def ROC_OvR(labels, probs, classes:list, positive_class_indices:[int, list, np.n
 def ROC_OvO(labels, probs, classes:list, 
             positive_class_indices:[int, list, np.ndarray]=None, negative_class_indices:[int, list, np.ndarray]=None,
             show_average:bool=False, return_result:bool=False):
+    def _roc_data(actual_vector, predict_vector, class_list, pos_class_name, thresholds=None):
+        fpr, tpr, thresholds = [], [], thresholds_calc(predict_vector) if thresholds is None else thresholds
+        for t in thresholds:
+            def lambda_fun(x): return threshold_func(x, pos_class_name, class_list, t)
+            cm = pycmCM(actual_vector=actual_vector, predict_vector=predict_vector, threshold=lambda_fun)
+            fpr.append(cm.FPR[pos_class_name]); tpr.append(cm.TPR[pos_class_name])
+        return np.array(fpr), np.array(tpr), np.array(thresholds)
+    
     """ 3. Drawing a ROC curve using One vs One """
     # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html#roc-curve-using-the-ovo-macro-average
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
