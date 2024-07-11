@@ -47,6 +47,8 @@ def precision_class(confusion_obj:pycmCM, classes=None):
     return base_class_metric('PPV', confusion_obj, classes)
     
 """ AUC (Area under the ROC curve) """
-def AUC(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+def AUC_OvR(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     if positive_class_idx is None: raise ValueError('AUC requires positive_class_idx.')
-    return base_metric('AUC', confusion_obj, positive_class_idx)        
+    return base_metric('AUC', confusion_obj, positive_class_idx)     
+def AUC_OvR_class(confusion_obj:pycmCM, classes=None):
+    return base_class_metric('AUC', confusion_obj, classes)      
