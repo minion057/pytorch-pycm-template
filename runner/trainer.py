@@ -98,12 +98,14 @@ class Trainer(BaseTrainer):
                 self.optimizer.zero_grad()
                 
             # 5. Update the Result
+            use_data, use_target = data.detach().cpu(), target.detach().cpu().tolist()
+            use_output, use_predict =output.detach().cpu(), predict.detach().cpu()
             # 5-1. loss
             self.train_metrics.update('loss', loss.item())
             
             # 5-2. confusion matrix 
-            confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
-            if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
+            confusion_content = {'actual':use_target, 'predict':use_predict.tolist()}
+            if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in use_output]
             self.train_confusion.update(self.confusion_key, confusion_content, img_update=False)
             
             confusion_obj = self.train_confusion.get_confusion_obj(self.confusion_key)
@@ -118,24 +120,24 @@ class Trainer(BaseTrainer):
             # The data concerning the projector is collected with each batch and will be updated after all batches are completed.
             # See 5-3-2.
             if self.train_projector and epoch == 1:                
-                label_img, features = tb_projector_resize(data.detach().cpu().clone(), label_img, features)
-                class_labels.extend([str(self.classes[lab]) for lab in target.cpu().tolist()])
+                label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
+                class_labels.extend([str(self.classes[lab]) for lab in use_target])
                 
             # 6. Print the result
             if batch_idx % self.log_step == 0 or batch_idx == self.len_epoch-1 or self.len_epoch == 1:
                 self.logger.debug(f'Train Epoch: {epoch} {self._progress(batch_idx)} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
-                self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
             
             if (batch_idx == self.len_epoch-2 or self.len_epoch == 1) and self.tensorboard_pred_plot: 
                 # last batch -1 > To minimize batches with a length of 1 as much as possible.
                 # If you want to modify the last batch, pretend that self.len_epoch-2 is self.len_epoch-1.
-                self.prediction_images, self.prediction_labels = data.cpu()[-self.preds_item_cnt:], [self.classes[lab] for lab in target.cpu().tolist()[-self.preds_item_cnt:]]
+                self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
                 data_channel = self.prediction_images.shape[1]
-                preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())
+                preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
                 preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
                 if self.plottable_metric_ftns is not None:
                     use_prob = self.train_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                else: use_prob = [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
+                else: use_prob = [self.softmax(el).tolist() for el in use_output[-len(preds):]]
                 self.prediction_preds = [self.classes[lab] for lab in preds]
                 self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
             if batch_idx == self.len_epoch: break
@@ -190,12 +192,15 @@ class Trainer(BaseTrainer):
                 output = self.model(data)
                 logit, predict = torch.max(output, 1) 
                 loss = self._loss(output, target, logit)
-
+                
+                use_data, use_target = data.detach().cpu(), target.detach().cpu().tolist()
+                use_output, use_predict =output.detach().cpu(), predict.detach().cpu()
+                
                 # 3. Update the loss
                 self.valid_metrics.update('loss', loss.item())
                 # 4. Update the confusion matrix and input data
-                confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
-                if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
+                confusion_content = {'actual':use_target, 'predict':use_predict.clone().tolist()}
+                if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in use_output]
                 self.valid_confusion.update(self.confusion_key, confusion_content, img_update=False)
                     
                 confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
@@ -206,23 +211,23 @@ class Trainer(BaseTrainer):
                     if met_kwargs is None: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes))
                     else: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))               
                     
-                if batch_idx % self.log_step == 0: self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                if batch_idx % self.log_step == 0: self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
                 
                 # 4-1. Update the Projector
                 if self.valid_projector and epoch == 1:                    
-                    label_img, features = tb_projector_resize(data.detach().cpu().clone(), label_img, features)
-                    class_labels.extend([str(self.classes[lab]) for lab in target.cpu().tolist()])
+                    label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
+                    class_labels.extend([str(self.classes[lab]) for lab in use_target])
                 
                 if (batch_idx == len(self.valid_data_loader)-2 or len(self.valid_data_loader) == 1) and self.tensorboard_pred_plot:
                     # last batch -1 > To minimize batches with a length of 1 as much as possible.
                     # If you want to modify the last batch, pretend that self.len_epoch-2 is self.len_epoch-1.
-                    self.prediction_images, self.prediction_labels = data.cpu()[-self.preds_item_cnt:], [self.classes[lab] for lab in target.cpu().tolist()[-self.preds_item_cnt:]]
+                    self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
                     data_channel = self.prediction_images.shape[1]
-                    preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())
+                    preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
                     preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1  
                     if self.plottable_metric_ftns is not None: 
                         use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                    else: use_prob = [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
+                    else: use_prob = [self.softmax(el).tolist() for el in use_output[-len(preds):]]
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
                     
@@ -275,7 +280,7 @@ class Trainer(BaseTrainer):
             else:
                 actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
                 probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
-                
+            
             met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
             tag = met.__name__ if tag is None else tag
             save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
