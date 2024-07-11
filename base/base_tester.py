@@ -7,7 +7,7 @@ import datetime
 from abc import abstractmethod
 from logger import TensorboardWriter
 from pathlib import Path
-from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
+from utils import ensure_dir, write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class BaseTester:
     """
@@ -50,7 +50,7 @@ class BaseTester:
         else: self.logger.warning("Warning: Pre-trained model is not use.\n")
         
         # Setting the save directory path
-        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
+        if not self.output_dir.is_dir(): ensure_dir(self.output_dir)
         self.output_metrics = self.output_dir / 'metrics-test.json'
         
 

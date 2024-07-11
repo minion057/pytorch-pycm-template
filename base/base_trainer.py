@@ -9,7 +9,7 @@ from numpy import inf
 from logger import TensorboardWriter
 from copy import deepcopy
 from pathlib import Path
-from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
+from utils import ensure_dir, read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
 
 class BaseTrainer:
     """
@@ -54,7 +54,7 @@ class BaseTrainer:
         # Setting the save directory path
         self.checkpoint_dir = config.checkpoint_dir
         self.output_dir = Path(config.output_dir) / 'training'
-        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
+        if not self.output_dir.is_dir(): ensure_dir(self.output_dir, True)
         self.output_metrics = self.output_dir / 'metrics.json'
 
         # setup visualization writer instance

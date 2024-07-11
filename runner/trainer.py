@@ -2,8 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTrainer, MetricTracker, ConfusionTracker
-from utils import inf_loop, tb_projector_resize, plot_classes_preds, close_all_plots
-from utils import register_forward_hook_layer
+from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize, plot_classes_preds, close_all_plots
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
@@ -79,7 +78,7 @@ class Trainer(BaseTrainer):
             fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
             self.writer.add_figure(tag, fig)
             if self.save_performance_plot: 
-                if not save_dir.is_dir(): save_dir.mkdir(parents=True, exist_ok=True)
+                if not save_dir.is_dir(): ensure_dir(save_dir, True)
                 fig.savefig(save_dir / f'{tag}_{mode}.png', bbox_inches='tight')
             
     def _get_a_log(self, epoch):        

@@ -8,10 +8,10 @@ from copy import deepcopy
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import RocCurveDisplay
 
-def ensure_dir(dirname):
+def ensure_dir(dirname, exist_ok:bool=False):
     dirname = Path(dirname)
     if not dirname.is_dir():
-        dirname.mkdir(parents=True, exist_ok=False)
+        dirname.mkdir(parents=True, exist_ok=exist_ok)
 
 def read_json(fname):
     fname = Path(fname)

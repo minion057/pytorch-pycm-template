@@ -1,10 +1,11 @@
-from pathlib import Path
 import numpy as np
 import pandas as pd
-from collections import OrderedDict
 import json
 import matplotlib.pyplot as plt
+from pathlib import Path
+from collections import OrderedDict
 from copy import deepcopy
+from utils import ensure_dir
 
 class ResultVisualization:
     def __init__(self, parent_dir, result_name,
@@ -251,7 +252,7 @@ class ResultVisualization:
         save_name += f'.{extension}' 
         if str(save_name)[0] != '/': save_path = self.output_dir / save_name
         else: save_path = Path(save_name)
-        if not save_path.parent.is_dir(): save_path.parent.mkdir(parents=True, exist_ok=True)
+        if not save_path.parent.is_dir(): ensure_dir(save_path.parent, True)
         
         writer=pd.ExcelWriter(save_path, engine='openpyxl')
         for sheet_name, df in self.df_dict.items():
@@ -267,7 +268,7 @@ class ResultVisualization:
         save_name += f'.{extension}' 
         if str(save_name)[0] != '/': save_path = self.output_dir / save_name
         else: save_path = Path(save_name)
-        if not save_path.parent.is_dir(): save_path.parent.mkdir(parents=True, exist_ok=True)
+        if not save_path.parent.is_dir(): ensure_dir(save_path.parent, True)
         
         title = (by_metric.lower().capitalize() if by_metric_replace_str is None else by_metric_replace_str) + ' by '
         for idx, b in enumerate(by, 1):

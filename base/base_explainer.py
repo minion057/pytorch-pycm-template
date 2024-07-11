@@ -5,8 +5,7 @@ import numpy as np
 from abc import abstractmethod
 from copy import deepcopy
 from pathlib import Path
-from utils import get_layers
-
+from utils import ensure_dir, get_layers
 
 class BaseExplainer:
     def __init__(self, model, config, classes, device, xai_layers:list=None):
@@ -33,8 +32,7 @@ class BaseExplainer:
         # if xai_layers is None or len(xai_layers) >= len(self.all_layers): self.xai_layers = self._find_last_conv_layer()
         
         # Setting the save directory path
-        # self.output_dir = Path('/data/jhyu/TNBC-performance/saved/')
-        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)        
+        if not self.output_dir.is_dir(): ensure_dir(self.output_dir)        
         
     def _resume_checkpoint(self, resume_path):
         resume_path = str(resume_path)

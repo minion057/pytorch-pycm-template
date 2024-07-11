@@ -5,7 +5,7 @@ from functools import reduce, partial
 from operator import getitem
 from datetime import datetime
 from logger import setup_logging
-from utils import read_json, write_json
+from utils import ensure_dir, read_json, write_json
 import shutil
 
 class ConfigParser:
@@ -51,9 +51,9 @@ class ConfigParser:
         # make directory for saving checkpoints and log.
         exist_ok = run_id == ''
         if self.resume is None:
-            self.checkpoint_dir.mkdir(parents=True, exist_ok=exist_ok)
-            self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
-            self.output_dir.mkdir(parents=True, exist_ok=exist_ok)
+            ensure_dir(self.checkpoint_dir, exist_ok)
+            ensure_dir(self.log_dir, exist_ok)
+            ensure_dir(self.output_dir, exist_ok)
             # save updated config file to the checkpoint dir
             write_json(self.config, self._checkpoint_dir / 'config.json')
         else:
