@@ -69,6 +69,12 @@ class ConfusionTracker:
         cm = self.get_confusion_obj(key)
         if type(cm) != pycmCM: return None
         return cm.plot(number_label=True).figure if title is None else cm.plot(number_label=True, title=title).figure
+    def saveConfusionMatrix(self, key, save_dir, save_name:str='cm'): 
+        cm = self.get_confusion_obj(key)
+        if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
+        if save_name != 'cm': save_name = f'cm_{save_name}'
+        cm.save_obj(Path(save_dir)/save_name) # pycmCM(file=open(f'{save_name}.obj', "r"))
+        
     
 class FixedSpecConfusionTracker:
     """ The current metric uses the one-vs-one strategy. """
@@ -188,3 +194,8 @@ class FixedSpecConfusionTracker:
         cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
         if type(cm) != pycmCM: return None
         return cm.plot(number_label=True).figure if title is None else cm.plot(number_label=True, title=title).figure
+    def saveConfusionMatrix(self, goal, pos_class_name, neg_class_name, save_dir, save_name:str='cm'):  
+        cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
+        if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
+        if save_name != 'cm': save_name = f'cm_{save_name}'
+        cm.save_obj(Path(save_dir)/save_name) # pycmCM(file=open(f'{save_name}.obj', "r"))
