@@ -22,7 +22,6 @@ class Tester(BaseTester):
         self.wirter_mode = f'test'
 
         self.metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
-        self.confusion_key = 'confusion'
         self.confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
 
         self.softmax = nn.Softmax(dim=0)
@@ -50,15 +49,17 @@ class Tester(BaseTester):
                 # 2. Forward pass: compute predicted outputs by passing inputs to the model
                 output = self.model(data)
                 logit, predict = torch.max(output, 1)
-                if self.loss_fn_name != 'bce_loss': loss = self.criterion(output, target)
-                else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
+                loss = self._loss(output, target, logit)
                     
+                use_data, use_target = data.detach().cpu(), target.detach().cpu().tolist()
+                use_output, use_predict =output.detach().cpu(), predict.detach().cpu()
+                
                 # 3. Update the loss
                 self.writer.set_step(batch_num, f'batch_{self.wirter_mode}')
                 self.metrics.update('loss', loss.item())
                 # 4. Update the confusion matrix and input data
-                confusion_content = {'actual':target.cpu().tolist(), 'predict':predict.cpu().tolist()}
-                if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in output.detach().cpu()]
+                confusion_content = {'actual':use_target, 'predict':use_predict.clone().tolist()}
+                if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in use_output]
                 self.confusion.update(self.confusion_key, confusion_content, img_update=False)
 
                 confusion_obj = self.confusion.get_confusion_obj(self.confusion_key)
@@ -70,23 +71,23 @@ class Tester(BaseTester):
                     else: self.metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
                     
                 if batch_idx % self.log_step == 0:
-                    self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                    self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
                 
                 # 4-1. Update the Projector
                 if self.projector:                    
-                    label_img, features = tb_projector_resize(data.detach().cpu().clone(), label_img, features)
-                    class_labels.extend([str(self.classes[lab]) for lab in target.cpu().tolist()])
+                    label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
+                    class_labels.extend([str(self.classes[lab]) for lab in use_target])
                 
                 if batch_idx == len(self.data_loader)-2 and self.tensorboard_pred_plot:
                     # last batch -1 > To minimize batches with a length of 1 as much as possible.
                     # If you want to modify the last batch, pretend that len(self.data_loader)-2 is self.len_epoch-1.
-                    self.prediction_images, self.prediction_labels = data.cpu()[-self.preds_item_cnt:], [self.classes[lab] for lab in target.cpu().tolist()[-self.preds_item_cnt:]]
+                    self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
                     data_channel = self.prediction_images.shape[1]
-                    preds = np.squeeze(predict[-self.preds_item_cnt:].detach().cpu().numpy())                    
+                    preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())                    
                     preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
                     if self.plottable_metric_ftns is not None:
                         use_prob = self.confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                    else: use_prob = [self.softmax(el).tolist() for el in output[-len(preds):].detach().cpu()]
+                    else: use_prob = [self.softmax(el).tolist() for el in use_output[-len(preds):]]
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
         
@@ -105,8 +106,28 @@ class Tester(BaseTester):
         
         # 5. setting result
         return self._get_a_log()
+
+    def _loss(self, output, target, logit):
+        if self.loss_fn_name != 'bce_loss': loss = self.criterion(output, target)
+        else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
+        return loss
+    
+    def _plottable_metrics(self):
+        actual_vector = self.confusion.get_actual_vector(self.confusion_key)
+        probability_vector = self.confusion.get_probability_vector(self.confusion_key)
+        for met in self.plottable_metric_ftns:
+            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
+            tag = met.__name__ if tag is None else tag
+            save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
+            if met_kwargs is None: fig = met(actual_vector, probability_vector, self.classes)
+            else: fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
+            self.writer.add_figure(tag, fig)
+            if self.save_performance_plot: 
+                if not save_dir.is_dir(): save_dir.mkdir(parents=True, exist_ok=True)
+                fig.savefig(save_dir / f'{tag}_test-epoch{self.test_epoch}.png', bbox_inches='tight')
     
     def _set_metric_kwargs(self, met_kwargs):
+        if met_kwargs is None: return None, None, None
         if 'tag' in met_kwargs: 
             tag = met_kwargs['tag']
             met_kwargs.pop('tag')  
@@ -117,20 +138,6 @@ class Tester(BaseTester):
         else: save_dir = None
         return met_kwargs, tag, save_dir
     
-    def _plottable_metrics(self):
-        for met in self.plottable_metric_ftns:
-            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
-            tag = met.__name__ if tag is None else tag
-            save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
-            if met_kwargs is None: fig = met(self.confusion.get_actual_vector(self.confusion_key),
-                                             self.confusion.get_probability_vector(self.confusion_key), self.classes)
-            else: fig = met(self.confusion.get_actual_vector(self.confusion_key),
-                            self.confusion.get_probability_vector(self.confusion_key), self.classes, **met_kwargs)
-            self.writer.add_figure(met.__name__, fig)
-            if self.save_performance_plot: 
-                if not save_dir.is_dir(): save_dir.mkdir(parents=True, exist_ok=True)
-                fig.savefig(save_dir / f'{tag}_test-epoch{self.test_epoch}.png', bbox_inches='tight')
-            
     def _get_a_log(self):
         log = self.metrics.result()
         log_confusion = self.confusion.result()

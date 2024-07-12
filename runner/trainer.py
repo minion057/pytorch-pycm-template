@@ -37,7 +37,6 @@ class Trainer(BaseTrainer):
         self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
         self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
-        self.confusion_key = 'confusion'
         self.train_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
         self.valid_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
 
@@ -145,7 +144,10 @@ class Trainer(BaseTrainer):
         if self.cfg_da is not None: hook.remove()
         # 5-3-2. Update the curve plot and projector
         self.writer.set_step(epoch)
-        if self.plottable_metric_ftns is not None: self._plottable_metrics(mode='training')
+        if self.plottable_metric_ftns is not None: 
+            self._plottable_metrics(actual_vector = self.train_confusion.get_actual_vector(self.confusion_key),
+                                    probability_vector = self.train_confusion.get_probability_vector(self.confusion_key),
+                                    mode='training')
         if self.train_projector and epoch == 1: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
         # 5-3-3. Upate the example of predtion
         if self.tensorboard_pred_plot:
@@ -233,7 +235,10 @@ class Trainer(BaseTrainer):
                     
         # 4-2. Update the curve plot and projector
         self.writer.set_step(epoch, 'valid')
-        if self.plottable_metric_ftns is not None: self._plottable_metrics(mode='validation')
+        if self.plottable_metric_ftns is not None:
+            self._plottable_metrics(actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key),
+                                    probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key),
+                                    mode='validation')
         if self.valid_projector and epoch == 1: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
         # 4-3. Upate the example of predtion
         if self.tensorboard_pred_plot:
@@ -272,19 +277,13 @@ class Trainer(BaseTrainer):
             pass
         else: TypeError('The applicable types are up or down.')
         
-    def _plottable_metrics(self, mode='training'):
-        for met in self.plottable_metric_ftns:
-            if mode=='training':
-                actual_vector = self.train_confusion.get_actual_vector(self.confusion_key)
-                probability_vector = self.train_confusion.get_probability_vector(self.confusion_key)
-            else:
-                actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key)
-                probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key)
-            
+    def _plottable_metrics(self, actual_vector, probability_vector, mode='training'):
+        for met in self.plottable_metric_ftns:            
             met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
             tag = met.__name__ if tag is None else tag
             save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
-            fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
+            if met_kwargs is None: fig = met(actual_vector, probability_vector, self.classes)
+            else: fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
             self.writer.add_figure(tag, fig)
             if self.save_performance_plot: 
                 if not save_dir.is_dir(): ensure_dir(save_dir, True)

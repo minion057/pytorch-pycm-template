@@ -27,7 +27,7 @@ class BaseTester:
         self.loss_fn_name = config['loss'] 
         self.metrics_kwargs = config['metrics'] if 'metrics' in config.config.keys() else None
         self.plottable_metrics_kwargs = config['plottable_metrics'] if 'plottable_metrics' in config.config.keys() else None
-
+        self.confusion_key, self.confusion_tag_for_writer = 'confusion', 'ConfusionMatrix'
 
         self.test_epoch = 1
 
@@ -123,8 +123,7 @@ class BaseTester:
         write_dict2json(log, self.output_metrics)
 
         # Save the result of confusion matrix image.
-        plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Test Data', 
-                                    self.output_dir/f'confusion_matrix_test.png')
+        plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Test Data', self.output_dir/f'confusion_matrix_test.png')
 
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot:
