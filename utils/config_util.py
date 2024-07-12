@@ -1,5 +1,5 @@
 from pathlib import Path
-from util import ensure_dir
+from .util import ensure_dir
 
 CUSTOM_MASSAGE = 'Please enter the required parameters and their values.'
 
