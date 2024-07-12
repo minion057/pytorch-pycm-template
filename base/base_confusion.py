@@ -16,9 +16,10 @@ class ConfusionTracker:
         self.reset()
 
     def reset(self):
-        for key in self.index:
-            self._data.loc[key, 'actual'], self._data.loc[key, 'predict'], self._data.loc[key, 'probability'] = [], [], []
-            self._data.loc[key, 'confusion'] = None
+        self._data.loc[:, 'actual'] = []
+        self._data.loc[:, 'predict'] = []
+        self._data.loc[:, 'probability'] = []
+        self._data.loc[:, 'confusion'] = None
 
     def update(self, key, value:dict, set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):
         required_keys = ['actual', 'predict', 'probability']
@@ -99,12 +100,11 @@ class FixedSpecConfusionTracker:
         self.reset()
     
     def reset(self):
-        for goal, pos_class_name, neg_class_name in self.index:
-            self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = None
-            self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = 0. 
-            self._data.loc[(goal, pos_class_name, neg_class_name), 'fixed_score'] = float(goal)
-            self._data.loc[(goal, pos_class_name, neg_class_name), 'refer_score'] = None
-            self._data.loc[(goal, pos_class_name, neg_class_name), 'tag'] = ''
+        self._data.loc[:, 'confusion'] = None
+        self._data.loc[:, 'auc'] = 0. 
+        self._data.loc[:, 'fixed_score'] = float(goal)
+        self._data.loc[:, 'refer_score'] = None
+        self._data.loc[:, 'tag'] = ''
     
     def update(self, actual_vector, probability_vector,
                set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):     
