@@ -132,7 +132,7 @@ class Tester(BaseTester):
             tag = met_kwargs['tag']
             met_kwargs.pop('tag')  
         else: tag = None
-        if 'save_dir':
+        if 'save_dir' in met_kwargs: 
             save_dir = met_kwargs['save_dir']
             met_kwargs.pop('save_dir') 
         else: save_dir = None
