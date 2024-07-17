@@ -143,4 +143,9 @@ class Tester(BaseTester):
         log_confusion = self.confusion.result()
         log.update(log_confusion) 
         return log
+    
+    def _save_other_output(self, log):
+        self._save_confusion_obj()
         
+    def _save_confusion_obj(self, filename='cm', message='Saving checkpoint for Confusion Matrix'):
+        self.confusion.saveConfusionMatrix(self.confusion_key, self.output_dir, filename)

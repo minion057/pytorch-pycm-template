@@ -153,7 +153,7 @@ class BaseTrainer:
            
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=best)
-                if best: self._save_other_best_output(epoch)
+                self._save_other_output(epoch, log, save_best=best)
             
         end = time.time()
         self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
@@ -222,7 +222,7 @@ class BaseTrainer:
 
         self.logger.info("Checkpoint loaded. Resume training from epoch {}\n".format(self.start_epoch))
 
-    def _save_other_best_output(self, epoch):
+    def _save_other_output(self, epoch, log, save_best=False):
         pass
 
     def _save_tensorboard(self, log):

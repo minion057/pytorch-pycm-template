@@ -78,6 +78,8 @@ class BaseTester:
         self._save_output(log)
         # Save result with tensorboard
         self._save_tensorboard(log)
+        # Save result using tester.py
+        self._save_other_output(log)
 
         # print logged informations to the screen
         self.logger.info('')
@@ -118,6 +120,9 @@ class BaseTester:
 
         self.logger.info("Checkpoint loaded. Testing from epoch {}\n".format(self.test_epoch))
 
+    def _save_other_output(self, log):
+        pass
+    
     def _save_output(self, log):
         # Save the result of metrics.
         write_dict2json(log, self.output_metrics)
