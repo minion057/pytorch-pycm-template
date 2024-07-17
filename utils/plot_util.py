@@ -168,9 +168,9 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
         bounds = np.array(bounds)*100 # [[l*100, u*100] for l, u in bounds]
         if not all((0 <= l <= 100 or 0 <= u <= 100) for l, u in bounds): raise ValueError('The values in the list (bounds) are outside the range between 0 and 100.')
     errors = [[], []]
-    for score, (lower, upper) in zip(means, bounds):
-        errors[0].append(score - lower)
-        errors[1].append(upper - score)
+    for score, (lower, upper) in zip(means, bounds): # 메트릭 점수를 사용하기 때문에 범위를 0~100으로 고정
+        errors[0].append(max(score - lower, 0))
+        errors[1].append(min(upper - score, 100))
     errors = np.array(errors)
     
     colors, palette = [], ['#D7E1EE', '#B1C9F5', '#6F8CE7', '#8B8BB7'] # ['lightsteelblue', 'cornflowerblue', 'royalblue', 'midnightblue']
