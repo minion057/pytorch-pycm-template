@@ -68,7 +68,7 @@ def ROC_OvR(labels, probs, classes:list, positive_class_indices:[int, list, np.n
     positive_class = label_classes if positive_class_indices is None else positive_class_indices
     
     # Customize ROC curve
-    plot_kwargs = {'ax':crv.plot(classes=positive_class), 'return_plot':True}
+    plot_kwargs = {'classes':classes, 'crv':crv, 'positive_class':positive_class, 'return_plot':True}
     if show_average:
         macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area = ROC(labels, probs, classes, crv)
         plot_kwargs.update({'macro_fpr':macro_fpr, 'macro_tpr':macro_tpr, 'macro_area':macro_area,
@@ -103,6 +103,7 @@ def ROC_OvO(labels, probs, classes:list,
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
     
+    # print(f'init class_indices: {positive_class_indices} & {negative_class_indices}')
     # Calculate ROC curve for each class combination
     if positive_class_indices is None and negative_class_indices is None: 
         raise ValueError("positive_class_indices and negative_class_indices cannot be None at the same time.")
@@ -123,13 +124,16 @@ def ROC_OvO(labels, probs, classes:list,
         # pos_neg_same_index = [index for index, element in enumerate(negative_class_indices) if element in positive_class_indices]
         # if pos_neg_same_index != []: raise ValueError(f'The class to be set negative cannot be the same as the class to be set positive.: {np.array(classes)[pos_neg_same_index]}')    
     else: negative_class_indices = deepcopy(label_classes)
+    # print(f'change class_indices: {list(positive_class_indices)} & {list(negative_class_indices)}')
     
     cal_pair_list, need_pair_list = np.array(list(combinations(label_classes, 2))), np.array(list(permutations(label_classes, 2)))
+    # print(f'init pair_list: {list(cal_pair_list)} & {list(need_pair_list)}')
     cal_pair_list = [i for i in cal_pair_list if i[0] in positive_class_indices or i[1] in positive_class_indices]
     cal_pair_list = [i for i in cal_pair_list if i[0] in negative_class_indices or i[1] in negative_class_indices]
     need_pair_list = need_pair_list[np.isin(need_pair_list[:, 0], positive_class_indices)]
     need_pair_list = need_pair_list[np.isin(need_pair_list[:, 1], negative_class_indices)]
-    if cal_pair_list == [] or need_pair_list == []: raise ValueError('No ROC curve can be drawn.')
+    if list(cal_pair_list) == [] or list(need_pair_list) == []: raise ValueError('No ROC curve can be drawn.')
+    # print(f'change pair_list: {list(cal_pair_list)} & {list(need_pair_list)}')
     
     roc_dict = {'fpr':[], 'tpr':[], 'auc':[], 'threshold':[], 'actual':[], 'prob':[]}
     positive_roc_dict, negative_roc_dict = deepcopy(roc_dict), deepcopy(roc_dict)
@@ -181,9 +185,11 @@ def ROC_OvO(labels, probs, classes:list,
         roc_dict['actual'].append(use_roc['actual'][use_index])
         roc_dict['prob'].append(use_roc['prob'][use_index])
     
-    plot_kwargs = {'classes': classes, 'fpr': roc_dict['fpr'], 'tpr': roc_dict['tpr'], 'auc': roc_dict['auc'], 'return_plot': True}
+    plot_kwargs = {'classes': classes, 'pos_neg_pair_indices':roc_dict['pos_neg_idx'],
+                   'fpr': roc_dict['fpr'], 'tpr': roc_dict['tpr'], 'auc': roc_dict['auc'], 'return_plot': True}
     if show_average:
-        plot_kwargs.update({'mean_fpr': mean_roc_dict['fpr'], 'mean_tpr': mean_roc_dict['tpr'], 'mean_auc': mean_roc_dict['auc']})
+        plot_kwargs.update({'macro_pair_indices':cal_pair_list, 'mean_auc': mean_roc_dict['auc'],
+                            'mean_fpr': mean_roc_dict['fpr'], 'mean_tpr': mean_roc_dict['tpr']})
     fig = plot_ROC_OvO(**plot_kwargs)
     # return roc curve figure
     if return_result: return roc_dict, fig
