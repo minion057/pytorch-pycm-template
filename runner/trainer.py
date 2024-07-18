@@ -335,4 +335,3 @@ class Trainer(BaseTrainer):
         self.train_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_dir, filename+'_training')
         if self.do_validation: 
             self.valid_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_dir, filename+'validation')
-        self.logger.info("{}: {} ...{}".format(message, filename, '\n' if save_best else ''))

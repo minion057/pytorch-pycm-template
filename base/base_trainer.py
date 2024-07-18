@@ -234,11 +234,12 @@ class BaseTrainer:
             self._log_metrics_to_tensorboard(log)
             
             # 3. Confusion Matrix
-            fig = self._make_a_confusion_matrix(log, return_plot=True)
-            self.writer.add_figure(self.confusion_tag_for_writer, fig[0])
-            if f'val_{self.confusion_key}' in log.keys():
+            self.writer.add_figure(self.confusion_tag_for_writer, 
+                                   self._make_a_confusion_matrix(log[self.confusion_key], return_plot=True))
+            if self.do_validation:
                 self.writer.set_step(log['epoch'], 'valid')
-                self.writer.add_figure(self.confusion_tag_for_writer, fig[-1])
+                self.writer.add_figure(self.confusion_tag_for_writer, 
+                                       self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], mode='Validation', return_plot=True))
             close_all_plots()
             
     def _log_metrics_to_tensorboard(self, log:dict):
@@ -294,7 +295,8 @@ class BaseTrainer:
         write_dict2json(result, self.output_metrics)
 
         # Save the result of confusion matrix image.
-        self._make_a_confusion_matrix(log, return_plot=False)
+        self._make_a_confusion_matrix(log[self.confusion_key], return_plot=False)
+        if self.do_validation: self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], mode='Validation', return_plot=False)
 
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot: plot_performance_N(result, self.output_dir/'metrics_graphs.png')
@@ -339,22 +341,12 @@ class BaseTrainer:
             else: new_content[key] = [value]
         return new_content
     
-    def _make_a_confusion_matrix(self, log:dict, return_plot:bool=False):        
-        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(log[self.confusion_key]), 
-                       'classes':self.classes, 'return_plot':return_plot}
-        if return_plot:
-            fig = [plot_confusion_matrix_1(**plot_kwargs)]
-            if f'val_{self.confusion_key}' in list(log.keys()):
-                plot_kwargs['confusion'] = log[f'val_{self.confusion_key}']
-                fig.append(plot_confusion_matrix_1(**plot_kwargs))
-            return fig
-        else:
-            # Save the result of confusion matrix image.
-            plot_kwargs['title'] = 'Confusion Matrix: Training Data'
-            plot_kwargs['file_path'] = self.output_dir/f'confusion_matrix_training.png'
+    def _make_a_confusion_matrix(self, confusion, 
+                                 mode:str='Training', return_plot:bool=False):        
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes, 'return_plot':return_plot}
+        if return_plot: return plot_confusion_matrix_1(**plot_kwargs)
+        else: # Save the result of confusion matrix image.
+            plot_kwargs['title'] = f'Confusion Matrix: {mode} Data'
+            plot_kwargs['file_path'] = self.output_dir/f'confusion_matrix_{mode.lower()}.png'
             plot_confusion_matrix_1(**plot_kwargs)
-            if f'val_{self.confusion_key}' in list(log.keys()): # if self.do_validation:
-                plot_kwargs['confusion'] = log[f'val_{self.confusion_key}']
-                plot_kwargs['title'] = plot_kwargs['title'].replace('Training', 'Validation')
-                plot_kwargs['file_path'] = str(plot_kwargs['file_path']).replace('training', 'validation')
         
