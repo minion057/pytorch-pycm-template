@@ -9,7 +9,8 @@ from numpy import inf
 from logger import TensorboardWriter
 from copy import deepcopy
 from pathlib import Path
-from utils import ensure_dir, read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
+from utils import ensure_dir, read_json, write_dict2json, convert_confusion_matrix_to_list
+from utils import plot_confusion_matrix_1, plot_performance_N, close_all_plots
 
 class BaseTrainer:
     """
@@ -329,8 +330,17 @@ class BaseTrainer:
                 raise KeyError(f"Key '{key}' not found in json_data")
         return use_data
     
-    def _make_a_confusion_matrix(self, log:dict, return_plot:bool=False):
-        plot_kwargs = {'confusion':log[self.confusion_key], 'classes':self.classes, 'return_plot':return_plot}
+    def _convert_values_to_list(self, content):
+        new_content = deepcopy(content)
+        for key, value in content.items():
+            if key == 'totaltime': continue
+            if isinstance(value, dict): new_content[key] = self._convert_values_to_list(value)
+            else: new_content[key] = [value]
+        return new_content
+    
+    def _make_a_confusion_matrix(self, log:dict, return_plot:bool=False):        
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(log[self.confusion_key]), 
+                       'classes':self.classes, 'return_plot':return_plot}
         if return_plot:
             fig = [plot_confusion_matrix_1(**plot_kwargs)]
             if f'val_{self.confusion_key}' in list(log.keys()):
