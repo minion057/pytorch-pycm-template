@@ -328,10 +328,11 @@ class Trainer(BaseTrainer):
         return f'[{current_str}/{total} ({percentage:2s})%]'
     
     def _save_other_output(self, epoch, log, save_best:bool=False):
-        self._save_confusion_obj(filename='cm_latest')
+        self._save_confusion_obj(filename='cm_latest', save_best=save_best)
         if save_best: self._save_confusion_obj(filename='cm_model_best', save_best=save_best)
         
     def _save_confusion_obj(self, filename, save_best:bool, message='Saving checkpoint for Confusion Matrix'):
         self.train_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_dir, filename+'_training')
-        if self.do_validation: self.valid_confusion(self.confusion_key, self.confusion_dir, filename+'validation')
-        self.logger.info("{}: {} ...{}".format(message, filename, '' if save_best else '\n'))
+        if self.do_validation: 
+            self.valid_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_dir, filename+'validation')
+        self.logger.info("{}: {} ...{}".format(message, filename, '\n' if save_best else ''))

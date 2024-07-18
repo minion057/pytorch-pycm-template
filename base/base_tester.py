@@ -7,7 +7,8 @@ import datetime
 from abc import abstractmethod
 from logger import TensorboardWriter
 from pathlib import Path
-from utils import ensure_dir, write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
+from utils import ensure_dir, write_dict2json, convert_confusion_matrix_to_list
+from utils import plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class BaseTester:
     """
@@ -122,18 +123,6 @@ class BaseTester:
 
     def _save_other_output(self, log):
         pass
-    
-    def _save_output(self, log):
-        # Save the result of metrics.
-        write_dict2json(log, self.output_metrics)
-
-        # Save the result of confusion matrix image.
-        plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Test Data', self.output_dir/f'confusion_matrix_test.png')
-
-        # Save the reuslt of metrics graphs.
-        if self.save_performance_plot:
-            file_name = f'metrics_graphs_test.png'
-            plot_performance_1(log, self.output_dir/file_name)
 
     def _save_tensorboard(self, log):
         # Save the value per epoch. And save the value of test.
@@ -148,7 +137,7 @@ class BaseTester:
                 else: self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
             
             # 3. Confusion Matrix
-            self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['confusion'], self.classes, return_plot=True))
+            self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(log, return_plot=True))
             close_all_plots()
 
     def _setting_time(self, start, end):        
@@ -157,3 +146,25 @@ class BaseTester:
         hour_min_sec = day_time[-1].split(":")
         if len(day_time)==2: runtime = f'{int(day_time[0])*24+int(hour_min_sec[0])}:{hour_min_sec[1]}:{hour_min_sec[-1]}'
         return runtime
+    
+    def _save_output(self, log):
+        # Save the result of metrics.
+        write_dict2json(log, self.output_metrics)
+
+        # Save the result of confusion matrix image.
+        self._make_a_confusion_matrix(log, return_plot=False)
+
+        # Save the reuslt of metrics graphs.
+        if self.save_performance_plot:
+            file_name = f'metrics_graphs_test.png'
+            plot_performance_1(log, self.output_dir/file_name)
+            
+    def _make_a_confusion_matrix(self, log:dict, return_plot:bool=False):        
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(log[self.confusion_key]), 
+                       'classes':self.classes, 'return_plot':return_plot}
+        if return_plot: return plot_confusion_matrix_1(**plot_kwargs)
+        else:
+            # Save the result of confusion matrix image.
+            plot_kwargs['title'] = 'Confusion Matrix: Test Data'
+            plot_kwargs['file_path'] = self.output_dir/f'confusion_matrix_test.png'
+            plot_confusion_matrix_1(**plot_kwargs)

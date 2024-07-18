@@ -45,7 +45,8 @@ def plot_classes_preds(images, labels, preds, probs, idx:int=5, one_channel:bool
     if show: plt.show()
     close_all_plots()
 
-def plot_confusion_matrix_1(confusion:list, classes:list, title:str=None, file_path=None, dpi:int=300, return_plot:bool=False, show:bool=False):
+def plot_confusion_matrix_1(confusion:list, classes:list, 
+                            title:str=None, file_path=None, dpi:int=300, return_plot:bool=False, show:bool=False):
     close_all_plots()
     disp = ConfusionMatrixDisplay(confusion_matrix=np.array(confusion), display_labels=np.array(classes))
     confusion_plt = disp.plot(cmap=plt.cm.binary)
@@ -55,7 +56,8 @@ def plot_confusion_matrix_1(confusion:list, classes:list, title:str=None, file_p
     if show: plt.show()
     close_all_plots()
 
-def plot_confusion_matrix_N(confusion_list:list, classes:list, title:str, subtitle_list:list, file_path=None, dpi:int=300, show:bool=False):
+def plot_confusion_matrix_N(confusion_list:list, classes:list, title:str, subtitle_list:list, 
+                            file_path=None, dpi:int=300, show:bool=False):
     close_all_plots()
     if len(confusion_list) <= 1: raise ValueError('If you have a confusion matrix, you can to use \'write_confusion_matrix_1\'.')
     figsize = (len(confusion_list)*3,5)
@@ -133,6 +135,7 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(15,5), show:boo
     for name, score in logs.items():
         if name in ['epoch', 'loss', 'val_loss', 'confusion', 'val_confusion']: continue
         if '_class' in name or 'time' in name or 'auc' in name: continue
+        if isinstance(score, dict): continue
         plt.plot(logs['epoch'], score, label=str(name))
     plt.legend(loc='lower left', bbox_to_anchor=(0,1.15,1,0.2), ncol=3, mode='expand')
     if logs['epoch'][0]!=len(logs['epoch']): plt.xlim([logs['epoch'][0],len(logs['epoch'])])
@@ -246,10 +249,11 @@ def plot_ROC(macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area,
     if show: plt.show()  
     close_all_plots()
 
-def plot_ROC_OvR(ax, 
+def plot_ROC_OvR(classes, crv, positive_class,
                  macro_fpr=None, macro_tpr=None, micro_fpr=None, micro_tpr=None, macro_area=None, micro_area=None,
                  file_path=None, return_plot:bool=False, show:bool=False):
     plot_args = _ROC_plot_setting()
+    ax = crv.plot(classes=positive_class)
     if not all(value is None for value in [macro_fpr, macro_tpr, micro_fpr, micro_tpr, macro_area, micro_area]):
         ax.plot(macro_fpr, macro_tpr, label=f"macro-average (AUC = {macro_area:.{plot_args['precision']}f})", **plot_args['macro_plot_args'])
         ax.plot(micro_fpr, micro_tpr, label=f"micro-average (AUC = {micro_area:.{plot_args['precision']}f})", **plot_args['micro_plot_args'])
@@ -274,14 +278,14 @@ def plot_ROC_OvR(ax,
     if show: plt.show()  
     close_all_plots()
     
-def plot_ROC_OvO(classes, pos_neg_pair_indices, fpr, tpr, auc_area,
-                 macro_pair_indices=None, macro_fpr=None, macro_tpr=None, macro_auc_area=None, 
+def plot_ROC_OvO(classes, pos_neg_pair_indices, fpr, tpr, auc,
+                 macro_pair_indices=None, macro_fpr=None, macro_tpr=None, macro_auc=None, 
                  file_path=None, return_plot:bool=False, show:bool=False):
     close_all_plots()
     # Setting up for plot
     plot_args = _ROC_plot_setting()
     width, height = plot_args['figsize']
-    show_average = all(value is None for value in [macro_pair_indices, macro_fpr, macro_tpr, macro_auc_area])
+    show_average = all(value is not None for value in [macro_pair_indices, macro_fpr, macro_tpr, macro_auc])
     if show_average: width = height+1
     row, col = 1, 2 if show_average else 1
     fig = plt.figure(figsize=(col*width, row*height), layout="constrained")
@@ -291,14 +295,14 @@ def plot_ROC_OvO(classes, pos_neg_pair_indices, fpr, tpr, auc_area,
     common_plot_args = {'title':'ROC Curve (One vs One)', 'tight_layout':False}
     ax, colors = fig.add_subplot(gs[0, 0]), get_color_cycle()
     for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(pos_neg_pair_indices, colors)):
-        plot_label = f'{classes[pos_class_idx]} vs {classes[neg_class_idx]} (AUC = {auc_area[idx]:.{plot_args["precision"]}f})'
+        plot_label = f'{classes[pos_class_idx]} vs {classes[neg_class_idx]} (AUC = {auc[idx]:.{plot_args["precision"]}f})'
         ax.plot(fpr[idx], tpr[idx], label=plot_label, color=color)
     ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
     if show_average:
         ax.legend()
         ax = fig.add_subplot(gs[0, 1])
         for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(macro_pair_indices, colors)):
-            plot_label = f'macro-average {classes[pos_class_idx]} and {classes[neg_class_idx]} (AUC = {macro_auc_area[idx]:.{plot_args["precision"]}f})'
+            plot_label = f'macro-average {classes[pos_class_idx]} and {classes[neg_class_idx]} (AUC = {macro_auc[idx]:.{plot_args["precision"]}f})'
             ax.plot(macro_fpr, macro_tpr[idx], label=plot_label, color=color)
         ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
         ax.legend()

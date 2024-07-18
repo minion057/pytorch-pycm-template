@@ -1,7 +1,7 @@
 import torch
 from torch.nn import DataParallel as DP
 from torch.nn.parallel import DistributedDataParallel as DDP
-
+import numpy as np
 import time
 import datetime
 from abc import abstractmethod
@@ -288,7 +288,7 @@ class BaseTrainer:
         # Save the result of metrics.
         if self.output_metrics.is_file():
             result = read_json(self.output_metrics)
-            result = self._slice_dict_values(result, int(log['epoch'])) # Adjusting the number of results per epoch.
+            result = self._slice_dict_values(result, int(log['epoch'])-1) # Adjusting the number of results per epoch.
             result = self._merge_and_append_json(result, log)
         else: result = self._convert_values_to_list(log)
         write_dict2json(result, self.output_metrics)
@@ -306,8 +306,9 @@ class BaseTrainer:
             if isinstance(value, list):
                 new_content[key] = value[:slice_size]
             elif isinstance(value, dict):
-                new_content[key] = slice_dict_values(value, slice_size)
-            else: raise TypeError(f'Restricts dictionary values to lists or dictionaries only.\nThe current detected type is {type(value)}.')
+                new_content[key] = self._slice_dict_values(value, slice_size)
+            else: raise TypeError('Restricts dictionary values to lists or dictionaries only.\n'
+                                  +f'The current detected type is {type(value)}.')
         return new_content
     
     def _merge_and_append_json(self, json_data, new_data):
@@ -321,7 +322,7 @@ class BaseTrainer:
                     use_data[key] = np.append(use_data[key], value)
                 elif isinstance(use_data[key], dict):
                     if isinstance(value, dict):
-                        use_data[key] = merge_and_append_json(use_data[key], value)
+                        use_data[key] = self._merge_and_append_json(use_data[key], value)
                     else:
                         raise TypeError(f"Value type mismatch for key '{key}': expected dict, got {type(value)}")
                 else:
