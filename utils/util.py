@@ -131,3 +131,16 @@ def integer_encoding(label, classes): #  by index of classes
         label2label = np.array(label)
     else: raise ValueError(f'Unable to convert label to integer type.\nCurrent classes: {classes}, items in label: {label_classes}.')
     return label2label
+
+def convert_confusion_matrix_to_list(content): 
+    if isinstance(content, dict):
+        cm = []
+        for key in content.keys():
+            row = [content[key][sub_key] for sub_key in content.keys()]
+            cm.append(row)
+        if len(cm) != len(content):
+            raise ValueError('A loss occurred when converting a confusion matrix to an array.')
+    elif isinstance(content, list) or isinstance(content, np.ndarray): 
+        cm = deepcopy(content)
+    else: raise TypeError('The confusion matrix can only be a table (dictionary), numpy array, or list.')
+    return cm
