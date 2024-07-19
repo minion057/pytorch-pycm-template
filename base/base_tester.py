@@ -159,12 +159,14 @@ class BaseTester:
             file_name = f'metrics_graphs_test.png'
             plot_performance_1(log, self.output_dir/file_name)
             
-    def _make_a_confusion_matrix(self, log:dict, return_plot:bool=False):        
-        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(log[self.confusion_key]), 
-                       'classes':self.classes, 'return_plot':return_plot}
-        if return_plot: return plot_confusion_matrix_1(**plot_kwargs)
-        else:
-            # Save the result of confusion matrix image.
-            plot_kwargs['title'] = 'Confusion Matrix: Test Data'
-            plot_kwargs['file_path'] = self.output_dir/f'confusion_matrix_test.png'
+    def _make_a_confusion_matrix(self, confusion,
+                                 save_dir=None, title=None):        
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
+        if title is not None: plot_kwargs['title'] = title
+        if save_dir is None:
+            plot_kwargs['return_plot'] = True
+            return plot_confusion_matrix_1(**plot_kwargs)
+        else: # Save the result of confusion matrix image.
+            if title is None: plot_kwargs['title'] = 'Confusion Matrix: Test Data'
+            plot_kwargs['file_path'] = Path(save_dir)/f'confusion_matrix_test.png'
             plot_confusion_matrix_1(**plot_kwargs)

@@ -18,19 +18,20 @@ class FixedSpecTrainer(Trainer):
         self.device = device
 
         # Removing duplicate AUC calculation since the trainer already computes it.
-        # for met in self.metric_ftns:
-        #     if met.__name__.lower() == 'auc': self.metric_ftns.remove(met)
-        self.ROCNameForFixedSpec = 'ROC_OvO'
+        if 'fiexed_goal' not in config['trainer'].keys():
+            raise ValueError('There is no fixed specificity score to track.')
+        self.ROCNameForFixedSpec, self.AUCNameForFixedSpec = 'ROC_OvO', 'AUC_OvO'
+        for met in self.metric_ftns:
+            if self.AUCNameForFixedSpec.lower() in met.__name__.lower(): self.metric_ftns.remove(met)
 
         self.ROCForFixedSpecParams, self.original_result_name  = None, 'maxprob'
         if self.plottable_metrics_kwargs is not None:
             if self.ROCNameForFixedSpec in self.plottable_metrics_kwargs.keys(): 
                 self.ROCForFixedSpecParams ={
-                    'goal_score':self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['fixed_goal'],
+                    'goal_score':config['trainer']['fixed_goal'],
                     'negative_class_indices':self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['negative_class_indices'],
                     'output_dir': self.output_dir / 'FixedSpec',
                 }
-                del self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['fixed_goal']
                 self.ROCForFixedSpecParams['output_metrics'] = self.ROCForFixedSpecParams['output_dir'] / 'metrics.json'
                 if not self.ROCForFixedSpecParams['output_dir'].is_dir(): ensure_dir(self.ROCForFixedSpecParams['output_dir'], True)
                 self.train_ROCForFixedSpec = FixedSpecConfusionTracker(goal_score=self.ROCForFixedSpecParams['goal_score'], classes=self.classes,
@@ -79,14 +80,14 @@ class FixedSpecTrainer(Trainer):
             for key, value in val_log.items(): log[key].update(**{'val_'+k : v for k, v in value.items()})
         
         # AUC Result
-        log[self.ROCNameForFixedSpec], use_pair = {}, []
-        if self.do_validation: log[f'val_{self.ROCNameForFixedSpec}'] = {}
+        log[self.AUCNameForFixedSpec], use_pair = {}, []
+        if self.do_validation: log[f'val_{self.AUCNameForFixedSpec}'] = {}
         for goal, pos_class_name, neg_class_name in self.train_ROCForFixedSpec.index:
             if (pos_class_name, neg_class_name) in use_pair: continue
             use_pair.append((pos_class_name, neg_class_name))
             use_tag = f'P-{pos_class_name}_N-{neg_class_name}'
-            log[self.ROCNameForFixedSpec][use_tag] = self.train_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
-            if self.do_validation: log[f'val_{self.ROCNameForFixedSpec}'][use_tag] = self.valid_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
+            log[self.AUCNameForFixedSpec][use_tag] = self.train_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
+            if self.do_validation: log[f'val_{self.AUCNameForFixedSpec}'][use_tag] = self.valid_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
         
         # model save and reset
         self._save_BestFixedSpecModel(epoch)
@@ -139,23 +140,23 @@ class FixedSpecTrainer(Trainer):
             'epoch':1,
             'loss':0.5,
             'val_loss':1.0,
-            'auc':{class_name:0.9},
-            'val_auc':{class_name:0.7},
+            'self.AUCNameForFixedSpec':{class_name:0.9},
+            'val_self.AUCNameForFixedSpec':{class_name:0.7},
             'maxprob':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... },
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
         '''
         basic_log = {key:val for key, val in log.items() if type(val) != dict} # epoch, loss, val_loss, runtime
-        auc_log = {key:val for key, val in log.items() if self.ROCNameForFixedSpec in key}
+        auc_log = {key:val for key, val in log.items() if self.AUCNameForFixedSpec in key}
         
         for category, content in log.items():
-            if type(content) != dict or self.ROCNameForFixedSpec in category: continue # basic_log, auc_log
-            
-            # Save the result of confusion matrix image.
+            if type(content) != dict or self.AUCNameForFixedSpec in category: continue # basic_log, auc_log
             if category == self.original_result_name:  
-                self._save_confusion_matrix_1(content)  
+                save_cm_path = self.output_dir  
                 save_metrics_path = self.output_metrics
-            else: save_metrics_path = Path(str(self.ROCForFixedSpecParams['output_metrics']).replace('.json', f'_{category}.json'))
+            else: 
+                save_cm_path = self.ROCForFixedSpecParams['output_dir']
+                save_metrics_path = Path(str(self.ROCForFixedSpecParams['output_metrics']).replace('.json', f'_{category}.json'))
             
             # Save the result of metrics.
             if save_metrics_path.is_file():
@@ -175,10 +176,11 @@ class FixedSpecTrainer(Trainer):
                 result.update(self._convert_values_to_list(content))
             write_dict2json(result, save_metrics_path)
             
-            save_dir = self.output_dir 
-            if category != self.original_result_name: save_dir = self.ROCForFixedSpecParams['output_dir']
-            # Save the result of confusion matrix image.
-            self._make_a_confusion_matrix(content, return_plot=False)
+            # Save the result of confusion matrix image. -> 이 시점에 저장하는 것이 맞는가?
+            self._make_a_confusion_matrix(content[self.confusion_key], save_mode=f'Training_{category}', save_dir=save_cm_path)
+            if self.do_validation:
+                self._make_a_confusion_matrix(content[f'val_{self.confusion_key}'], 
+                                              save_mode=f'Validation_{category}', save_dir=save_cm_path)
             # Save the reuslt of metrics graphs.
             if self.save_performance_plot: plot_performance_N(result, save_dir/f'metrics_graphs_{category}.png')
             close_all_plots()
@@ -189,8 +191,8 @@ class FixedSpecTrainer(Trainer):
             'epoch':1,
             'loss':0.5,
             'val_loss':1.0,
-            'self.ROCNameForFixedSpec':{class_name:0.9},
-            'val_self.ROCNameForFixedSpec':{class_name:0.7},
+            'self.AUCNameForFixedSpec':{class_name:0.9},
+            'val_self.AUCNameForFixedSpec':{class_name:0.7},
             'maxprob':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... },
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
@@ -206,7 +208,7 @@ class FixedSpecTrainer(Trainer):
                         scalars = {category:content, f'val_{category}':log[f'val_{category}']}
                         self.writer.add_scalars(category, {str(k):v for k, v in scalars.items()})
                     else: self.writer.add_scalar(category, content)
-                elif self.ROCNameForFixedSpec in category: # auc
+                elif self.AUCNameForFixedSpec in category: # auc
                     scalars = deepcopy(content)
                     if f'val_{category}' in log.keys(): 
                         scalars.update(**{f'val_{tag}':auc for tag, auc in log[f'val_{category}'].items()})

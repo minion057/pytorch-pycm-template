@@ -235,11 +235,11 @@ class BaseTrainer:
             
             # 3. Confusion Matrix
             self.writer.add_figure(self.confusion_tag_for_writer, 
-                                   self._make_a_confusion_matrix(log[self.confusion_key], return_plot=True))
+                                   self._make_a_confusion_matrix(log[self.confusion_key]))
             if self.do_validation:
                 self.writer.set_step(log['epoch'], 'valid')
                 self.writer.add_figure(self.confusion_tag_for_writer, 
-                                       self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], mode='Validation', return_plot=True))
+                                       self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], save_mode='Validation'))
             close_all_plots()
             
     def _log_metrics_to_tensorboard(self, log:dict):
@@ -295,8 +295,9 @@ class BaseTrainer:
         write_dict2json(result, self.output_metrics)
 
         # Save the result of confusion matrix image.
-        self._make_a_confusion_matrix(log[self.confusion_key], return_plot=False)
-        if self.do_validation: self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], mode='Validation', return_plot=False)
+        self._make_a_confusion_matrix(log[self.confusion_key], save_dir=self.output_dir)
+        if self.do_validation: 
+            self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], save_mode='Validation', save_dir=self.output_dir)
 
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot: plot_performance_N(result, self.output_dir/'metrics_graphs.png')
@@ -342,11 +343,13 @@ class BaseTrainer:
         return new_content
     
     def _make_a_confusion_matrix(self, confusion, 
-                                 mode:str='Training', return_plot:bool=False):        
-        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes, 'return_plot':return_plot}
-        if return_plot: return plot_confusion_matrix_1(**plot_kwargs)
+                                 save_mode:str='Training', save_dir=None, title=None):        
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
+        if title is not None: plot_kwargs['title'] = title
+        if save_dir is None: 
+            plot_kwargs['return_plot'] = True
+            return plot_confusion_matrix_1(**plot_kwargs)
         else: # Save the result of confusion matrix image.
-            plot_kwargs['title'] = f'Confusion Matrix: {mode} Data'
-            plot_kwargs['file_path'] = self.output_dir/f'confusion_matrix_{mode.lower()}.png'
+            if title is None: plot_kwargs['title'] = f'Confusion Matrix: {save_mode} Data'
+            plot_kwargs['file_path'] = Path(save_dir)/f'confusion_matrix_{save_mode.lower()}.png'
             plot_confusion_matrix_1(**plot_kwargs)
-        

@@ -196,6 +196,7 @@ class FixedSpecConfusionTracker:
         cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
         if type(cm) != pycmCM: return None
         return cm.plot(number_label=True).figure if title is None else cm.plot(number_label=True, title=title).figure
+    
     def saveConfusionMatrix(self, goal, pos_class_name, neg_class_name, save_dir, save_name:str='cm'):  
         cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
         if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
