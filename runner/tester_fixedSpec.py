@@ -1,7 +1,7 @@
 from .tester import Tester
 from base import FixedSpecConfusionTracker
 from copy import deepcopy
-from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
+from utils import ensure_dir, write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class FixedSpecTester(Tester):
     """
@@ -13,7 +13,7 @@ class FixedSpecTester(Tester):
         self.device = device
         
         # Removing duplicate AUC calculation since the trainer already computes it.
-        if 'fiexed_goal' not in config['trainer'].keys():
+        if 'fixed_goal' not in config['trainer'].keys():
             raise ValueError('There is no fixed specificity score to track.')
         self.ROCNameForFixedSpec, self.AUCNameForFixedSpec = 'ROC_OvO', 'AUC_OvO'
         for met in self.metric_ftns:
@@ -25,13 +25,10 @@ class FixedSpecTester(Tester):
                 self.ROCForFixedSpecParams ={
                     'goal_score':config['trainer']['fixed_goal'],
                     'negative_class_indices':self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['negative_class_indices'],
-                    'output_dir': self.output_dir / 'FixedSpec',
                 }
-                self.ROCForFixedSpecParams['output_metrics'] = self.ROCForFixedSpecParams['output_dir'] / 'metrics-test.json'
-                if not self.ROCForFixedSpecParams['output_dir'].is_dir(): ensure_dir(self.ROCForFixedSpecParams['output_dir'], True)
                 self.test_ROCForFixedSpec = FixedSpecConfusionTracker(goal_score=self.ROCForFixedSpecParams['goal_score'], classes=self.classes,
                                                                        negative_class_indices=self.ROCForFixedSpecParams['negative_class_indices'])
-                self.best_auc = {f'{pos_class_name} VS {neg_class_name}':None for goal, pos_class_name, neg_class_name in self.train_ROCForFixedSpec.index}
+                self.best_auc = {f'{pos_class_name} VS {neg_class_name}':None for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index}
             else: raise ValueError(f'Warring: {self.ROCNameForFixedSpec} is not in the config[plottable_metrics]')
         else: raise ValueError('Warring: plottable_metrics is not in the config')
                 
@@ -78,9 +75,9 @@ class FixedSpecTester(Tester):
         goal_metrics = {}
         # 1. AUC: Pass
         # 2. Metrics
-        for goal, pos_class_name, neg_class_name in ROCForFixedSpec.index:
-            category = ROCForFixedSpec.get_tag(goal, pos_class_name, neg_class_name)
-            confusion_obj = ROCForFixedSpec.get_confusion_obj(goal, pos_class_name, neg_class_name)
+        for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
+            category = self.test_ROCForFixedSpec.get_tag(goal, pos_class_name, neg_class_name)
+            confusion_obj = self.test_ROCForFixedSpec.get_confusion_obj(goal, pos_class_name, neg_class_name)
             goal_metrics[category] = {}
             for met in self.metric_ftns:# pycm version
                 met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
@@ -108,14 +105,8 @@ class FixedSpecTester(Tester):
         
         for category, content in log.items():
             if type(content) != dict or self.AUCNameForFixedSpec in category: continue # basic_log, auc_log
-            
-            if category == self.original_result_name: 
-                # Save the result of confusion matrix image.
-                self._make_a_confusion_matrix(content[self.confusion_key], return_plot=False)
-                save_metrics_path = self.output_metrics
-                # plot_confusion_matrix_1(val[self.confusion_key], self.classes, 
-                #                         'Confusion Matrix: Test Data', self.output_dir/f'confusion_matrix_test.png')
-            else: save_metrics_path = str(self.FixedNegativeROC['output_metrics']).replace('.json', f'_{category}.json')
+            save_metrics_path = self.output_metrics
+            if category != self.original_result_name: save_metrics_path = str(save_metrics_path).replace('.json', f'_{category}.json')
             
             # Save the result of metrics.
             result = deepcopy(basic_log)
@@ -123,12 +114,10 @@ class FixedSpecTester(Tester):
             for k, v in content.items(): result[k] = v
             write_dict2json(result, save_metrics_path)
 
-            # Save the reuslt of metrics graphs.
-            save_dir = self.output_dir if category == self.original_result_name else self.FixedNegativeROC['output_dir']
             # Save the result of confusion matrix image.
-            self._make_a_confusion_matrix(content[self.confusion_key], return_plot=False)
+            self._make_a_confusion_matrix(content[self.confusion_key], save_mode=f'Test {category}', save_dir=self.confusion_img_dir)
             # Save the reuslt of metrics graphs.
-            if self.save_performance_plot: plot_performance_1(result, save_dir/f'metrics_graphs_{category}.png')
+            if self.save_performance_plot: plot_performance_1(result, self.metrics_img_dir/f'metrics_graphs_{category}.png')
             close_all_plots()
             
     def _save_tensorboard(self, log):
@@ -150,5 +139,5 @@ class FixedSpecTester(Tester):
             
                     # 3. Confusion Matrix
                     self.writer.set_step(self.test_epoch, f'{self.wirter_mode}_{key}')
-                    self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(value['confusion'], self.classes, return_plot=True))
+                    self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(value[self.confusion_key]))
                     close_all_plots()

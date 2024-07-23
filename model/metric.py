@@ -51,4 +51,7 @@ def AUC_OvR(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     if positive_class_idx is None: raise ValueError('AUC requires positive_class_idx.')
     return base_metric('AUC', confusion_obj, positive_class_idx)     
 def AUC_OvR_class(confusion_obj:pycmCM, classes=None):
-    return base_class_metric('AUC', confusion_obj, classes)      
+    print(f'AUC_OvR_class original: {confusion_obj.AUC}')
+    result = base_class_metric('AUC', confusion_obj, classes)      
+    print(f'AUC_OvR_class original: {result}')
+    return result # base_class_metric('AUC', confusion_obj, classes)      

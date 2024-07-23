@@ -2,7 +2,8 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTrainer, MetricTracker, ConfusionTracker
-from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize, plot_classes_preds, close_all_plots
+from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize
+from utils import plot_classes_preds, close_all_plots
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
@@ -39,8 +40,8 @@ class Trainer(BaseTrainer):
 
         self.train_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
         self.valid_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
-        self.confusion_dir = self.output_dir / 'confusion'
-        ensure_dir(self.confusion_dir)
+        self.confusion_obj_dir = self.output_dir / 'confusion_object'
+        ensure_dir(self.confusion_obj_dir)
 
         self.softmax = nn.Softmax(dim=0)
         self.preds_item_cnt = 5
@@ -311,7 +312,8 @@ class Trainer(BaseTrainer):
             val_log, val_confusion = self._valid_epoch(epoch) # Validation Result
             log.update(**{'val_'+k : v for k, v in val_log.items()})
             log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
-        log.update(log_confusion)           
+        log.update(log_confusion)    
+        log = self._sort_train_val_sequences(log)       
         return log
             
     def _progress(self, batch_idx):
@@ -332,6 +334,6 @@ class Trainer(BaseTrainer):
         if save_best: self._save_confusion_obj(filename='cm_model_best', save_best=save_best)
         
     def _save_confusion_obj(self, filename, save_best:bool, message='Saving checkpoint for Confusion Matrix'):
-        self.train_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_dir, filename+'_training')
+        self.train_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_obj_dir, filename+'_training')
         if self.do_validation: 
-            self.valid_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_dir, filename+'validation')
+            self.valid_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_obj_dir, filename+'_validation')

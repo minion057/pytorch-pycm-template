@@ -124,7 +124,7 @@ class Tester(BaseTester):
             self.writer.add_figure(tag, fig)
             if self.save_performance_plot: 
                 if not save_dir.is_dir(): save_dir.mkdir(parents=True, exist_ok=True)
-                fig.savefig(save_dir / f'{tag}_test-epoch{self.test_epoch}.png', bbox_inches='tight')
+                fig.savefig(save_dir / f'{tag}_test.png', bbox_inches='tight') # -epoch{self.test_epoch}
     
     def _set_metric_kwargs(self, met_kwargs):
         if met_kwargs is None: return None, None, None

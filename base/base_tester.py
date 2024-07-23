@@ -51,8 +51,14 @@ class BaseTester:
         else: self.logger.warning("Warning: Pre-trained model is not use.\n")
         
         # Setting the save directory path
-        if not self.output_dir.is_dir(): ensure_dir(self.output_dir)
-        self.output_metrics = self.output_dir / 'metrics-test.json'
+        ensure_dir(self.output_dir)
+        self.metrics_dir = self.output_dir / 'metrics_json'
+        ensure_dir(self.metrics_dir, True)
+        self.output_metrics = self.metrics_dir / 'metrics.json'
+        self.metrics_img_dir = self.output_dir / 'metrics_imgae'
+        ensure_dir(self.metrics_img_dir)
+        self.confusion_img_dir = self.output_dir / 'confusion_imgae'
+        ensure_dir(self.confusion_img_dir)
         
 
     @abstractmethod
@@ -137,7 +143,7 @@ class BaseTester:
                 else: self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
             
             # 3. Confusion Matrix
-            self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(log, return_plot=True))
+            self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(log[self.confusion_key]))
             close_all_plots()
 
     def _setting_time(self, start, end):        
@@ -152,21 +158,19 @@ class BaseTester:
         write_dict2json(log, self.output_metrics)
 
         # Save the result of confusion matrix image.
-        self._make_a_confusion_matrix(log, return_plot=False)
+        self._make_a_confusion_matrix(log[self.confusion_key], save_dir=self.confusion_img_dir)
 
         # Save the reuslt of metrics graphs.
-        if self.save_performance_plot:
-            file_name = f'metrics_graphs_test.png'
-            plot_performance_1(log, self.output_dir/file_name)
+        if self.save_performance_plot: plot_performance_1(log, self.metrics_img_dir/'metrics_graphs_test.png')
             
     def _make_a_confusion_matrix(self, confusion,
-                                 save_dir=None, title=None):        
+                                 save_mode:str='Test', save_dir=None, title=None):        
         plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
         if title is not None: plot_kwargs['title'] = title
         if save_dir is None:
             plot_kwargs['return_plot'] = True
             return plot_confusion_matrix_1(**plot_kwargs)
         else: # Save the result of confusion matrix image.
-            if title is None: plot_kwargs['title'] = 'Confusion Matrix: Test Data'
-            plot_kwargs['file_path'] = Path(save_dir)/f'confusion_matrix_test.png'
+            if title is None: plot_kwargs['title'] = f'Confusion Matrix: {save_mode} Data'
+            plot_kwargs['file_path'] = Path(save_dir)/f'ConfusionMatrix_{save_mode.lower().replace(" ", "_")}.png'
             plot_confusion_matrix_1(**plot_kwargs)

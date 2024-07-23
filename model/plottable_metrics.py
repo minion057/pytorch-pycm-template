@@ -60,7 +60,7 @@ def ROC_OvR(labels, probs, classes:list, positive_class_indices:[int, list, np.n
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
     crv = ROCCurve(actual_vector=np.array(labels), probs=np.array(probs), classes=label_classes)
-
+    print(f'ROC_OvR AREA!!!: {crv.area()}')
     # Setting up for plot
     if not isinstance(positive_class_indices, (int, list, np.ndarray)) and positive_class_indices is not None:
         raise TypeError("positive_class_indices must be an int, list, or np.ndarray")
@@ -135,7 +135,7 @@ def ROC_OvO(labels, probs, classes:list,
     if list(cal_pair_list) == [] or list(need_pair_list) == []: raise ValueError('No ROC curve can be drawn.')
     # print(f'change pair_list: {list(cal_pair_list)} & {list(need_pair_list)}')
     
-    roc_dict = {'fpr':[], 'tpr':[], 'auc':[], 'threshold':[], 'actual':[], 'prob':[]}
+    roc_dict = {'fpr':[], 'tpr':[], 'auc':[], 'thresholds':[], 'actual':[], 'prob':[]}
     positive_roc_dict, negative_roc_dict = deepcopy(roc_dict), deepcopy(roc_dict)
     mean_roc_dict = {'fpr':np.linspace(0.0, 1.0, 1000), 'tpr':[], 'auc':[]}
     for (pos_class_idx, neg_class_idx) in cal_pair_list:
@@ -157,7 +157,7 @@ def ROC_OvO(labels, probs, classes:list,
         positive_roc_dict['fpr'].append(fpr_pos); negative_roc_dict['fpr'].append(fpr_neg)
         positive_roc_dict['tpr'].append(tpr_pos); negative_roc_dict['tpr'].append(tpr_neg)
         positive_roc_dict['auc'].append(auc_pos); negative_roc_dict['auc'].append(auc_neg)
-        positive_roc_dict['threshold'].append(threshold_pos); negative_roc_dict['threshold'].append(threshold_neg)
+        positive_roc_dict['thresholds'].append(threshold_pos); negative_roc_dict['thresholds'].append(threshold_neg)
         positive_roc_dict['actual'].append(pos_labels); negative_roc_dict['actual'].append(neg_labels)
         positive_roc_dict['prob'].append(pos_probs); negative_roc_dict['prob'].append(neg_probs)
         
@@ -181,7 +181,7 @@ def ROC_OvO(labels, probs, classes:list,
         roc_dict['fpr'].append(use_roc['fpr'][use_index])
         roc_dict['tpr'].append(use_roc['tpr'][use_index])
         roc_dict['auc'].append(use_roc['auc'][use_index])
-        roc_dict['threshold'].append(use_roc['threshold'][use_index])
+        roc_dict['thresholds'].append(use_roc['thresholds'][use_index])
         roc_dict['actual'].append(use_roc['actual'][use_index])
         roc_dict['prob'].append(use_roc['prob'][use_index])
     

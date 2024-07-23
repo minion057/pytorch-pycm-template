@@ -56,8 +56,14 @@ class BaseTrainer:
         # Setting the save directory path
         self.checkpoint_dir = config.checkpoint_dir
         self.output_dir = Path(config.output_dir) / 'training'
-        if not self.output_dir.is_dir(): ensure_dir(self.output_dir, True)
-        self.output_metrics = self.output_dir / 'metrics.json'
+        ensure_dir(self.output_dir, True)
+        self.metrics_dir = self.output_dir / 'metrics_json'
+        ensure_dir(self.metrics_dir, True)
+        self.output_metrics = self.metrics_dir / 'metrics.json'
+        self.metrics_img_dir = self.output_dir / 'metrics_imgae'
+        ensure_dir(self.metrics_img_dir)
+        self.confusion_img_dir = self.output_dir / 'confusion_imgae'
+        ensure_dir(self.confusion_img_dir)
 
         # setup visualization writer instance
         # log_dir is set to "[save_dir]/log/[name]/start_time" in advance when parsing in the config file.
@@ -234,12 +240,10 @@ class BaseTrainer:
             self._log_metrics_to_tensorboard(log)
             
             # 3. Confusion Matrix
-            self.writer.add_figure(self.confusion_tag_for_writer, 
-                                   self._make_a_confusion_matrix(log[self.confusion_key]))
+            self.writer.add_figure(self.confusion_tag_for_writer, self._make_a_confusion_matrix(log[self.confusion_key]))
             if self.do_validation:
                 self.writer.set_step(log['epoch'], 'valid')
-                self.writer.add_figure(self.confusion_tag_for_writer, 
-                                       self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], save_mode='Validation'))
+                self.writer.add_figure(self.confusion_tag_for_writer, self._make_a_confusion_matrix(log[f'val_{self.confusion_key}']))
             close_all_plots()
             
     def _log_metrics_to_tensorboard(self, log:dict):
@@ -295,12 +299,12 @@ class BaseTrainer:
         write_dict2json(result, self.output_metrics)
 
         # Save the result of confusion matrix image.
-        self._make_a_confusion_matrix(log[self.confusion_key], save_dir=self.output_dir)
+        self._make_a_confusion_matrix(log[self.confusion_key], save_dir=self.confusion_img_dir)
         if self.do_validation: 
-            self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], save_mode='Validation', save_dir=self.output_dir)
+            self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], save_mode='Validation', save_dir=self.confusion_img_dir)
 
         # Save the reuslt of metrics graphs.
-        if self.save_performance_plot: plot_performance_N(result, self.output_dir/'metrics_graphs.png')
+        if self.save_performance_plot: plot_performance_N(result, self.metrics_img_dir/'metrics_graphs.png')
         
     def _slice_dict_values(self, content:dict, slice_size:int):
         new_content = deepcopy(content)
@@ -342,6 +346,34 @@ class BaseTrainer:
             else: new_content[key] = [value]
         return new_content
     
+    def _sort_train_val_sequences(self, content):
+        keys = list(content.keys())
+        sorted_keys = []
+        time_keys = []  # List to hold keys that contain 'time'
+        
+        for key in keys:
+            if key.startswith('val_'):
+                continue  # Skip 'val_' prefixed keys for now
+            if 'time' in key:
+                time_keys.append(key)  # Collect time-related keys
+                continue
+            sorted_keys.append(key)
+            val_key = 'val_' + key
+            if val_key in keys:
+                sorted_keys.append(val_key)
+        
+        # Append any remaining keys that were not paired with 'val_' prefixed keys
+        for key in keys:
+            if key not in sorted_keys and 'time' not in key:
+                sorted_keys.append(key)
+        
+        # Append the time-related keys at the end
+        sorted_keys.extend(time_keys)
+        
+        # Create a new dictionary with sorted keys
+        sorted_data = {key: content[key] for key in sorted_keys}
+        return sorted_data
+    
     def _make_a_confusion_matrix(self, confusion, 
                                  save_mode:str='Training', save_dir=None, title=None):        
         plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
@@ -351,5 +383,5 @@ class BaseTrainer:
             return plot_confusion_matrix_1(**plot_kwargs)
         else: # Save the result of confusion matrix image.
             if title is None: plot_kwargs['title'] = f'Confusion Matrix: {save_mode} Data'
-            plot_kwargs['file_path'] = Path(save_dir)/f'confusion_matrix_{save_mode.lower()}.png'
+            plot_kwargs['file_path'] = Path(save_dir)/f'ConfusionMatrix_{save_mode.lower().replace(" ", "_")}.png'
             plot_confusion_matrix_1(**plot_kwargs)

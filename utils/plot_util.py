@@ -94,7 +94,8 @@ def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=
     xticks, values = [], []    
     for name, score in logs.items():
         if name in ['epoch', 'loss', 'val_loss', 'confusion', 'val_confusion']: continue
-        if '_class' in name or 'time' in name or 'auc' in name: continue
+        if '_class' in name or 'time' in name or 'auc' in name.lower(): continue
+        if isinstance(score, dict): continue
         xticks.append(name)
         values.append(score[0] if type(score) == list else score)
     x = np.arange(len(xticks))

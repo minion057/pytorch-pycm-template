@@ -18,7 +18,7 @@ class FixedSpecTrainer(Trainer):
         self.device = device
 
         # Removing duplicate AUC calculation since the trainer already computes it.
-        if 'fiexed_goal' not in config['trainer'].keys():
+        if 'fixed_goal' not in config['trainer'].keys():
             raise ValueError('There is no fixed specificity score to track.')
         self.ROCNameForFixedSpec, self.AUCNameForFixedSpec = 'ROC_OvO', 'AUC_OvO'
         for met in self.metric_ftns:
@@ -30,10 +30,7 @@ class FixedSpecTrainer(Trainer):
                 self.ROCForFixedSpecParams ={
                     'goal_score':config['trainer']['fixed_goal'],
                     'negative_class_indices':self.plottable_metrics_kwargs[self.ROCNameForFixedSpec]['negative_class_indices'],
-                    'output_dir': self.output_dir / 'FixedSpec',
                 }
-                self.ROCForFixedSpecParams['output_metrics'] = self.ROCForFixedSpecParams['output_dir'] / 'metrics.json'
-                if not self.ROCForFixedSpecParams['output_dir'].is_dir(): ensure_dir(self.ROCForFixedSpecParams['output_dir'], True)
                 self.train_ROCForFixedSpec = FixedSpecConfusionTracker(goal_score=self.ROCForFixedSpecParams['goal_score'], classes=self.classes,
                                                                        negative_class_indices=self.ROCForFixedSpecParams['negative_class_indices'])
                 self.valid_ROCForFixedSpec = deepcopy(self.train_ROCForFixedSpec)
@@ -72,12 +69,15 @@ class FixedSpecTrainer(Trainer):
                 log[self.original_result_name][metric_name] = log[metric_name] 
                 del log[metric_name] 
         log[self.original_result_name].update(log_confusion)
+        log[self.original_result_name] = self._sort_train_val_sequences(log[self.original_result_name])
         
         # Goal Result (FixedSpec)
         log.update(self._summarize_ROCForFixedSpec(mode='training'))
         if self.do_validation:
             val_log = self._summarize_ROCForFixedSpec(mode='validation')
-            for key, value in val_log.items(): log[key].update(**{'val_'+k : v for k, v in value.items()})
+            for key, value in val_log.items(): 
+                log[key].update(**{'val_'+k : v for k, v in value.items()})
+                log[key] = self._sort_train_val_sequences(log[key])
         
         # AUC Result
         log[self.AUCNameForFixedSpec], use_pair = {}, []
@@ -151,12 +151,8 @@ class FixedSpecTrainer(Trainer):
         
         for category, content in log.items():
             if type(content) != dict or self.AUCNameForFixedSpec in category: continue # basic_log, auc_log
-            if category == self.original_result_name:  
-                save_cm_path = self.output_dir  
-                save_metrics_path = self.output_metrics
-            else: 
-                save_cm_path = self.ROCForFixedSpecParams['output_dir']
-                save_metrics_path = Path(str(self.ROCForFixedSpecParams['output_metrics']).replace('.json', f'_{category}.json'))
+            save_metrics_path = self.output_metrics
+            if category != self.original_result_name: save_metrics_path = Path(str(save_metrics_path).replace('.json', f'_{category}.json'))
             
             # Save the result of metrics.
             if save_metrics_path.is_file():
@@ -176,13 +172,13 @@ class FixedSpecTrainer(Trainer):
                 result.update(self._convert_values_to_list(content))
             write_dict2json(result, save_metrics_path)
             
-            # Save the result of confusion matrix image. -> 이 시점에 저장하는 것이 맞는가?
-            self._make_a_confusion_matrix(content[self.confusion_key], save_mode=f'Training_{category}', save_dir=save_cm_path)
+            # Save the result of confusion matrix image. 
+            self._make_a_confusion_matrix(content[self.confusion_key], save_mode=f'Training {category}', save_dir=self.confusion_img_dir)
             if self.do_validation:
                 self._make_a_confusion_matrix(content[f'val_{self.confusion_key}'], 
-                                              save_mode=f'Validation_{category}', save_dir=save_cm_path)
+                                              save_mode=f'Validation {category}', save_dir=self.confusion_img_dir)
             # Save the reuslt of metrics graphs.
-            if self.save_performance_plot: plot_performance_N(result, save_dir/f'metrics_graphs_{category}.png')
+            if self.save_performance_plot: plot_performance_N(result, self.metrics_img_dir/f'metrics_graphs_{category}.png')
             close_all_plots()
             
     def _save_tensorboard(self, log):
@@ -218,10 +214,9 @@ class FixedSpecTrainer(Trainer):
                     self._log_metrics_to_tensorboard(content)
             
                     # 3. Confusion Matrix
-                    fig = self._make_a_confusion_matrix(content, return_plot=True)
                     self.writer.set_step(log['epoch'], f'train_{category}', False)
-                    self.writer.add_figure(self.confusion_tag_for_writer, fig[0]) 
+                    self.writer.add_figure(self.confusion_tag_for_writer, self._make_a_confusion_matrix(content[self.confusion_key])) 
                     if f'val_{self.confusion_key}' in content.keys():
                         self.writer.set_step(log['epoch'], f'valid_{category}', False)
-                        self.writer.add_figure(self.confusion_tag_for_writer, fig[-1]) 
+                        self.writer.add_figure(self.confusion_tag_for_writer, self._make_a_confusion_matrix(content[f'val_{self.confusion_key}'])) 
                     close_all_plots()

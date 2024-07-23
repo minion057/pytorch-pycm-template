@@ -43,12 +43,8 @@ class ConfusionTracker:
 
         if img_update or set_title is not None or img_save_dir_path is not None:
             # Perform only when all classes of data are present         
-            confusion_plt = self.plotConfusionMatrix(key, set_title if set_title is not None else f'Confusion matrix - {key}')
-            if self.writer is not None and img_update:
-                self.writer.add_figure('ConfusionMatrix', confusion_plt)
-            if img_save_dir_path is not None:
-                confusion_plt.savefig(Path(img_save_dir_path)/f'ConfusionMatrix{key}.png', dpi=300, bbox_inches='tight')
-
+            self.plotConfusionMatrix(key, set_title, img_save_dir_path, img_update)
+            
     def get_actual_vector(self, key):
         return self._data.loc[key, 'actual']
     def get_prediction_vector(self, key):
@@ -67,10 +63,18 @@ class ConfusionTracker:
     def result(self):
         return {key:self.get_confusion_matrix(key, dict) for key in self.index}
 
-    def plotConfusionMatrix(self, key, title:str=None): 
+    def plotConfusionMatrix(self, key, 
+                            title:str=None, img_save_dir_path=None, img_update:bool=False, return_plot:bool=False):
         cm = self.get_confusion_obj(key)
-        if type(cm) != pycmCM: return None
-        return cm.plot(number_label=True).figure if title is None else cm.plot(number_label=True, title=title).figure
+        if type(cm) != pycmCM: raise TypeError(f'It is not a pycm object.')
+        if title is None: title = f'Confusion matrix: {key}'
+        confusion_plt = cm.plot(number_label=True, title=title).figure
+        use_tag = f'ConfusionMatrix_{key}'
+        if self.writer is not None and img_update:
+            self.writer.add_figure(use_tag, confusion_plt)
+        if img_save_dir_path is not None:
+            confusion_plt.savefig(Path(img_save_dir_path)/use_tag, dpi=300, bbox_inches='tight')
+        if return_plot: return confusion_plt
     
     def saveConfusionMatrix(self, key, save_dir, save_name:str='cm'): 
         cm = self.get_confusion_obj(key)
@@ -83,9 +87,10 @@ class FixedSpecConfusionTracker:
     """ The current metric uses the one-vs-one strategy. """
     def __init__(self, classes, goal_score:list, negative_class_indices:[int, list, np.ndarray], goal_digit:int=2, writer=None):
         self.writer = writer
-        self.classes = classes
-        self.negative_class_indices = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx == self.negative_class_idx}
-        self.positive_class_indices = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx != self.negative_class_idx}
+        self.classes = np.array(classes)
+        if isinstance(negative_class_indices, int): negative_class_indices = [negative_class_indices]
+        self.negative_class_indices = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx in negative_class_indices}
+        self.positive_class_indices = {class_idx:class_name for class_idx, class_name in enumerate(self.classes) if class_idx not in negative_class_indices}
         if self.positive_class_indices == {}: self.positive_class_indices = deepcopy(self.negative_class_indices) # all classes are negative and positive
         
         self.goal_digit, self.goal_score = goal_digit, goal_score
@@ -110,7 +115,7 @@ class FixedSpecConfusionTracker:
     
     def update(self, actual_vector, probability_vector,
                set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):     
-        actual_vector, probability_vector = np.array(actual_vector), np.array(probability_vector)
+        actual_vector, probability_vector = integer_encoding(actual_vector, self.classes), np.array(probability_vector)
         actual_classes = np.unique(actual_vector).tolist()
         
         # Generating a confusion matrix with predetermined scores.
@@ -122,12 +127,12 @@ class FixedSpecConfusionTracker:
             if goal > 1 or goal <= 0: print('Warring: Goal score should be less than 1.')
             goal2fpr = 1-goal # spec+fpr = 1
             try: 
-                pos_class_idx, neg_class_idx = self.classes.index(pos_class_name), self.classes.index(neg_class_name)
+                pos_class_idx, neg_class_idx = np.where(self.classes == pos_class_name)[0][0], np.where(self.classes == neg_class_name)[0][0]
                 pos_neg_idx = roc_dict['pos_neg_idx'].index([pos_class_idx, neg_class_idx])
                 print(f'Now Positive Class: {pos_class_name} ({pos_class_idx}) & Negative Class: {neg_class_name} ({neg_class_idx}) -> {pos_neg_idx}')
             except: raise ValueError(f'No ROC was calculated with positive class {pos_class_name} and negative class {neg_class_name}.')
             fpr, tpr = roc_dict['fpr'][pos_neg_idx], roc_dict['tpr'][pos_neg_idx] # 1 -> 0
-            thresholds = roc_dict['thresholds'] # 0 -> 1
+            thresholds = roc_dict['thresholds'][pos_neg_idx] # 0 -> 1
             
             # If no instances meet the target score, it will return closest_value. 
             target_fpr, closest_fpr = round(goal2fpr, self.goal_digit), None
@@ -141,30 +146,24 @@ class FixedSpecConfusionTracker:
             print(f'Now goal is {goal} of {pos_class_name} ({same_value_index})')
             print(f"-> best_idx is {best_idx} & threshold cnt is {len(thresholds)} (fpr: {len(fpr)}, tpr: {len(tpr)})")
             
-            pos_mask, neg_mask = labels == pos_class_idx, labels == neg_class_idx
+            pos_mask, neg_mask = actual_vector == pos_class_idx, actual_vector == neg_class_idx
             all_mask = np.logical_or(pos_mask, neg_mask)
             all_idx, use_classes = np.flatnonzero(all_mask), [False, True]
-            pos_labels, pos_probs = pos_mask[all_mask], probs[all_idx, pos_class_idx]
+            pos_labels, pos_probs = pos_mask[all_mask], probability_vector[all_idx, pos_class_idx]
             
             # A basic confusion matrix is generated based on the class with the highest probability.
             best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], pos_class_idx)
             best_cm.prob_vector = pos_probs
             best_cm.classes = [pos_class_name if class_name else neg_class_name for class_name in use_classes]
-            best_cm.table = {best_cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in cm_v.items()} for cm_idx, cm_v in enumerate(best_cm.table.values())}
+            best_cm.table = {best_cm.classes[cm_idx]:{best_cm.classes[idx]:v for idx, v in cm_v.items()} for cm_idx, cm_v in enumerate(best_cm.table.values())}
             self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = deepcopy(best_cm)
-            self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = crv.area()[pos_class_idx]
+            self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][pos_class_idx]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'refer_score'] = tpr[best_idx]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'tag'] = f'FixedSpec-{str(goal).replace("0.", "")}_Positive-{pos_class_name}_Negative-{neg_class_name}'
             
             if img_update or set_title is not None or img_save_dir_path is not None:
-                if set_title is None: 
-                    set_title = f'Confusion matrix - Fixed Spec: {goal}\n(Positive class: {pos_class_name} VS Negative class: {neg_class_name})'
-                confusion_plt = self.plotConfusionMatrix(goal, pos_class_name, neg_class_name, set_title)
-                use_tag = f'ConfusionMatrix:{self.get_tag(goal, pos_class_name, neg_class_name)}'
-                if self.writer is not None and img_update:
-                    self.writer.add_figure(use_tag, confusion_plt)
-                if img_save_dir_path is not None:
-                    confusion_plt.savefig(Path(img_save_dir_path)/use_tag, dpi=300, bbox_inches='tight')
+                self.plotConfusionMatrix(goal, pos_class_name, neg_class_name, 
+                                         set_title, img_save_dir_path, img_update)
 
     def _createConfusionMatrixobj(self, actual_vector, probability_vector, threshold, positive_class_idx):
         actual_classes = np.unique(actual_vector).tolist()
@@ -192,10 +191,19 @@ class FixedSpecConfusionTracker:
     def result(self):
         return {key:self.get_confusion_matrix(*key, dict) for key in self.index}
     
-    def plotConfusionMatrix(self, goal, pos_class_name, neg_class_name, title:str=None): 
+    def plotConfusionMatrix(self, goal, pos_class_name, neg_class_name, 
+                            title:str=None, img_save_dir_path=None, img_update:bool=False): 
         cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
-        if type(cm) != pycmCM: return None
-        return cm.plot(number_label=True).figure if title is None else cm.plot(number_label=True, title=title).figure
+        if type(cm) != pycmCM: raise TypeError(f'It is not a pycm object.')
+        if title is None: 
+            title = f'Confusion matrix - Fixed Spec: {goal}\n'
+            title += f'(Positive class: {pos_class_name} VS Negative class: {neg_class_name})'
+        confusion_plt = cm.plot(number_label=True, title=title).figure
+        use_tag = f'ConfusionMatrix_{self.get_tag(goal, pos_class_name, neg_class_name)}'
+        if self.writer is not None and img_update:
+            self.writer.add_figure(use_tag, confusion_plt)
+        if img_save_dir_path is not None:
+            confusion_plt.savefig(Path(img_save_dir_path)/use_tag, dpi=300, bbox_inches='tight')
     
     def saveConfusionMatrix(self, goal, pos_class_name, neg_class_name, save_dir, save_name:str='cm'):  
         cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
