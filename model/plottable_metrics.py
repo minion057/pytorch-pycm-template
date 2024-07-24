@@ -60,7 +60,6 @@ def ROC_OvR(labels, probs, classes:list, positive_class_indices:[int, list, np.n
     labels, probs = integer_encoding(labels, classes), np.array(probs) # only integer label
     label_classes = np.unique(labels).tolist()
     crv = ROCCurve(actual_vector=np.array(labels), probs=np.array(probs), classes=label_classes)
-    print(f'ROC_OvR AREA!!!: {crv.area()}')
     # Setting up for plot
     if not isinstance(positive_class_indices, (int, list, np.ndarray)) and positive_class_indices is not None:
         raise TypeError("positive_class_indices must be an int, list, or np.ndarray")
