@@ -2,20 +2,19 @@ import torch
 from torch.nn import DataParallel as DP
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from abc import abstractmethod
-from logger import TensorboardWriter
-
-from pathlib import Path
-from utils import write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
-
 import time
 import datetime
+from abc import abstractmethod
+from logger import TensorboardWriter
+from pathlib import Path
+from utils import ensure_dir, write_dict2json, convert_confusion_matrix_to_list
+from utils import plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class BaseTester:
     """
     Base class for all testers
     """
-    def __init__(self, model, criterion, metric_ftns, curve_metric_ftns, config, classes, device):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device):
         self.config = config
         self.logger = config.get_logger('tester', 2)
         
@@ -25,9 +24,11 @@ class BaseTester:
         self.model = model
         self.criterion = criterion
         self.metric_ftns = metric_ftns
-        self.curve_metric_ftns = curve_metric_ftns
+        self.plottable_metric_ftns = plottable_metric_ftns
         self.loss_fn_name = config['loss'] 
-        self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.metrics_kwargs = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.plottable_metrics_kwargs = config['plottable_metrics'] if 'plottable_metrics' in config.config.keys() else None
+        self.confusion_key, self.confusion_tag_for_writer = 'confusion', 'ConfusionMatrix'
 
         self.test_epoch = 1
 
@@ -50,8 +51,14 @@ class BaseTester:
         else: self.logger.warning("Warning: Pre-trained model is not use.\n")
         
         # Setting the save directory path
-        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
-        self.output_metrics = self.output_dir / 'metrics-test.json'
+        ensure_dir(self.output_dir)
+        self.metrics_dir = self.output_dir / 'metrics_json'
+        ensure_dir(self.metrics_dir, True)
+        self.output_metrics = self.metrics_dir / 'metrics.json'
+        self.metrics_img_dir = self.output_dir / 'metrics_imgae'
+        ensure_dir(self.metrics_img_dir)
+        self.confusion_img_dir = self.output_dir / 'confusion_imgae'
+        ensure_dir(self.confusion_img_dir)
         
 
     @abstractmethod
@@ -78,6 +85,8 @@ class BaseTester:
         self._save_output(log)
         # Save result with tensorboard
         self._save_tensorboard(log)
+        # Save result using tester.py
+        self._save_other_output(log)
 
         # print logged informations to the screen
         self.logger.info('')
@@ -118,18 +127,8 @@ class BaseTester:
 
         self.logger.info("Checkpoint loaded. Testing from epoch {}\n".format(self.test_epoch))
 
-    def _save_output(self, log):
-        # Save the result of metrics.
-        write_dict2json(log, self.output_metrics)
-
-        # Save the result of confusion matrix image.
-        plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Test Data', 
-                                    self.output_dir/f'confusion_matrix_test.png')
-
-        # Save the reuslt of metrics graphs.
-        if self.save_performance_plot:
-            file_name = f'metrics_graphs_test.png'
-            plot_performance_1(log, self.output_dir/file_name)
+    def _save_other_output(self, log):
+        pass
 
     def _save_tensorboard(self, log):
         # Save the value per epoch. And save the value of test.
@@ -144,7 +143,7 @@ class BaseTester:
                 else: self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
             
             # 3. Confusion Matrix
-            self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['confusion'], self.classes, return_plot=True))
+            self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(log[self.confusion_key]))
             close_all_plots()
 
     def _setting_time(self, start, end):        
@@ -153,3 +152,25 @@ class BaseTester:
         hour_min_sec = day_time[-1].split(":")
         if len(day_time)==2: runtime = f'{int(day_time[0])*24+int(hour_min_sec[0])}:{hour_min_sec[1]}:{hour_min_sec[-1]}'
         return runtime
+    
+    def _save_output(self, log):
+        # Save the result of metrics.
+        write_dict2json(log, self.output_metrics)
+
+        # Save the result of confusion matrix image.
+        self._make_a_confusion_matrix(log[self.confusion_key], save_dir=self.confusion_img_dir)
+
+        # Save the reuslt of metrics graphs.
+        if self.save_performance_plot: plot_performance_1(log, self.metrics_img_dir/'metrics_graphs_test.png')
+            
+    def _make_a_confusion_matrix(self, confusion,
+                                 save_mode:str='Test', save_dir=None, title=None):        
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
+        if title is not None: plot_kwargs['title'] = title
+        if save_dir is None:
+            plot_kwargs['return_plot'] = True
+            return plot_confusion_matrix_1(**plot_kwargs)
+        else: # Save the result of confusion matrix image.
+            if title is None: plot_kwargs['title'] = f'Confusion Matrix: {save_mode} Data'
+            plot_kwargs['file_path'] = Path(save_dir)/f'ConfusionMatrix_{save_mode.lower().replace(" ", "_")}.png'
+            plot_confusion_matrix_1(**plot_kwargs)

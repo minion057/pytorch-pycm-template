@@ -69,16 +69,16 @@ def main(config):
     test_data_loader = data_loader.loaderdict['test'].dataloader
     
     classes = test_data_loader.dataset.classes
-    n_samples_per_class = 6
+    n_samples_per_class = 5
     explainset = get_a_explainset(test_data_loader, n_samples_per_class, classes)
-    
+    print(f"Input Shape: {explainset[0]['data'][0].shape}")
     # build model architecture, then print to console
     model = config.init_obj('arch', module_arch)
     
     # print the model infomation
     # 1. basic method
-    if model.__str__().split('\n')[-1] != ')': print(model) # Based on the basic model (BaseModel).
-    else: print(cal_model_parameters(model))
+    # if model.__str__().split('\n')[-1] != ')': print(model) # Based on the basic model (BaseModel).
+    # else: print(cal_model_parameters(model))
     # 2. to use the torchinfo library (from torchinfo import summary)
     # input_size = next(iter(test_data_loader))[0].shape
     # print('\nInput_size: {}'.format(input_size))
@@ -92,11 +92,11 @@ def main(config):
     
     # CAM requires complete fully connected layer information. 
     # However, there are cases where the model does not have a fully connected layer. 
-    # Therefore, run without the CAM method.
+    # Therefore, run without the CAM method in activation_based_methods.
+    # SSCAM adds noise and consumes a lot of VRAM, so run it except when using a GPU.
     gradient_based_methods = ['GradCAM', 'GradCAMpp', 'SmoothGradCAMpp', 'XGradCAM', 'LayerCAM'] # Fast. 
-    activation_based_methods = ['ScoreCAM', 'SSCAM', 'ISCAM'] # 'CAM' # Slow.
+    activation_based_methods = ['ScoreCAM', 'SSCAM', 'ISCAM'] if device.type == 'cpu' else ['ScoreCAM', 'ISCAM'] # Slow.
     all_methods = gradient_based_methods + activation_based_methods
-    
     exp = Explainer(model, 
                     config=config,
                     classes=classes,

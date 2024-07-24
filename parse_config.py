@@ -5,7 +5,7 @@ from functools import reduce, partial
 from operator import getitem
 from datetime import datetime
 from logger import setup_logging
-from utils import read_json, write_json
+from utils import ensure_dir, read_json, write_json
 import shutil
 
 class ConfigParser:
@@ -46,13 +46,14 @@ class ConfigParser:
         self._checkpoint_dir = save_dir / 'models' / exper_name / run_id
         self._log_dir = save_dir / 'log' / exper_name / run_id
         self._output_dir = save_dir / 'output' / exper_name / run_id
+        self._explanation_dir = save_dir / 'explanation' / exper_name / run_id
 
         # make directory for saving checkpoints and log.
         exist_ok = run_id == ''
         if self.resume is None:
-            self.checkpoint_dir.mkdir(parents=True, exist_ok=exist_ok)
-            self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
-            self.output_dir.mkdir(parents=True, exist_ok=exist_ok)
+            ensure_dir(self.checkpoint_dir, exist_ok)
+            ensure_dir(self.log_dir, exist_ok)
+            ensure_dir(self.output_dir, exist_ok)
             # save updated config file to the checkpoint dir
             write_json(self.config, self._checkpoint_dir / 'config.json')
         else:
@@ -99,9 +100,11 @@ class ConfigParser:
             # update new config for fine-tuning
             config.update(read_json(args.config))
 
+        try: core = args.core
+        except: core=None
         # parse custom cli options into dictionary
         modification = {opt.target : getattr(args, _get_opt_name(opt.flags)) for opt in options}
-        return cls(config, resume, modification, run_id, args.test, args.core)
+        return cls(config, resume, modification, run_id, args.test, core)
 
     def init_obj(self, name, module, *args, **kwargs):
         """
@@ -160,6 +163,10 @@ class ConfigParser:
     def output_dir(self):
         return self._output_dir
         
+    @property
+    def explanation_dir(self):
+        return self._explanation_dir
+    
 # helper functions to update config dict with custom cli options
 def _update_config(config, modification):
     if modification is None:

@@ -15,7 +15,7 @@ import data_loader.npz_loaders as module_data
 from torchvision import transforms
 import data_loader.transforms as module_transforms
 import model.loss as module_loss
-import model.metric_curve_plot as module_curve_metric
+import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
@@ -60,13 +60,15 @@ def main(config):
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
     metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
-    curve_metric = [getattr(module_curve_metric, met) for met in config['curve_metrics'].keys()] if 'curve_metrics' in config.config.keys() else None
+    plottable_metric = None
+    if 'plottable_metrics' in config.config.keys():
+        plottable_metric = [getattr(module_plottable_metric, met) for met in config['plottable_metrics'].keys()]
 
-    tester = Tester(model, criterion, metrics, curve_metric,
-                      config=config,
-                      classes=classes,
-                      device=device,
-                      data_loader=test_data_loader)
+    tester = Tester(model, criterion, metrics, plottable_metric,
+                    config=config,
+                    classes=classes,
+                    device=device,
+                    data_loader=test_data_loader)
 
     tester.test()
 

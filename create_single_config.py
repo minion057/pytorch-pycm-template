@@ -1,6 +1,6 @@
 from utils import CUSTOM_MASSAGE, yes_or_no, monitor_value
 from utils import type_int, type_float, type_attr, type_path, type_metrics
-from utils import write_json
+from utils import ensure_dir, write_json
 
 from collections import OrderedDict
 from pathlib import Path
@@ -128,7 +128,7 @@ def main():
     print(f'\nIf you don\'t set a file save path, it will be saved in the {save_path} folder in the current execution directory.')
     if yes_or_no('Do you want to set the file save path? '): save_path=type_path('\nPlease enter the file path. : ')
     else:
-        try: Path(save_path).mkdir(parents=True, exist_ok=True)
+        try: ensure_dir(save_path, True)
         except Exception as e: print(e)
     
     # config_file_name=f"{config['arch']['type']}.json"

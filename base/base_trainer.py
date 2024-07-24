@@ -1,25 +1,22 @@
 import torch
 from torch.nn import DataParallel as DP
 from torch.nn.parallel import DistributedDataParallel as DDP
-
+import numpy as np
+import time
+import datetime
 from abc import abstractmethod
 from numpy import inf
 from logger import TensorboardWriter
 from copy import deepcopy
-
 from pathlib import Path
-from utils import read_json, write_dict2json, plot_confusion_matrix_1, plot_performance_N, close_all_plots
-import model.metric_curve_plot as module_curve_metric
-
-import time
-import datetime
-
+from utils import ensure_dir, read_json, write_dict2json, convert_confusion_matrix_to_list
+from utils import plot_confusion_matrix_1, plot_performance_N, close_all_plots
 
 class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, model, criterion, metric_ftns, curve_metric_ftns, optimizer, config, classes, device):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device):
         self.config = config
         self.logger = config.get_logger('trainer', config['trainer']['verbosity'])
         
@@ -29,10 +26,12 @@ class BaseTrainer:
         self.model = model
         self.criterion = criterion
         self.metric_ftns = metric_ftns
-        self.curve_metric_ftns = curve_metric_ftns
+        self.plottable_metric_ftns = plottable_metric_ftns
         self.optimizer = optimizer
         self.loss_fn_name = config['loss'] 
-        self.metrics_class_index = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.metrics_kwargs = config['metrics'] if 'metrics' in config.config.keys() else None
+        self.plottable_metrics_kwargs = config['plottable_metrics'] if 'plottable_metrics' in config.config.keys() else None
+        self.confusion_key, self.confusion_tag_for_writer = 'confusion', 'ConfusionMatrix'
 
         cfg_trainer = config['trainer']
         self.epochs = cfg_trainer['epochs']
@@ -57,8 +56,14 @@ class BaseTrainer:
         # Setting the save directory path
         self.checkpoint_dir = config.checkpoint_dir
         self.output_dir = Path(config.output_dir) / 'training'
-        if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)
-        self.output_metrics = self.output_dir / 'metrics.json'
+        ensure_dir(self.output_dir, True)
+        self.metrics_dir = self.output_dir / 'metrics_json'
+        ensure_dir(self.metrics_dir, True)
+        self.output_metrics = self.metrics_dir / 'metrics.json'
+        self.metrics_img_dir = self.output_dir / 'metrics_imgae'
+        ensure_dir(self.metrics_img_dir)
+        self.confusion_img_dir = self.output_dir / 'confusion_imgae'
+        ensure_dir(self.confusion_img_dir)
 
         # setup visualization writer instance
         # log_dir is set to "[save_dir]/log/[name]/start_time" in advance when parsing in the config file.
@@ -81,7 +86,7 @@ class BaseTrainer:
             self.sampling_name = str(self.sampling['name']).lower() # random, ...
         self.cfg_da = config['data_augmentation'] if 'data_augmentation' in config.config.keys() else None
         if self.cfg_da is not None:
-            self.DA = str(self.cfg_da['type']).lower()
+            self.DA = str(self.cfg_da['type'])#.lower()
             self.DAargs, self.hookargs = self.cfg_da['args'], self.cfg_da['hook_args']
             self.pre_hook = self.cfg_da['hook_args']['pre']
     
@@ -119,7 +124,7 @@ class BaseTrainer:
             self.logger.info('')
             self.logger.info('============ METRIC RESULT ============')
             for idx, (key, value) in enumerate(log.items(), 1):
-                if '_class' in key or 'confusion' in key: continue
+                if '_class' in key or self.confusion_key in key: continue
                 if type(value) == dict:
                     self.logger.info(f'{idx}. {str(key):15s}')
                     for i, (k, v) in enumerate(value.items(), 1):
@@ -155,6 +160,7 @@ class BaseTrainer:
            
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=best)
+                self._save_other_output(epoch, log, save_best=best)
             
         end = time.time()
         self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
@@ -223,56 +229,38 @@ class BaseTrainer:
 
         self.logger.info("Checkpoint loaded. Resume training from epoch {}\n".format(self.start_epoch))
 
-    def _save_output(self, log):
-        # log = {'epoch':1, metrics:1, val_metrics:2, confusion:3, val_confusion:4}
-        
-        # Save the result of metrics.
-        if self.output_metrics.is_file():
-            result = read_json(self.output_metrics)
-            for k in result.keys():
-                if k == 'totaltime': continue
-                if len(result[k]) != int(log['epoch']): result[k]=result[k][:int(log['epoch'])-1]
-                result[k].append(log[k])
-        else:
-            result = {}
-            for k, v in log.items():
-                result[k] = [v]
-        write_dict2json(result, self.output_metrics)
-
-        # Save the result of confusion matrix image.
-        plot_confusion_matrix_1(log['confusion'], self.classes, 'Confusion Matrix: Training Data', self.output_dir/'confusion_matrix_training.png')
-        if 'val_confusion' in list(log.keys()): plot_confusion_matrix_1(log['val_confusion'], self.classes, 'Confusion Matrix: Validation Data', self.output_dir/'confusion_matrix_validation.png')
-
-        # Save the reuslt of metrics graphs.
-        if self.save_performance_plot: plot_performance_N(result, self.output_dir/'metrics_graphs.png')
+    def _save_other_output(self, epoch, log, save_best=False):
+        pass
 
     def _save_tensorboard(self, log):
         # Save the value per epoch. And save the value of training andvalidation.
         if self.tensorboard:
-            self.writer.set_step(log['epoch']-1)
-            for key, value in log.items():
-                if key in ['epoch', 'confusion', 'val_confusion']: continue
-                if 'val_' in key or 'time' in key: continue
-                # 1. All metrics
-                if '_class' not in key:
-                    if f'val_{key}' in log.keys():
-                        content = {key:value, f'val_{key}':log[f'val_{key}']}
-                        self.writer.add_scalars(key, {str(k):v for k, v in content.items()})
-                    else: self.writer.add_scalar(key, value)
-                # 2. All metrics per class
-                else:
-                    if f'val_{key}' in log.keys():
-                        content = deepcopy(value)
-                        content.update({f'val_{k}':v for k, v in log[f'val_{key}'].items()})
-                        self.writer.add_scalars(key, {str(k):v for k, v in content.items()})
-                    else: self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
+            self.writer.set_step(log['epoch'])
+            # 1. All metrics (with loss) 2. All metrics per class
+            self._log_metrics_to_tensorboard(log)
             
             # 3. Confusion Matrix
-            self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['confusion'], self.classes, return_plot=True))
-            if 'val_confusion' in log.keys():
-                self.writer.set_step(log['epoch']-1, 'valid')
-                self.writer.add_figure('ConfusionMatrix', plot_confusion_matrix_1(log['val_confusion'], self.classes, return_plot=True))
+            self.writer.add_figure(self.confusion_tag_for_writer, self._make_a_confusion_matrix(log[self.confusion_key]))
+            if self.do_validation:
+                self.writer.set_step(log['epoch'], 'valid')
+                self.writer.add_figure(self.confusion_tag_for_writer, self._make_a_confusion_matrix(log[f'val_{self.confusion_key}']))
             close_all_plots()
+            
+    def _log_metrics_to_tensorboard(self, log:dict):
+        for key, value in log.items():
+            if key in ['epoch', self.confusion_key, f'val_{self.confusion_key}']: continue
+            if 'val_' in key or 'time' in key: continue
+            if '_class' not in key: # 1. All metrics
+                if f'val_{key}' in log.keys():
+                    scalars = {key:value, f'val_{key}':log[f'val_{key}']}
+                    self.writer.add_scalars(key, {str(k):v for k, v in scalars.items()})
+                else: self.writer.add_scalar(key, value)
+            else: # 2. All metrics per class
+                if f'val_{key}' in log.keys():
+                    scalars = deepcopy(value)
+                    scalars.update({f'val_{k}':v for k, v in log[f'val_{key}'].items()})
+                    self.writer.add_scalars(key, {str(k):v for k, v in scalars.items()})
+                else: self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
         
     def _save_runtime(self, runtime:str):
         if not self.output_metrics.is_file(): raise ValueError('Not found output file.')
@@ -300,3 +288,100 @@ class BaseTrainer:
         totalSecs, sec = divmod(totalSecs, 60)
         hr, min = divmod(totalSecs, 60)
         return f'{hr:d}:{min:d}:{sec:d}'
+    
+    def _save_output(self, log):
+        # Save the result of metrics.
+        if self.output_metrics.is_file():
+            result = read_json(self.output_metrics)
+            result = self._slice_dict_values(result, int(log['epoch'])-1) # Adjusting the number of results per epoch.
+            result = self._merge_and_append_json(result, log)
+        else: result = self._convert_values_to_list(log)
+        write_dict2json(result, self.output_metrics)
+
+        # Save the result of confusion matrix image.
+        self._make_a_confusion_matrix(log[self.confusion_key], save_dir=self.confusion_img_dir)
+        if self.do_validation: 
+            self._make_a_confusion_matrix(log[f'val_{self.confusion_key}'], save_mode='Validation', save_dir=self.confusion_img_dir)
+
+        # Save the reuslt of metrics graphs.
+        if self.save_performance_plot: plot_performance_N(result, self.metrics_img_dir/'metrics_graphs.png')
+        
+    def _slice_dict_values(self, content:dict, slice_size:int):
+        new_content = deepcopy(content)
+        for key, value in content.items():
+            if key == 'totaltime': continue
+            if isinstance(value, list):
+                new_content[key] = value[:slice_size]
+            elif isinstance(value, dict):
+                new_content[key] = self._slice_dict_values(value, slice_size)
+            else: raise TypeError('Restricts dictionary values to lists or dictionaries only.\n'
+                                  +f'The current detected type is {type(value)}.')
+        return new_content
+    
+    def _merge_and_append_json(self, json_data, new_data):
+        use_data = deepcopy(json_data)
+        for key, value in new_data.items():
+            if key == 'totaltime': continue
+            if key in use_data:
+                if isinstance(use_data[key], list):
+                    use_data[key].append(value)
+                elif isinstance(use_data[key], np.ndarray):
+                    use_data[key] = np.append(use_data[key], value)
+                elif isinstance(use_data[key], dict):
+                    if isinstance(value, dict):
+                        use_data[key] = self._merge_and_append_json(use_data[key], value)
+                    else:
+                        raise TypeError(f"Value type mismatch for key '{key}': expected dict, got {type(value)}")
+                else:
+                    raise TypeError(f"Unsupported type for key '{key}': {type(use_data[key])}")
+            else:
+                raise KeyError(f"Key '{key}' not found in json_data")
+        return use_data
+    
+    def _convert_values_to_list(self, content):
+        new_content = deepcopy(content)
+        for key, value in content.items():
+            if key == 'totaltime': continue
+            if isinstance(value, dict): new_content[key] = self._convert_values_to_list(value)
+            else: new_content[key] = [value]
+        return new_content
+    
+    def _sort_train_val_sequences(self, content):
+        keys = list(content.keys())
+        sorted_keys = []
+        time_keys = []  # List to hold keys that contain 'time'
+        
+        for key in keys:
+            if key.startswith('val_'):
+                continue  # Skip 'val_' prefixed keys for now
+            if 'time' in key:
+                time_keys.append(key)  # Collect time-related keys
+                continue
+            sorted_keys.append(key)
+            val_key = 'val_' + key
+            if val_key in keys:
+                sorted_keys.append(val_key)
+        
+        # Append any remaining keys that were not paired with 'val_' prefixed keys
+        for key in keys:
+            if key not in sorted_keys and 'time' not in key:
+                sorted_keys.append(key)
+        
+        # Append the time-related keys at the end
+        sorted_keys.extend(time_keys)
+        
+        # Create a new dictionary with sorted keys
+        sorted_data = {key: content[key] for key in sorted_keys}
+        return sorted_data
+    
+    def _make_a_confusion_matrix(self, confusion, 
+                                 save_mode:str='Training', save_dir=None, title=None):        
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
+        if title is not None: plot_kwargs['title'] = title
+        if save_dir is None: 
+            plot_kwargs['return_plot'] = True
+            return plot_confusion_matrix_1(**plot_kwargs)
+        else: # Save the result of confusion matrix image.
+            if title is None: plot_kwargs['title'] = f'Confusion Matrix: {save_mode} Data'
+            plot_kwargs['file_path'] = Path(save_dir)/f'ConfusionMatrix_{save_mode.lower().replace(" ", "_")}.png'
+            plot_confusion_matrix_1(**plot_kwargs)

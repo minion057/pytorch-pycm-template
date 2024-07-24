@@ -37,15 +37,16 @@ class TensorboardWriter():
         self.tag_mode_exceptions = {'add_histogram', 'add_embedding'}
         self.timer = datetime.now()
 
-    def set_step(self, step, mode='train'):
+    def set_step(self, step, mode='train', save_time:bool=True):
         self.mode = mode
         self.step = step
-        if step == 0:
-            self.timer = datetime.now()
-        else:
-            duration = datetime.now() - self.timer
-            self.add_scalar('steps_per_sec', 1 / duration.total_seconds())
-            self.timer = datetime.now()
+        if save_time:
+            if step == 0:
+                self.timer = datetime.now()
+            else:
+                duration = datetime.now() - self.timer
+                self.add_scalar('steps_per_sec', 1 / duration.total_seconds())
+                self.timer = datetime.now()
 
     def __getattr__(self, name):
         """

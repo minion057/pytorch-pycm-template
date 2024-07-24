@@ -1,4 +1,5 @@
 from pathlib import Path
+from .util import ensure_dir
 
 CUSTOM_MASSAGE = 'Please enter the required parameters and their values.'
 
@@ -62,7 +63,7 @@ def type_path(message:str, valuecnt:int=0, file:bool=False):
     else:
         try:
             if not value.is_dir():
-                value.mkdir(parents=True, exist_ok=True)
+                ensure_dir(value, True)
                 print('Path creation completed.')
         except Exception as e:
             correct = False
