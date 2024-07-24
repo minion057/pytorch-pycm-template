@@ -79,7 +79,7 @@ class ConfusionTracker:
     def saveConfusionMatrix(self, key, save_dir, save_name:str='cm'): 
         cm = self.get_confusion_obj(key)
         if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
-        if save_name != 'cm': save_name = f'cm_{save_name}'
+        if 'cm' not in save_name: save_name = f'cm_{save_name}'
         cm.save_obj(str(Path(save_dir)/save_name)) # pycmCM(file=open(f'{save_name}.obj', "r"))
         
     
@@ -208,5 +208,5 @@ class FixedSpecConfusionTracker:
     def saveConfusionMatrix(self, goal, pos_class_name, neg_class_name, save_dir, save_name:str='cm'):  
         cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
         if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
-        if save_name != 'cm': save_name = f'cm_{save_name}'
+        if 'cm' not in save_name: save_name = f'cm_{save_name}'
         cm.save_obj(str(Path(save_dir)/save_name)) # pycmCM(file=open(f'{save_name}.obj', "r"))
