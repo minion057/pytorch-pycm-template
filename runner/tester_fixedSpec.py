@@ -75,6 +75,7 @@ class FixedSpecTester(Tester):
         goal_metrics = {}
         # 1. AUC: Pass
         # 2. Metrics
+        confusion_dict = ROCForFixedSpec.result()
         for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
             category = self.test_ROCForFixedSpec.get_tag(goal, pos_class_name, neg_class_name)
             confusion_obj = self.test_ROCForFixedSpec.get_confusion_obj(goal, pos_class_name, neg_class_name)
@@ -85,7 +86,7 @@ class FixedSpecTester(Tester):
                 use_confusion_obj = deepcopy(confusion_obj)                             
                 if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)
                 else: goal_metrics[category][tag] = met(use_confusion_obj, self.classes, **met_kwargs)                
-            goal_metrics[category][self.confusion_key] = confusion_obj.to_array().tolist()
+            goal_metrics[category][self.confusion_key] = confusion_dict[(goal, pos_class_name, neg_class_name)]
         return goal_metrics
     
     def _save_output(self, log):
