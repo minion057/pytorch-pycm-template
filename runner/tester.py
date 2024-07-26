@@ -148,4 +148,4 @@ class Tester(BaseTester):
         self._save_confusion_obj()
         
     def _save_confusion_obj(self, filename='cm', message='Saving checkpoint for Confusion Matrix'):
-        self.confusion.saveConfusionMatrix(self.confusion_key, self.output_dir, filename)
+        save_pycm_object(self.confusion.get_confusion_obj(self.confusion_key), save_dir=self.output_dir, save_name= filename)

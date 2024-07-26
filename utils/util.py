@@ -6,7 +6,7 @@ from itertools import repeat
 from collections import OrderedDict
 from copy import deepcopy
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.metrics import RocCurveDisplay
+from pycm import ConfusionMatrix as pycmCM
 
 def ensure_dir(dirname, exist_ok:bool=False):
     dirname = Path(dirname)
@@ -143,4 +143,26 @@ def convert_confusion_matrix_to_list(content):
     elif isinstance(content, list) or isinstance(content, np.ndarray): 
         cm = deepcopy(content)
     else: raise TypeError('The confusion matrix can only be a table (dictionary), numpy array, or list.')
+    return cm
+
+def save_pycm_object(cm:pycmCM, save_dir, save_name:str='cm'):
+    if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
+    if 'cm' not in save_name: save_name = f'cm_{save_name}'
+    try:
+        result = cm.save_obj(str(Path(save_dir)/save_name), save_stat=False, save_vector=True)
+        if not result['Status']: raise SaveError('Saving the pycm object failed.')
+    except SaveError as e: print(f'Save errors: {str(e)}')
+    except Exception as e: print(f'Unexpected errors: {str(e)}')
+    
+def load_pycm_object(object_path:str):
+    if Path(object_path).suffix != '.obj': raise TypeError('Only pycm objects saved as `obj` can be loaded.')
+    try: json_obj = read_json(object_path)
+    except Exception as e: print(f'Unexpected errors: {str(e)}')
+    # 객체에서 classes를 변경했다면, json으로 불러와야지만 확인할 수 있음
+    # 바로 pycm 객체로 불러온다면, 변경된 classes가 아닌, 원래 classes로 불러와짐
+    # 따라서 변경해주는 작업 진행
+    object_classes = [class_name for (class_name, pred_value) in json_obj['Matrix']]
+    cm = pycmCM(file=open(object_path, "r"))
+    cm.classes = object_classes
+    cm.table = {cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in cm_v.items()} for cm_idx, cm_v in enumerate(cm.table.values())}
     return cm

@@ -28,23 +28,19 @@ class ConfusionTracker:
             # if 'actual' not in list(value.keys()) or 'predict' not in list(value.keys()):
             raise ValueError('Correct answer (actual), predicted (predict) and probability value (probability) are required to update ConfusionTracker.'
                              + f'\nNow Value {list(value.keys())}.')
-        self._data.loc[key, 'actual'].extend(value['actual'])
+        self._data.loc[key, 'actual'].extend([self.classes[class_idx] for class_idx in integer_encoding(value['actual'], self.classes)])
         self._data.loc[key, 'predict'].extend(value['predict'])
         self._data.loc[key, 'probability'].extend(value['probability'])
         
         # A basic confusion matrix is generated based on the class with the highest probability.
-        cm = pycmCM(actual_vector=self._data.loc[key, 'actual'], predict_vector=self._data.loc[key, 'predict'])
+        cm = pycmCM(actual_vector=np.array(self._data.loc[key, 'actual']), predict_vector=np.array(self._data.loc[key, 'predict']))
         cm.prob_vector = self._data.loc[key, 'probability']
-        if all(class_name!=self.classes[class_idx] for class_idx, class_name in enumerate(cm.classes)):
-            if len(self.classes) != len(cm.classes): raise ValueError(f'The number of classes set in the confusion matrix is different from the actual number of classes.')
-            cm.classes = self.classes
-            cm.table = {cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in cm_v.items()} for cm_idx, cm_v in enumerate(cm.table.values())}
         self._data.loc[key, 'confusion'] = deepcopy(cm)
 
         if img_update or set_title is not None or img_save_dir_path is not None:
             # Perform only when all classes of data are present         
             self.plotConfusionMatrix(key, set_title, img_save_dir_path, img_update)
-            
+        
     def get_actual_vector(self, key):
         return self._data.loc[key, 'actual']
     def get_prediction_vector(self, key):
@@ -80,7 +76,7 @@ class ConfusionTracker:
         cm = self.get_confusion_obj(key)
         if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
         if 'cm' not in save_name: save_name = f'cm_{save_name}'
-        cm.save_obj(str(Path(save_dir)/save_name)) # pycmCM(file=open(f'{save_name}.obj', "r"))
+        cm.save_obj(str(Path(save_dir)/save_name), save_stat=False, save_vector=True)
         
     
 class FixedSpecConfusionTracker:
@@ -152,10 +148,9 @@ class FixedSpecConfusionTracker:
             pos_labels, pos_probs = pos_mask[all_mask], probability_vector[all_idx, pos_class_idx]
             
             # A basic confusion matrix is generated based on the class with the highest probability.
-            best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], pos_class_idx)
+            pos_labels = [pos_class_name if p else neg_class_name for p in pos_labels]
+            best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], [pos_class_name, neg_class_name])
             best_cm.prob_vector = pos_probs
-            best_cm.classes = [pos_class_name if class_name else neg_class_name for class_name in use_classes]
-            best_cm.table = {best_cm.classes[cm_idx]:{best_cm.classes[idx]:v for idx, v in cm_v.items()} for cm_idx, cm_v in enumerate(best_cm.table.values())}
             self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = deepcopy(best_cm)
             self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][pos_class_idx]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'refer_score'] = tpr[best_idx]
@@ -165,11 +160,9 @@ class FixedSpecConfusionTracker:
                 self.plotConfusionMatrix(goal, pos_class_name, neg_class_name, 
                                          set_title, img_save_dir_path, img_update)
 
-    def _createConfusionMatrixobj(self, actual_vector, probability_vector, threshold, positive_class_idx):
-        actual_classes = np.unique(actual_vector).tolist()
-        positive_class = actual_classes[positive_class_idx]
-        def lambda_fun(x): return threshold_func(x, positive_class, actual_classes, threshold)
-        return pycmCM(actual_vector, probability_vector, threshold=lambda_fun)    
+    def _createConfusionMatrixobj(self, actual_vector, probability_vector, threshold, actual_classes):
+        def lambda_fun(x): return threshold_func(x, True, actual_classes, threshold)
+        return pycmCM(np.array(actual_vector), np.array(probability_vector), threshold=lambda_fun)  
     
     def get_auc(self, goal, pos_class_name, neg_class_name):
         return self._data.loc[(goal, pos_class_name, neg_class_name), 'auc']
@@ -204,9 +197,3 @@ class FixedSpecConfusionTracker:
             self.writer.add_figure(use_tag, confusion_plt)
         if img_save_dir_path is not None:
             confusion_plt.savefig(Path(img_save_dir_path)/use_tag, dpi=300, bbox_inches='tight')
-    
-    def saveConfusionMatrix(self, goal, pos_class_name, neg_class_name, save_dir, save_name:str='cm'):  
-        cm = self.get_confusion_obj(goal, pos_class_name, neg_class_name)
-        if type(cm) != pycmCM: print('Warning: Can\'t save because there is no confusion matrix.')
-        if 'cm' not in save_name: save_name = f'cm_{save_name}'
-        cm.save_obj(str(Path(save_dir)/save_name)) # pycmCM(file=open(f'{save_name}.obj', "r"))

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTrainer, MetricTracker, ConfusionTracker
-from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize
+from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize, save_pycm_object
 from utils import plot_classes_preds, close_all_plots
 import numpy as np
 from copy import deepcopy
@@ -334,6 +334,8 @@ class Trainer(BaseTrainer):
         if save_best: self._save_confusion_obj(filename='cm_model_best', save_best=save_best)
         
     def _save_confusion_obj(self, filename, save_best:bool, message='Saving checkpoint for Confusion Matrix'):
-        self.train_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_obj_dir, filename+'_training')
+        save_pycm_object(self.train_confusion.get_confusion_obj(self.confusion_key), 
+                         save_dir=self.confusion_obj_dir, save_name= filename+'_training')
         if self.do_validation: 
-            self.valid_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_obj_dir, filename+'_validation')
+            save_pycm_object(self.train_confusion.get_confusion_obj(self.confusion_key), 
+                             save_dir=self.confusion_obj_dir, save_name= filename+'_validation')
