@@ -94,11 +94,10 @@ def tb_projector_resize(data, label_img, features):
     return label_img, features
 
 def check_onehot_label(item, classes):
-    item_class = np.unique(np.array(item), return_counts=True)[0]
-    if type(item) in [list, np.ndarray]:      
-        if all([0, 1] == item_class): return True
-        if all(i in classes for i in item_class): return False
-    else: return False
+    item = np.array(item)
+    item_class = np.unique(item, return_counts=True)[0]
+    if all([0, 1] == item_class): return True
+    if all(i in classes for i in item_class): return False
     return True
 
 def onehot_encoding(label, classes):
