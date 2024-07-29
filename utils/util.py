@@ -96,9 +96,12 @@ def tb_projector_resize(data, label_img, features):
 def check_onehot_label(item, classes):
     item = np.array(item)
     item_class = np.unique(item, return_counts=True)[0]
-    if all([0, 1] == item_class): return True
-    if all(i in classes for i in item_class): return False
-    return True
+    if all([0, 1] == item_class): 
+        if len(classes) == len(item): return True
+        else: raise ValueError('It\'s a one-hot encoding format, but it\'s not the same size as classes.')
+    if len(item) >= 2 and (item_class == [0] or item_class == [1]):
+        raise ValueError(f'It\'s a one-hot encoding format, but only {item_class} exists.')
+    return False
 
 def onehot_encoding(label, classes):
     if type(classes) == np.ndarray: classes = classes.tolist() # for FutureWarning by numpy
