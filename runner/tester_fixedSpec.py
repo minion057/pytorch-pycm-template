@@ -75,7 +75,7 @@ class FixedSpecTester(Tester):
         goal_metrics = {}
         # 1. AUC: Pass
         # 2. Metrics
-        confusion_dict = ROCForFixedSpec.result()
+        confusion_dict = self.test_ROCForFixedSpec.result()
         for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
             category = self.test_ROCForFixedSpec.get_tag(goal, pos_class_name, neg_class_name)
             confusion_obj = self.test_ROCForFixedSpec.get_confusion_obj(goal, pos_class_name, neg_class_name)

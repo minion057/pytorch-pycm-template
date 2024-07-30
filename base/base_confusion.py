@@ -29,7 +29,7 @@ class ConfusionTracker:
             raise ValueError('Correct answer (actual), predicted (predict) and probability value (probability) are required to update ConfusionTracker.'
                              + f'\nNow Value {list(value.keys())}.')
         self._data.loc[key, 'actual'].extend([self.classes[class_idx] for class_idx in integer_encoding(value['actual'], self.classes)])
-        self._data.loc[key, 'predict'].extend(value['predict'])
+        self._data.loc[key, 'predict'].extend([self.classes[class_idx] for class_idx in integer_encoding(value['predict'], self.classes)])
         self._data.loc[key, 'probability'].extend(value['probability'])
         
         # A basic confusion matrix is generated based on the class with the highest probability.
@@ -107,7 +107,9 @@ class FixedSpecConfusionTracker:
         self._data.loc[:, 'auc'] = 0. 
         self._data.loc[:, 'refer_score'] = None
         self._data.loc[:, 'tag'] = ''
-        for goal, p, n in self.index: self._data.loc[(goal, p, n)] = float(goal)
+        for goal, p, n in self.index: 
+            if goal > 1 or goal <= 0: raise ValueError('Warring: Goal score should be less than 1.')
+            self._data.loc[(goal, p, n)] = float(goal)
     
     def update(self, actual_vector, probability_vector,
                set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):     
@@ -120,12 +122,10 @@ class FixedSpecConfusionTracker:
                                                             negative_class_indices=list(self.negative_class_indices.keys()),
                                                             return_result=True)
         for goal, pos_class_name, neg_class_name in self.index:
-            if goal > 1 or goal <= 0: print('Warring: Goal score should be less than 1.')
             goal2fpr = 1-goal # spec+fpr = 1
             try: 
                 pos_class_idx, neg_class_idx = np.where(self.classes == pos_class_name)[0][0], np.where(self.classes == neg_class_name)[0][0]
                 pos_neg_idx = roc_dict['pos_neg_idx'].index([pos_class_idx, neg_class_idx])
-                print(f'Now Positive Class: {pos_class_name} ({pos_class_idx}) & Negative Class: {neg_class_name} ({neg_class_idx}) -> {pos_neg_idx}')
             except: raise ValueError(f'No ROC was calculated with positive class {pos_class_name} and negative class {neg_class_name}.')
             fpr, tpr = roc_dict['fpr'][pos_neg_idx], roc_dict['tpr'][pos_neg_idx] # 1 -> 0
             thresholds = roc_dict['thresholds'][pos_neg_idx] # 0 -> 1
@@ -139,8 +139,6 @@ class FixedSpecConfusionTracker:
             # Select the value with the highest TPR at the same specificity. (The earlier the index, the higher the score).
             same_value_index.sort()
             best_idx = same_value_index[0]
-            print(f'Now goal is {goal} of {pos_class_name} ({same_value_index})')
-            print(f"-> best_idx is {best_idx} & threshold cnt is {len(thresholds)} (fpr: {len(fpr)}, tpr: {len(tpr)})")
             
             pos_mask, neg_mask = actual_vector == pos_class_idx, actual_vector == neg_class_idx
             all_mask = np.logical_or(pos_mask, neg_mask)
@@ -149,7 +147,7 @@ class FixedSpecConfusionTracker:
             
             # A basic confusion matrix is generated based on the class with the highest probability.
             pos_labels = [pos_class_name if p else neg_class_name for p in pos_labels]
-            best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], [pos_class_name, neg_class_name])
+            best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], [neg_class_name, pos_class_name])
             best_cm.prob_vector = pos_probs
             self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = deepcopy(best_cm)
             self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][pos_class_idx]

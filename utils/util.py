@@ -99,7 +99,7 @@ def check_onehot_label(item, classes):
     if all([0, 1] == item_class): 
         if len(classes) == len(item): return True
         else: raise ValueError('It\'s a one-hot encoding format, but it\'s not the same size as classes.')
-    if len(item) >= 2 and (item_class == [0] or item_class == [1]):
+    if item.ndim == 1 and (item_class == [0] or item_class == [1]):
         raise ValueError(f'It\'s a one-hot encoding format, but only {item_class} exists.')
     return False
 
@@ -127,6 +127,8 @@ def integer_encoding(label, classes): #  by index of classes
             unique_value = label[0]
             if unique_value in classes:
                 integer_encoded = np.full(len(label), classes.index(unique_value))
+            elif unique_value < len(classes):
+                integer_encoded = label
             else:
                 raise ValueError(f'The unique value {unique_value} in the data is not present in the class list.')
         elif all([label_class in classes for label_class in label_classes]):
@@ -142,7 +144,7 @@ def integer_encoding(label, classes): #  by index of classes
             if not check_onehot_label(l, classes): 
                 raise ValueError('Invalid data type: must be one-dimensional (label/integer) or two-dimensional (one-hot).')
         integer_encoded = np.argmax(label, axis=1)
-    return integer_encoded
+    return np.array(integer_encoded)
 
 
 def convert_confusion_matrix_to_list(content): 
