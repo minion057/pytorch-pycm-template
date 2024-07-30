@@ -118,21 +118,32 @@ def onehot_encoding(label, classes):
     return label2onehot
 
 def integer_encoding(label, classes): #  by index of classes
-    if type(classes) == np.ndarray: classes = classes.tolist() # for FutureWarning by numpy
-    label_classes = np.unique(label)
-    item = label[0]
-    
-    if check_onehot_label(item, classes): # Is onehot
-        label2label = np.argmax(np.array(label), axis=1) 
-    elif np.array(classes).dtype == label_classes.dtype:
-        # Class and label are the same type as label, so get the index.
-        label2label = [classes.index(a) for a in label]
-    elif label_classes.dtype in [np.int32, np.int64] and all(label_classes == np.array(list(range(len(label_classes))))):
-        # Label is a number and has elements from 0 to the length of label_classes, so use it as an index.
-        # Use np.int32, np.int64 instead of np.integer for future compatibility.
-        label2label = np.array(label)
-    else: raise ValueError(f'Unable to convert label to integer type.\nCurrent classes: {classes}, items in label: {label_classes}.')
-    return label2label
+    label, classes = np.array(label), list(classes)
+    # Processing based on data type
+    if label.ndim == 1:
+        # Make sure all data is the same value
+        label_classes = np.unique(label)
+        if len(np.unique(label)) == 1:
+            unique_value = label[0]
+            if unique_value in classes:
+                integer_encoded = np.full(len(label), classes.index(unique_value))
+            else:
+                raise ValueError(f'The unique value {unique_value} in the data is not present in the class list.')
+        elif all([label_class in classes for label_class in label_classes]):
+            # Convert label encoding to integer encoding
+            integer_encoded = np.array([classes.index(label) for label in label])
+        elif all([label_class in list(range(len(classes))) for label_class in label_classes]):    
+            # Already an integer index
+            integer_encoded = label
+        else:
+            raise ValueError(f'Values in the data ({label_classes}) are not present in the class list ({classes}).')
+    else: # Two-dimensional data is likely to be one-hot encoding
+        for l in label:
+            if not check_onehot_label(l, classes): 
+                raise ValueError('Invalid data type: must be one-dimensional (label/integer) or two-dimensional (one-hot).')
+        integer_encoded = np.argmax(label, axis=1)
+    return integer_encoded
+
 
 def convert_confusion_matrix_to_list(content): 
     if isinstance(content, dict):
