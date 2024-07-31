@@ -50,7 +50,7 @@ class Trainer(BaseTrainer):
 
         # Hook for DA
         if self.cfg_da is not None: self.DA_ftns = getattr(module_DA, self.DA)(writer=self.writer, **self.DAargs)  
-            
+        
         # Clear the gradients of all optimized variables 
         self.optimizer.zero_grad()
         
@@ -268,7 +268,7 @@ class Trainer(BaseTrainer):
         
     def _da_loss(self, output, target, logit, loss):        
         try: loss = self.DA_ftns.loss(self._loss, output, target, logit, loss)
-        except: print('There is no loss function set up. If you need a specific formula, configure a loss function.')
+        except: raise AttributeError('There is no loss function set up. If you need a specific formula, configure a loss function.')
         self.DA_ftns.reset()
         return loss
     
