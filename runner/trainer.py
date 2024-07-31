@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTrainer, MetricTracker, ConfusionTracker
-from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize
+from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize, save_pycm_object
 from utils import plot_classes_preds, close_all_plots
 import numpy as np
 from copy import deepcopy
@@ -50,7 +50,7 @@ class Trainer(BaseTrainer):
 
         # Hook for DA
         if self.cfg_da is not None: self.DA_ftns = getattr(module_DA, self.DA)(writer=self.writer, **self.DAargs)  
-            
+        
         # Clear the gradients of all optimized variables 
         self.optimizer.zero_grad()
         
@@ -268,7 +268,7 @@ class Trainer(BaseTrainer):
         
     def _da_loss(self, output, target, logit, loss):        
         try: loss = self.DA_ftns.loss(self._loss, output, target, logit, loss)
-        except: print('There is no loss function set up. If you need a specific formula, configure a loss function.')
+        except: raise AttributeError('There is no loss function set up. If you need a specific formula, configure a loss function.')
         self.DA_ftns.reset()
         return loss
     
@@ -334,6 +334,8 @@ class Trainer(BaseTrainer):
         if save_best: self._save_confusion_obj(filename='cm_model_best', save_best=save_best)
         
     def _save_confusion_obj(self, filename, save_best:bool, message='Saving checkpoint for Confusion Matrix'):
-        self.train_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_obj_dir, filename+'_training')
+        save_pycm_object(self.train_confusion.get_confusion_obj(self.confusion_key), 
+                         save_dir=self.confusion_obj_dir, save_name= filename+'_training')
         if self.do_validation: 
-            self.valid_confusion.saveConfusionMatrix(self.confusion_key, self.confusion_obj_dir, filename+'_validation')
+            save_pycm_object(self.train_confusion.get_confusion_obj(self.confusion_key), 
+                             save_dir=self.confusion_obj_dir, save_name= filename+'_validation')

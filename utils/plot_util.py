@@ -171,10 +171,13 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
     if all((0 <= l <= 1 or 0 <= u <= 1) for l, u in bounds):
         bounds = np.array(bounds)*100 # [[l*100, u*100] for l, u in bounds]
         if not all((0 <= l <= 100 or 0 <= u <= 100) for l, u in bounds): raise ValueError('The values in the list (bounds) are outside the range between 0 and 100.')
-    errors = [[], []]
+    errors, real_bounds = [[], []], []
     for score, (lower, upper) in zip(means, bounds): # 메트릭 점수를 사용하기 때문에 범위를 0~100으로 고정
-        errors[0].append(max(score - lower, 0))
-        errors[1].append(min(upper - score, 100))
+        lower_error, upper_error  = score - lower, upper - score
+        if score-lower_error < 0 or lower_error < 0: lower_error = score
+        if score+upper_error > 100: upper_error = 100 - score
+        real_bounds.append((score-lower_error, score+upper_error))
+        errors[0].append(lower_error); errors[1].append(upper_error)
     errors = np.array(errors)
     
     colors, palette = [], ['#D7E1EE', '#B1C9F5', '#6F8CE7', '#8B8BB7'] # ['lightsteelblue', 'cornflowerblue', 'royalblue', 'midnightblue']
@@ -190,22 +193,31 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
         else: colors.append(palette[3])
     
     close_all_plots()
-    fig = plt.figure(figsize=(2*len(means), 5))
-    plt.bar([str(c) for c in classes], means, width=0.35, color=colors)
-    plt.errorbar([str(c) for c in classes], means, yerr=errors, color='k', capsize=5, fmt=' ', label=f'Mean {metric_name} (±{CI}% CI)')
-    plt.legend(); plt.ylim(0, 100)
+    fig = plt.figure(figsize=((2 if len(means) >= 3 else 3)*len(means), 5))
+    x = np.arange(len(classes))
+    plt.bar(x, means, width=0.5, color=colors)
+    plt.errorbar(x, means, yerr=errors, color='k', capsize=5, fmt=' ', label=f'Mean {metric_name} (±{CI}% CI)')
+    plt.legend(); plt.ylim(0, 105)
     plot_styles, plot_labels = plt.gca().get_legend().legendHandles, [t.get_text() for t in plt.gca().get_legend().get_texts()]
     legend_kwargs['handles'], legend_kwargs['labels'] = plot_styles + legend_kwargs['handles'], plot_labels + legend_kwargs['labels']
     plt.legend(**legend_kwargs)
     plt.title(f'Confidence Interval ({binom_method})', size=17, pad=20)
     plt.ylabel(metric_name, fontsize=15)
-    plt.xticks(rotation=55, ha='right', fontsize=12)
     if show_bound_text:
-        ci_bound_args = {'ha':'center', 'color':'crimson', 'weight':'bold', 'fontsize':9}
-        for x, (score, (down_point, up_point)) in enumerate(zip(means, bounds)):
-            plt.text(x, score+4, f'{score:.2f}%', va="top", color='dimgray', **{k:v for k,v in ci_bound_args.items() if k!='color'})
-            plt.text(x, down_point-2, f'{down_point:.2f}%', va="top", **ci_bound_args)
-            plt.text(x, up_point+2, f'{up_point:.2f}%', va="bottom", **ci_bound_args)
+        def format_number(num):
+            num = round(num, 2)
+            return num if isinstance(num, float) and num % 1 != 0 else f'{int(num)}'
+        plt.xticks([])
+        rows = ['Mean', 'Upper', 'Lower']
+        table_data = [[], [], []]
+        for score, (down_point, up_point) in zip(means, real_bounds):
+            table_data[0].append(f'{format_number(score)}%')
+            table_data[1].append(f'{format_number(up_point)}%')
+            table_data[2].append(f'{format_number(down_point)}%')
+        table = plt.table(cellText=table_data, rowLabels=rows, colLabels=[str(c) for c in classes], loc='bottom', cellLoc='center')
+        table.scale(1,2)
+        table.auto_set_font_size(False)
+    else: plt.xticks(x, [str(c) for c in classes], rotation=55, ha='right', fontsize=12)
     plt.tight_layout(rect=[0, 0, 1, 1])
     
     if file_path is not None: plt.savefig(file_path)

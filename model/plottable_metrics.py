@@ -7,27 +7,30 @@ from utils import onehot_encoding, integer_encoding
 from utils import plot_CI, plot_ROC, plot_ROC_OvR, plot_ROC_OvO
 from itertools import combinations, permutations
 from copy import deepcopy
+from base import base_class_metric
 
 """ 
 Metrics that need to be plotted, such as CI and ROC curves.
 """
 
 """ CI (Confidence interval) """
-def CI_wilson_class(confusion_obj:pycmCM, classes=None, 
+def CI_wilson_class(labels, probs, classes=None, 
                     use_metric:str='ACC', alpha:float=0.05, binom_method:str='wilson', one_sided:bool=False, 
-                    plot:bool=True, plot_metric_name:str=None):
+                    return_result:bool=False, plot_metric_name:str=None):
+    labels, probs = integer_encoding(labels, classes), np.array(probs)
+    labels, preds = [classes[idx] for idx in labels], [classes[idx] for idx in np.argmax(probs, axis=1)]
+    confusion_obj = pycmCM(actual_vector=np.array(labels), predict_vector=np.array(preds))
     if use_metric is None: raise ValueError('CI requires use_metric.')
     if alpha >= 1 or alpha <= 0: raise ValueError('CI requires alpha between 0 and 1.')
     kwargs = {'param':use_metric, 'alpha':alpha, 'binom_method':binom_method, 'one_sided':one_sided}
     bounds = base_class_metric('CI', confusion_obj, classes, **kwargs)
     means = base_class_metric(use_metric, confusion_obj, classes)
     result = {class_name:{f'mean':mean, 'lower_ci':ci_bounds[0], 'upper_ci':ci_bounds[1]} for (se, ci_bounds), (class_name, mean) in zip(bounds.values(), means.items())}
-    if plot: 
-        fig = plot_CI(list(means.values()), [ci_bound for se, ci_bound in bounds.values()], classes=classes, 
-                      metric_name=use_metric if plot_metric_name is None else plot_metric_name, 
-                      CI=int((1-alpha)*100), binom_method=binom_method, return_plot=True)
-        return result, fig
-    else: return result
+    fig = plot_CI(list(means.values()), [ci_bound for se, ci_bound in bounds.values()], classes=classes, 
+                  metric_name=use_metric if plot_metric_name is None else plot_metric_name, 
+                  CI=int((1-alpha)*100), binom_method=binom_method, return_plot=True)
+    if return_result: return result, fig
+    else: return fig
 """ CI (Confidence interval) """
 
 

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTester, MetricTracker, ConfusionTracker
-from utils import tb_projector_resize, plot_classes_preds, close_all_plots
+from utils import tb_projector_resize, plot_classes_preds, close_all_plots, save_pycm_object
 import numpy as np
 from copy import deepcopy
 from tqdm.auto import tqdm
@@ -148,4 +148,4 @@ class Tester(BaseTester):
         self._save_confusion_obj()
         
     def _save_confusion_obj(self, filename='cm', message='Saving checkpoint for Confusion Matrix'):
-        self.confusion.saveConfusionMatrix(self.confusion_key, self.output_dir, filename)
+        save_pycm_object(self.confusion.get_confusion_obj(self.confusion_key), save_dir=self.output_dir, save_name= filename)

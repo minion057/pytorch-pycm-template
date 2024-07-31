@@ -28,4 +28,4 @@ def base_class_metric(ftns_name, confusion_obj:pycmCM, classes=None, **kwargs):
     if classes is not None:
         if len(classes) != len(score_classes): raise ValueError('The number of set classes and the number of classes in the confusion matrix do not match.')
         if list(classes) != list(score_classes): return {classes[class_idx]:v for class_idx, v in enumerate(score.values())}
-    else: return score
+    return score
