@@ -9,11 +9,6 @@ class MixUp(BaseHook):
         self.type = 'mixup'
         super().__init__(self.type, cols=['lam', 'rand_index'], writer=writer)
         self.alpha = alpha
-        self.reset()
-
-    def reset(self):
-        self._data.loc[:, 'lam'] = None
-        self._data.loc[:, 'rand_index'] = None
         
     def update(self, batch_size):
         self._data.loc[self.type, 'lam'] = np.random.beta(self.alpha, self.alpha) if self.alpha > 0 else 1.
