@@ -268,7 +268,9 @@ class Trainer(BaseTrainer):
         
     def _da_loss(self, output, target, logit, loss):        
         try: loss = self.DA_ftns.loss(self._loss, output, target, logit, loss)
-        except: raise AttributeError('There is no loss function set up. If you need a specific formula, configure a loss function.')
+        except: 
+            # raise AttributeError('Loss function is not defined in the DA class. If you need a specific formula, configure a loss function.')
+            print('Loss function is not defined in the DA class. Thus, using the regular loss calculation formula.')
         self.DA_ftns.reset()
         return loss
     
