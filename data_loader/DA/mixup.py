@@ -9,11 +9,6 @@ class MixUp(BaseHook):
         self.type = 'mixup'
         super().__init__(self.type, cols=['lam', 'rand_index'], writer=writer)
         self.alpha = alpha
-        self.reset()
-
-    def reset(self):
-        self._data.loc[:, 'lam'] = None
-        self._data.loc[:, 'rand_index'] = None
         
     def update(self, batch_size):
         self._data.loc[self.type, 'lam'] = np.random.beta(self.alpha, self.alpha) if self.alpha > 0 else 1.
@@ -62,10 +57,11 @@ class MixUp(BaseHook):
         # loss: lam * criterion(pred, target_a) + (1 - lam) * criterion(pred, target_b)
         return mix_data
     
-    def loss(self, loss_ftns, output, target, logit, loss):
+    def loss(self, loss_ftns, output, target, logit):
         random_index, lam = self.rand_index(), self.lam()
         if random_index is None: return loss
         if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
+        basic_loss  = loss_ftns(output, target, logit).item()
         random_loss = loss_ftns(output, target[random_index], logit).item()
-        loss = loss*lam +  random_loss*(1.-lam)
-        return loss
+        loss = basic_loss*lam + random_loss*(1.-lam)
+        return {'loss':loss, 'target':target}

@@ -6,6 +6,7 @@ from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projecto
 from utils import plot_classes_preds, close_all_plots
 import numpy as np
 from copy import deepcopy
+from inspect import signature
 import matplotlib.pyplot as plt
 
 import data_loader.data_augmentation as module_DA
@@ -83,8 +84,8 @@ class Trainer(BaseTrainer):
             # 2. Forward pass: compute predicted outputs by passing inputs to the model
             output = self.model(data)
             logit, predict = torch.max(output, 1)
-            loss = self._loss(output, target, logit)
-            if self.cfg_da is not None: loss = self._da_loss(output, target, logit, loss)
+            if self.cfg_da is None: loss = self._loss(output, target, logit)
+            else: loss, target = self._da_loss(output, target, logit)
                 
             # 3. Backward pass: compute gradient of the loss with respect to model parameters
             if self.accumulation_steps is not None: loss = loss / self.accumulation_steps
@@ -266,11 +267,14 @@ class Trainer(BaseTrainer):
         else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
         return loss
         
-    def _da_loss(self, output, target, logit, loss):        
-        try: loss = self.DA_ftns.loss(self._loss, output, target, logit, loss)
-        except: raise AttributeError('There is no loss function set up. If you need a specific formula, configure a loss function.')
+    def _da_loss(self, output, target, logit):     
+        if 'loss' not in dir(self.DA_ftns):
+            raise AttributeError('Loss function is not defined in the DA class. If you need a specific formula, configure a loss function.')
+        result = self.DA_ftns.loss(self._loss, output, target, logit)
+        if not isinstance(result, dict) or result=={} or not all(k in ['loss', 'target'] for k in result.keys()): 
+            raise ValueError('The loss function in the DA class requires passing values as a dictionary with keys "loss" and "target".')
         self.DA_ftns.reset()
-        return loss
+        return result['loss'], result['target']
     
     def _sampling(self, data, target):
         if 'down' in self.sampling_type:

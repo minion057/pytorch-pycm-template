@@ -110,7 +110,7 @@ class ResultVisualization:
                         latest = int(latest)
                     
                     # 테스트 정보를 모두 가져온다.
-                    test_json = sorted((metrics_path/'test').glob(f'**/*{self.test_dirname}*/*{self.test_filename}*.json'))                    
+                    test_json = sorted((metrics_path/'test').glob(f'**/*{self.test_dirname}*/*{self.test_filename}*.json'))           
                     if len(test_json) >= 1:
                         test_epochs = []
                         for t in test_json:

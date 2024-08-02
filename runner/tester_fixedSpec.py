@@ -139,6 +139,6 @@ class FixedSpecTester(Tester):
                         else: self.writer.add_scalars(new_key, {str(k):v for k, v in new_value.items()})
             
                     # 3. Confusion Matrix
-                    self.writer.set_step(self.test_epoch, f'{self.wirter_mode}_{key}')
+                    self.writer.set_step(self.test_epoch, f'{self.wirter_mode}_{key}', False)
                     self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(value[self.confusion_key]))
                     close_all_plots()
