@@ -80,10 +80,11 @@ class CutMix(BaseHook):
         bbox_H2 = np.clip(cy + patch_H // 2, 0, H)
         return bbox_W1, bbox_H1, bbox_W2, bbox_H2
     
-    def loss(self, loss_ftns, output, target, logit, loss):
+    def loss(self, loss_ftns, output, target, logit):
         random_index, lam = self.rand_index(), self.lam()
         if random_index is None: return loss
         if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
+        basic_loss  = loss_ftns(output, target, logit).item()
         random_loss = loss_ftns(output, target[random_index], logit).item()
-        loss = loss*lam +  random_loss*(1.-lam)
-        return loss
+        loss = basic_loss*lam +  random_loss*(1.-lam)
+        return loss, target

@@ -39,7 +39,7 @@ class ColorJitter(BaseHook):
         if self.prob is None: 
             use_data = input_data[0]
             device = use_data.get_device()
-            da_result = self._run(da_result.detach().cpu().clone())
+            da_result = self._run(use_data.detach().cpu().clone())
             if device != -1: da_result = da_result.cuda()
             return (torch.cat((use_data, da_result), 0), )
         # 2. Method for using only one of the original or augmented data.
@@ -64,3 +64,7 @@ class ColorJitter(BaseHook):
             self.writer.add_figure(f'input_{self.type}', show_mix_result(da_data, titles=['Original Data', 'Result']))
             close_all_plots()
         return aug_data
+    
+    def loss(self, loss_ftns, output, target, logit):
+        use_target = torch.cat((target, target), 0) if self.prob is None else target
+        return {'loss': loss_ftns(output, use_target, logit), 'target':use_target}

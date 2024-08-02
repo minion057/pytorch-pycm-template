@@ -57,10 +57,11 @@ class MixUp(BaseHook):
         # loss: lam * criterion(pred, target_a) + (1 - lam) * criterion(pred, target_b)
         return mix_data
     
-    def loss(self, loss_ftns, output, target, logit, loss):
+    def loss(self, loss_ftns, output, target, logit):
         random_index, lam = self.rand_index(), self.lam()
         if random_index is None: return loss
         if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
+        basic_loss  = loss_ftns(output, target, logit).item()
         random_loss = loss_ftns(output, target[random_index], logit).item()
-        loss = loss*lam +  random_loss*(1.-lam)
-        return loss
+        loss = basic_loss*lam + random_loss*(1.-lam)
+        return {'loss':loss, 'target':target}
