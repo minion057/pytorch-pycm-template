@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTester, MetricTracker, ConfusionTracker
-from utils import tb_projector_resize, plot_classes_preds, close_all_plots, save_pycm_object
+from utils import tb_projector_resize, plot_classes_preds, close_all_plots, save_pycm_object, check_onehot_label
 import numpy as np
 from copy import deepcopy
 from tqdm.auto import tqdm
@@ -50,7 +50,8 @@ class Tester(BaseTester):
                 output = self.model(data)
                 logit, predict = torch.max(output, 1)
                 loss = self._loss(output, target, logit)
-                    
+                if check_onehot_label(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
+                
                 use_data, use_target = data.detach().cpu(), target.detach().cpu().tolist()
                 use_output, use_predict =output.detach().cpu(), predict.detach().cpu()
                 
