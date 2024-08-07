@@ -87,4 +87,4 @@ class CutMix(BaseHook):
         if random_index is None: return basic_loss
         random_loss = loss_ftns(output, target[random_index], logit)
         loss = basic_loss*lam +  random_loss*(1.-lam)
-        return loss, target
+        return {'loss':loss, 'target':target}
