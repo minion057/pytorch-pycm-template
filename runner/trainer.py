@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from torchvision.utils import make_grid
 from base import BaseTrainer, MetricTracker, ConfusionTracker
-from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize, save_pycm_object
-from utils import plot_classes_preds, close_all_plots
+from utils import ensure_dir, inf_loop, register_forward_hook_layer, tb_projector_resize, check_onehot_label
+from utils import plot_classes_preds, close_all_plots, save_pycm_object
 import numpy as np
 from copy import deepcopy
 from inspect import signature
@@ -86,7 +86,8 @@ class Trainer(BaseTrainer):
             logit, predict = torch.max(output, 1)
             if self.cfg_da is None: loss = self._loss(output, target, logit)
             else: loss, target = self._da_loss(output, target, logit)
-                
+            if check_onehot_label(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
+            
             # 3. Backward pass: compute gradient of the loss with respect to model parameters
             if self.accumulation_steps is not None: loss = loss / self.accumulation_steps
             loss.backward()
@@ -198,6 +199,7 @@ class Trainer(BaseTrainer):
                 output = self.model(data)
                 logit, predict = torch.max(output, 1) 
                 loss = self._loss(output, target, logit)
+                if check_onehot_label(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
                 
                 use_data, use_target = data.detach().cpu(), target.detach().cpu().tolist()
                 use_output, use_predict =output.detach().cpu(), predict.detach().cpu()
