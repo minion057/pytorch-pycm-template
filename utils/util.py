@@ -180,5 +180,5 @@ def load_pycm_object(object_path:str):
     cm = pycmCM(file=open(object_path, "r"))
     if object_classes != list(cm.classes):
         cm.classes = object_classes
-        cm.table = {cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in enumerate(cm_v.keys())} for cm_idx, cm_v in enumerate(cm.table.values())}
+        cm.table = {cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in enumerate(cm_v.values())} for cm_idx, cm_v in enumerate(cm.table.values())}
     return cm
