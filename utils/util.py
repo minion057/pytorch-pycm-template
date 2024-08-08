@@ -178,6 +178,7 @@ def load_pycm_object(object_path:str):
     # 따라서 변경해주는 작업 진행
     object_classes = [class_name for (class_name, pred_value) in json_obj['Matrix']]
     cm = pycmCM(file=open(object_path, "r"))
-    cm.classes = object_classes
-    cm.table = {cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in cm_v.items()} for cm_idx, cm_v in enumerate(cm.table.values())}
+    if object_classes != list(cm.classes):
+        cm.classes = object_classes
+        cm.table = {cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in enumerate(cm_v.keys())} for cm_idx, cm_v in enumerate(cm.table.values())}
     return cm
