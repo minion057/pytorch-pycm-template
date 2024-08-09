@@ -71,7 +71,7 @@ class Trainer(BaseTrainer):
         # Hook
         if self.cfg_da is not None:
             hook = register_forward_hook_layer(self.model, self.DA_ftns.forward_pre_hook if self.pre_hook else self.DA_ftns.forward_hook, **self.hookargs)
-        
+
         for batch_idx, (data, target) in enumerate(self.data_loader):
             batch_num = (epoch - 1) * self.len_epoch + batch_idx + 1
             self.writer.set_step(batch_num, 'batch_train')
@@ -108,15 +108,14 @@ class Trainer(BaseTrainer):
             self.train_metrics.update('loss', loss.item())
             
             # 5-2. confusion matrix 
-            confusion_content = {'actual':use_target, 'predict':use_predict.tolist()}
-            if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in use_output]
+            confusion_content = {'actual':use_target, 'predict':use_predict.tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
             self.train_confusion.update(self.confusion_key, confusion_content, img_update=False)
             
             confusion_obj = self.train_confusion.get_confusion_obj(self.confusion_key)
             for met in self.metric_ftns:# pycm version
                 met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
                 tag = met.__name__ if tag is None else tag
-                use_confusion_obj = deepcopy(confusion_obj)                             
+                use_confusion_obj = deepcopy(confusion_obj)                    
                 if met_kwargs is None: self.train_metrics.update(tag, met(use_confusion_obj, self.classes))
                 else: self.train_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
             
@@ -169,7 +168,7 @@ class Trainer(BaseTrainer):
             self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
             if self.lr_scheduler_name == 'ReduceLROnPlateau': self.lr_scheduler.step(val_log['loss'])
             else: self.lr_scheduler.step()
-        
+
         # 7. setting result     
         return self._get_a_log(epoch)
     
@@ -207,18 +206,16 @@ class Trainer(BaseTrainer):
                 # 3. Update the loss
                 self.valid_metrics.update('loss', loss.item())
                 # 4. Update the confusion matrix and input data
-                confusion_content = {'actual':use_target, 'predict':use_predict.clone().tolist()}
-                if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in use_output]
+                confusion_content = {'actual':use_target, 'predict':use_predict.tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
                 self.valid_confusion.update(self.confusion_key, confusion_content, img_update=False)
                     
                 confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
                 for met in self.metric_ftns:# pycm version
                     met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
                     tag = met.__name__ if tag is None else tag
-                    use_confusion_obj = deepcopy(confusion_obj)                             
+                    use_confusion_obj = deepcopy(confusion_obj)          
                     if met_kwargs is None: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes))
                     else: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))               
-                    
                 if batch_idx % self.log_step == 0: self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
                 
                 # 4-1. Update the Projector
@@ -262,7 +259,6 @@ class Trainer(BaseTrainer):
         # add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
             self.writer.add_histogram(name, p, bins='auto')
-        return self.valid_metrics.result(), self.valid_confusion.result()
 
     def _loss(self, output, target, logit):
         if self.loss_fn_name != 'bce_loss': loss = self.criterion(output, target)
@@ -287,6 +283,7 @@ class Trainer(BaseTrainer):
         else: TypeError('The applicable types are up or down.')
         
     def _plottable_metrics(self, actual_vector, probability_vector, mode='training'):
+        if np.array(probability_vector).ndim != 2: raise ValueError('The probability vector should be 2D array.')
         for met in self.plottable_metric_ftns:            
             met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
             tag = met.__name__ if tag is None else tag
@@ -311,11 +308,11 @@ class Trainer(BaseTrainer):
         return met_kwargs, tag, save_dir
         
     def _get_a_log(self, epoch):        
-        log = self.train_metrics.result()        
-        log_confusion = self.train_confusion.result()
-
+        log, log_confusion = self.train_metrics.result(), self.train_confusion.result()
+        
         if self.do_validation:
-            val_log, val_confusion = self._valid_epoch(epoch) # Validation Result
+            self._valid_epoch(epoch)
+            val_log, val_confusion = self.valid_metrics.result(),  self.valid_confusion.result()
             log.update(**{'val_'+k : v for k, v in val_log.items()})
             log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
         log.update(log_confusion)    
