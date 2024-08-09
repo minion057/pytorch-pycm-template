@@ -28,6 +28,8 @@ class ConfusionTracker:
             # if 'actual' not in list(value.keys()) or 'predict' not in list(value.keys()):
             raise ValueError('Correct answer (actual), predicted (predict) and probability value (probability) are required to update ConfusionTracker.'
                              + f'\nNow Value {list(value.keys())}.')
+        if np.array(value['probability']).ndim != 2:
+            raise ValueError(f'Probability value (probability) should be a 2D array. Now shape is {np.array(value["probability"]).shape}.')
         self._data.loc[key, 'actual'].extend([self.classes[class_idx] for class_idx in integer_encoding(value['actual'], self.classes)])
         self._data.loc[key, 'predict'].extend([self.classes[class_idx] for class_idx in integer_encoding(value['predict'], self.classes)])
         self._data.loc[key, 'probability'].extend(value['probability'])
@@ -112,7 +114,9 @@ class FixedSpecConfusionTracker:
             self._data.loc[(goal, p, n)] = float(goal)
     
     def update(self, actual_vector, probability_vector,
-               set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):     
+               set_title:str=None, img_save_dir_path:str=None, img_update:bool=False):   
+        if np.array(probability_vector).ndim != 2:
+            raise ValueError(f'Probability value (probability) should be a 2D array. Now shape is {np.array(probability_vector).shape}.')  
         actual_vector, probability_vector = integer_encoding(actual_vector, self.classes), np.array(probability_vector)
         actual_classes = np.unique(actual_vector).tolist()
         
@@ -148,7 +152,7 @@ class FixedSpecConfusionTracker:
             # A basic confusion matrix is generated based on the class with the highest probability.
             pos_labels = [pos_class_name if p else neg_class_name for p in pos_labels]
             best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], [neg_class_name, pos_class_name])
-            best_cm.prob_vector = pos_probs
+            best_cm.prob_vector = {'pos_probs':pos_probs, 'all_probs':probability_vector[all_idx, :], 'pos_class_idx': pos_class_idx, 'neg_class_idx': neg_class_idx}
             self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = deepcopy(best_cm)
             self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][pos_class_idx]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'refer_score'] = tpr[best_idx]
