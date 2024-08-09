@@ -23,7 +23,7 @@ class FixedSpecTrainer(Trainer):
         self.ROCNameForFixedSpec, self.AUCNameForFixedSpec = 'ROC_OvO', 'AUC_OvO'
         for met in self.metric_ftns:
             if self.AUCNameForFixedSpec.lower() in met.__name__.lower(): self.metric_ftns.remove(met)
-
+        
         self.ROCForFixedSpecParams, self.original_result_name  = None, 'maxprob'
         if self.plottable_metrics_kwargs is not None:
             if self.ROCNameForFixedSpec in self.plottable_metrics_kwargs.keys(): 
@@ -51,10 +51,10 @@ class FixedSpecTrainer(Trainer):
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
         '''
-        log = self.train_metrics.result()
-        log_confusion = self.train_confusion.result()
+        log, log_confusion = self.train_metrics.result(), self.train_confusion.result()
         if self.do_validation:
-            val_log, val_confusion = self._valid_epoch(epoch) # Validation Result
+            self._valid_epoch(epoch)
+            val_log, val_confusion = self.valid_metrics.result(),  self.valid_confusion.result()
             log.update(**{'val_'+k : v for k, v in val_log.items()})
             log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
         
@@ -100,10 +100,12 @@ class FixedSpecTrainer(Trainer):
             ROCForFixedSpec = self.train_ROCForFixedSpec
             self.train_ROCForFixedSpec.update(self.train_confusion.get_actual_vector(self.confusion_key),
                                               self.train_confusion.get_probability_vector(self.confusion_key), img_update=False)
+            maxprob_confusion = self.train_confusion.get_confusion_obj(self.confusion_key)
         else:
             ROCForFixedSpec = self.valid_ROCForFixedSpec
             self.valid_ROCForFixedSpec.update(self.valid_confusion.get_actual_vector(self.confusion_key),
                                               self.valid_confusion.get_probability_vector(self.confusion_key), img_update=False)
+            maxprob_confusion = self.valid_confusion.get_confusion_obj(self.confusion_key)
         goal_metrics = {}
         # 1. AUC: Pass
         # 2. Metrics
@@ -115,7 +117,7 @@ class FixedSpecTrainer(Trainer):
             for met in self.metric_ftns:# pycm version
                 met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
                 tag = met.__name__ if tag is None else tag
-                use_confusion_obj = deepcopy(confusion_obj)                             
+                use_confusion_obj = deepcopy(confusion_obj) if 'auc' not in met.__name__.lower() else deepcopy(maxprob_confusion)             
                 if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)
                 else: goal_metrics[category][tag] = met(use_confusion_obj, self.classes, **met_kwargs)                
             goal_metrics[category][self.confusion_key] = confusion_dict[(goal, pos_class_name, neg_class_name)]
