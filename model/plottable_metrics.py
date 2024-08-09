@@ -186,7 +186,6 @@ def ROC_OvO(labels, probs, classes:list,
         roc_dict['thresholds'].append(use_roc['thresholds'][use_index])
         roc_dict['actual'].append(use_roc['actual'][use_index])
         roc_dict['prob'].append(use_roc['prob'][use_index])
-    
     plot_kwargs = {'classes': classes, 'pos_neg_pair_indices':roc_dict['pos_neg_idx'],
                    'fpr': roc_dict['fpr'], 'tpr': roc_dict['tpr'], 'auc': roc_dict['auc'], 'return_plot': True}
     if show_average:

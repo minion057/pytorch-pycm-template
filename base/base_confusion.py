@@ -154,7 +154,7 @@ class FixedSpecConfusionTracker:
             best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], [neg_class_name, pos_class_name])
             best_cm.prob_vector = {'pos_probs':pos_probs, 'all_probs':probability_vector[all_idx, :], 'pos_class_idx': pos_class_idx, 'neg_class_idx': neg_class_idx}
             self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = deepcopy(best_cm)
-            self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][pos_class_idx]
+            self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][list(self.positive_class_indices.keys()).index(pos_class_idx)]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'refer_score'] = tpr[best_idx]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'tag'] = f'FixedSpec-{str(goal).replace("0.", "")}_Positive-{pos_class_name}_Negative-{neg_class_name}'
             
