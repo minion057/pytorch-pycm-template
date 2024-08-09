@@ -65,7 +65,13 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes=None, method:str='basic'):
     if method not in ['basic', 'roc']: raise ValueError('The method can only be "basic" or "roc".')
     if method.lower() == 'basic': return base_class_metric('AUC', confusion_obj, classes)
     if confusion_obj.prob_vector is None: raise ValueError('No value for prob vector.')
-    crv = ROCCurve(actual_vector=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=confusion_obj.classes)
+    try:
+        label_classes = list(np.unique(confusion_obj.actual_vector))
+        crv = ROCCurve(actual_vector=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=label_classes)
+    except:
+        print(confusion_obj.actual_vector[-1])
+        print(confusion_obj.prob_vector[-1])
+        print(confusion_obj.classes, ' & ', label_classes)
     if classes is None: return crv.area()
     return {classes[class_idx]:v for class_idx, v in enumerate(crv.area().values())}
         
