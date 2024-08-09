@@ -67,11 +67,12 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes=None, method:str='basic'):
     if confusion_obj.prob_vector is None: raise ValueError('No value for prob vector.')
     try:
         label_classes = list(np.unique(confusion_obj.actual_vector))
-        crv = ROCCurve(actual_vector=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=label_classes)
+        crv = ROCCurve(actual_vector=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=confusion_obj.classes)
     except:
         print(confusion_obj.actual_vector[-1])
         print(confusion_obj.prob_vector[-1])
         print(confusion_obj.classes, ' & ', label_classes)
+        raise
     if classes is None: return crv.area()
     return {classes[class_idx]:v for class_idx, v in enumerate(crv.area().values())}
         
