@@ -45,10 +45,7 @@ class TorchcamExplainer(BaseExplainer):
         self.device = device
         self.xai_layers = None
         
-        self.explain_model_name = config['arch']['type']
-        if 'deit' in self.explain_model_name.lower(): # 나중에 삭제
-            self.output_dir = Path(str(self.output_dir).replace(self.output_dir_name, f'{self.output_dir_name}_last_conv'))
-            if not self.output_dir.is_dir(): self.output_dir.mkdir(parents=True)       
+        self.explain_model_name = config['arch']['type']      
         self.explainset = explainset
         self.n_samples_per_class = len(explainset[0]['index'])
         self.explain_methods = explain_methods

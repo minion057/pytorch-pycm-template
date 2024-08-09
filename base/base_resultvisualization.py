@@ -9,8 +9,7 @@ from utils import ensure_dir
 
 class ResultVisualization:
     def __init__(self, parent_dir, result_name,
-                 test_dirname:str='test', test_filename:str='metrics', test_file_addtional_name:str='test',
-                 positive_class_name=None):
+                 test_dirname:str='test', test_filename:str='metrics', test_file_addtional_name:str='test'):
         parent_dir = Path(parent_dir)
         self.name = result_name
         self.output_dir = parent_dir / 'output' / self.name
@@ -18,7 +17,6 @@ class ResultVisualization:
         self.test_dirname = test_dirname
         self.test_filename = test_filename
         self.test_file_addtional_name = test_file_addtional_name
-        self.positive_class_name = positive_class_name
         self.sheet_list = ['training', 'validation', 'test']
         
         # output 중, metric.json 경로 정보 가져오기
@@ -32,16 +30,6 @@ class ResultVisualization:
             with open(json_path, 'r') as j:
                 json_content = json.load(j)
         except Exception as inst: print(inst) 
-        
-        # 나중에 수정
-        if 'auc' in json_content.keys(): 
-            if self.positive_class_name is not None:
-                json_content['auc']=json_content['auc'][self.positive_class_name]
-                if 'val_auc' in json_content.keys(): json_content['val_auc']=json_content['val_auc'][self.positive_class_name]
-            else: 
-                print('Warning: The AUC scores from the training or validation dataset exist, but there are no positive classes set up to view the scores.')
-                del json_content['auc']
-                if 'val_auc' in json_content.keys(): del json_content['val_auc']
         return json_content
     
     def _get_a_category_info(self):
@@ -94,9 +82,8 @@ class ResultVisualization:
                     run_id = metrics_cate.split('-')[-1]
                     if run_cate not in metrics_dict[category][model].keys(): metrics_dict[category][model][run_cate] = {}
                     
-                    # 훈련의 output을 가져온다.  
-                    train_json = sorted((metrics_path).glob('metrics*.json'))             
-                    if len(train_json) == 0: train_json = sorted((metrics_path/'training').glob('metrics*.json'))
+                    # 훈련의 output을 가져온다. 
+                    train_json = sorted((metrics_path).glob('training/**/metrics.json'))           
                     if len(train_json) != 1: raise ValueError('The JSON file containing the training results could not be found.')
                     else: train_json = train_json[-1]
                         
@@ -182,7 +169,8 @@ class ResultVisualization:
                 for run_cate, run_dict in model_dict.items():
                     for run_id, run_json in run_dict.items():
                         # 0. get a config
-                        basic_data = self._read_df_config(str(run_json['train']).replace('output', 'models').replace('metrics.json', 'config.json').replace('/training', ''))
+                        basic_path = str(run_json["train"])[:str(run_json["train"]).index(run_id)+len(run_id)].replace('output', 'models')
+                        basic_data = self._read_df_config(f'{basic_path}/config.json')
                         basic_data.insert(0, run_id)
                         # 1. get a train
                         tr, val, _ = self._read_df_result(run_json['train'])
@@ -215,9 +203,17 @@ class ResultVisualization:
         for k, v in json_content.items():
             if k in ['epoch', 'runtime', 'totaltime', 'loss', 'confusion', 'val_loss', 'val_confusion']: continue
             if mode == 'train':
-                if 'val' in k: valid[k.split('val_')[-1]] = v[-1]
-                else: train[k] = v[-1]
-            else: test[k] = v
+                if isinstance(v, dict):
+                    for kk, vv in v.items():
+                        if 'val' in kk: valid[f'{k}_{kk.split("val_")[-1]}'] = vv[-1]
+                        else: train[f'{k}_{kk}'] = vv[-1]
+                else:
+                    if 'val' in k: valid[k.split('val_')[-1]] = v[-1]
+                    else: train[k] = v[-1]
+            else: 
+                if isinstance(v, dict):
+                    for kk, vv in v.items(): test[f'{k}_{kk}'] = vv
+                else: test[k] = v
         return train, valid, test
 
     def _read_df_config(self, json_path):
@@ -237,8 +233,6 @@ class ResultVisualization:
         data = deepcopy(one)
         data.extend(two)
         return data
-    # 가져온 metric.json 기반으로 정보를 dataframe으로 변환 (테스트는 설정한 best_metric에 맞춰 높은 점수로 결정)
-
     
     # 변환한 dataframe을 기반으로 시각화 출력물 저장하기
     def _close_all_plots(self):    
@@ -258,6 +252,7 @@ class ResultVisualization:
         for sheet_name, df in self.df_dict.items():
             df.to_excel(writer, sheet_name=sheet_name)
         writer.close()
+        print(f'save... {save_name}')
     
     def save2bar_per_model(self, df, optimizer, loss, by_metric:str, by_metric_replace_str:str=None, by:list=['lr scheduler', 'DA', 'Sampling'], 
                            min_y:float=0.75, bar_width=0.8, figsize:tuple=(17, 5), colormap:str='tab20', xtick_rotation:int=0,
