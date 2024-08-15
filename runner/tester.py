@@ -59,8 +59,7 @@ class Tester(BaseTester):
                 self.writer.set_step(batch_num, f'batch_{self.wirter_mode}')
                 self.metrics.update('loss', loss.item())
                 # 4. Update the confusion matrix and input data
-                confusion_content = {'actual':use_target, 'predict':use_predict.clone().tolist()}
-                if self.plottable_metric_ftns is not None: confusion_content['probability']=[self.softmax(el).tolist() for el in use_output]
+                confusion_content = {'actual':use_target, 'predict':use_predict.clone().tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
                 self.confusion.update(self.confusion_key, confusion_content, img_update=False)
 
                 confusion_obj = self.confusion.get_confusion_obj(self.confusion_key)
