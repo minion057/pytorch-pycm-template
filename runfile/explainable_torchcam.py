@@ -33,13 +33,17 @@ def get_a_explainset(data_loader, n_samples_per_class:int, classes):
                           - The key value is the index of the class, 
                           - The value is the data to use (Tensor or numpy.ndarray type), labels and paths.
     """
+    classes = list(classes)
     labels = data_loader.dataset.labels
-    if isinstance(labels[0], list): labels = np.where(labels == 1)[-1].tolist() # for one-hot encoding
+    is_onehot = False
+    if check_onehot_label(labels[0], classes): 
+        is_onehot = True
+        labels = [classes[c_idx] for c_idx in np.argmax(labels, axis=1)] # for one-hot encoding
     
     label_classes = np.unique(labels).tolist()
     index_classes = [classes.index(l) for l in label_classes] if label_classes[-1] in classes else label_classes
     
-    class_indices = {class_idx:np.where(labels == label_classes[real_idx])[0].tolist() for real_idx, class_idx in enumerate(index_classes)}
+    class_indices = {class_idx:np.where(np.array(labels) == label_classes[real_idx])[0].tolist() for real_idx, class_idx in enumerate(index_classes)}
     class_indices = dict(sorted(class_indices.items()))
     
     n_samples = {class_name:{'index':class_index[:n_samples_per_class]} for class_name, class_index in class_indices.items()}
@@ -47,7 +51,7 @@ def get_a_explainset(data_loader, n_samples_per_class:int, classes):
         print(f'Example index list of explaination dataset: {class_name} -> {class_content["index"]}')
         data_label = [data_loader.dataset.__getitem__(_) for _ in class_content["index"]]
         n_samples[class_name]['data'] = [_[0] for _ in data_label]
-        n_samples[class_name]['labels'] = [np.argmax(_[1]).item() if check_onehot_label(_[1], classes) else _[1].item()for _ in data_label]
+        n_samples[class_name]['labels'] = [int(np.argmax(_[1]).item()) if is_onehot else _[1].item()for _ in data_label]
         if data_loader.dataset.data_paths is not None:
             n_samples[class_name]['paths'] = np.take(data_loader.dataset.data_paths, class_content["index"], axis=0)
     return n_samples      
