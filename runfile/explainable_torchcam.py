@@ -18,7 +18,7 @@ import data_loader.transforms as module_transforms
 
 from parse_config import ConfigParser
 from runner import TorchcamExplainer as Explainer
-from utils import prepare_device
+from utils import prepare_device, check_onehot_label
 
 def get_a_explainset(data_loader, n_samples_per_class:int, classes):
     """ Logic for creating datasets for use in XAI.
@@ -47,7 +47,7 @@ def get_a_explainset(data_loader, n_samples_per_class:int, classes):
         print(f'Example index list of explaination dataset: {class_name} -> {class_content["index"]}')
         data_label = [data_loader.dataset.__getitem__(_) for _ in class_content["index"]]
         n_samples[class_name]['data'] = [_[0] for _ in data_label]
-        n_samples[class_name]['labels'] = [_[1].item() for _ in data_label]
+        n_samples[class_name]['labels'] = [np.argmax(_[1]).item() if check_onehot_label(_[1], classes) else _[1].item()for _ in data_label]
         if data_loader.dataset.data_paths is not None:
             n_samples[class_name]['paths'] = np.take(data_loader.dataset.data_paths, class_content["index"], axis=0)
     return n_samples      
