@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 import json
 from pathlib import Path
@@ -7,6 +8,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from sklearn.preprocessing import OneHotEncoder
 from pycm import ConfusionMatrix as pycmCM
+from datetime import datetime, timedelta
 
 def ensure_dir(dirname, exist_ok:bool=False):
     dirname = Path(dirname)
@@ -182,3 +184,47 @@ def load_pycm_object(object_path:str):
         cm.classes = object_classes
         cm.table = {cm.classes[cm_idx]:{cm.classes[idx]:v for idx, v in enumerate(cm_v.values())} for cm_idx, cm_v in enumerate(cm.table.values())}
     return cm
+
+def format_elapsed_time(end_datetime, base_date:tuple=(2024, 1, 1)):
+    if not isinstance(base_date, tuple): raise TypeError('The base date must be a tuple.')
+    if len(base_date) != 3: raise ValueError('The base date must be a tuple of length 3.')
+    # 기준 날짜와 시간 데이터 설정
+    base_date = pd.Timestamp(*base_date)
+    if not isinstance(end_datetime, type(base_date)): end_datetime = pd.Timestamp(end_datetime)
+    # 경과 시간 계산
+    elapsed_time = end_datetime - base_date
+    
+    # 경과 시간에서 days를 시간으로 변환
+    total_seconds = elapsed_time.total_seconds()
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # HH:MM:SS 형식으로 변환
+    return f'{int(hours):02}:{int(minutes):02}:{int(seconds):02}'
+
+def convert_days_to_hours(time_str:str, base_date:tuple=(2024, 1, 1)):
+    if not isinstance(base_date, tuple): raise TypeError('The base date must be a tuple.')
+    if len(base_date) != 3: raise ValueError('The base date must be a tuple of length 3.')
+    # 기준 날짜와 시간 데이터 설정
+    base_date = pd.Timestamp(*base_date)
+    time_delta = pd.to_timedelta(time_str)
+    # base_date에 time_delta를 더해서 Timestamp로 변환
+    timestamp = base_date + time_delta
+    return format_elapsed_time(timestamp)
+
+def convert_to_datetime(time_str:str, base_date:tuple=(2024, 1, 1)):
+    if not isinstance(base_date, tuple): raise TypeError('The base date must be a tuple.')
+    if len(base_date) != 3: raise ValueError('The base date must be a tuple of length 3.')
+    # 시간을 ':'으로 분리
+    parts = time_str.split(':')
+    hours, minutes, seconds = map(int, parts)
+
+    # 시간 값이 24 이상이면 날짜를 추가
+    days = hours // 24
+    remaining_hours = hours % 24
+
+    # 현재 날짜를 기준으로 계산
+    base_date = datetime(*base_date)  # 기준 날짜, 원하는 날짜로 변경 가능
+    new_datetime = base_date + timedelta(days=days, hours=remaining_hours, minutes=minutes, seconds=seconds)
+
+    return new_datetime

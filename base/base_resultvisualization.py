@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from collections import OrderedDict
 from copy import deepcopy
-from utils import ensure_dir
+from utils import ensure_dir, format_elapsed_time, convert_to_datetime, convert_days_to_hours
 
 class ResultVisualization:
     def __init__(self, parent_dir, result_name,
@@ -132,7 +132,7 @@ class ResultVisualization:
     # output 중, metric.json 경로 정보 셋팅하는 함수
     
     # 가져온 metric.json 기반으로 정보를 dataframe으로 변환 (테스트는 설정한 best_metric에 맞춰 높은 점수로 결정)
-    def _json2df(self):
+    def _json2df(self, base_date:tuple=(2024, 1, 1)):
         sheet_data = self._set_a_df_info()
         df_dict = {s:'None' for s in self.sheet_list}
         
@@ -140,13 +140,13 @@ class ResultVisualization:
             df = pd.DataFrame(data=d_c['data'], columns=d_c['col'][0])
             model_mean_time = []
             if 'runtime' in df.columns:
-                df['runtime'] = pd.to_datetime(df['runtime']) #.dt.time
+                df.loc[:, 'runtime'] = pd.to_datetime([convert_to_datetime(convert_days_to_hours(t), base_date) for t in df.loc[:, 'runtime'].tolist()])
                 for model_name in df['model'].unique():
-                    mean_time = df[df['model']==model_name]['runtime'].mean().strftime('%H:%M:%S')
-                    mean_m = mean_time.split(':')
-                    mean_m = int(mean_m[0]) * 60 + int(mean_m[1])
-                    model_mean_time.append([model_name, mean_time, mean_m])
-                df['runtime'] = df['runtime'].dt.time            
+                    mean_datetime = pd.to_datetime(df[df['model']==model_name]['runtime'].apply(lambda x: x.timestamp()).mean(), unit='s')
+                    elapsed_time_str = format_elapsed_time(mean_datetime, base_date) # HH:MM:SS
+                    elapsed_time_min  = int(elapsed_time_str.split(':')[0]) * 60 + int(elapsed_time_str.split(':')[1])
+                    model_mean_time.append([model_name, elapsed_time_str, elapsed_time_min])
+                df['runtime'] = [format_elapsed_time(t, base_date) for t in df.loc[:, 'runtime'].tolist()] # HH:MM:SS # df['runtime'].time()
             df_dict[sheet] = deepcopy(df)
             
             if model_mean_time != []:
