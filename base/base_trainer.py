@@ -274,7 +274,8 @@ class BaseTrainer:
 
     def _setting_time(self, start, end):        
         runtime = str(datetime.timedelta(seconds=(end - start)))
-        day_time = runtime.split(' days, ')
+        day_time = runtime.split(', ')
+        if len(day_time)==2: day_time[0] = day_time[0][:day_time[0].index('d')-1]
         hour_min_sec = day_time[-1].split(":")
         if len(day_time)==2: runtime = f'{int(day_time[0])*24+int(hour_min_sec[0])}:{hour_min_sec[1]}:{hour_min_sec[-1]}'
         return runtime
