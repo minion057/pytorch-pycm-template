@@ -165,6 +165,8 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
             metric_name:str, CI:int, binom_method:str, show_bound_text:bool=True,
             file_path=None, show:bool=False, return_plot:bool=True):
     if len(means) != len(bounds) != len(classes): raise ValueError('All three lists (means, bounds, and classes) must be the same length.')
+    # means = np.array([float(m) if m != 'None' else 0. for m in means])
+    # bounds = [tuple([float(x) if x != 'None' else 0. for x in b]) for b in bounds]
     if all(0 <= x <= 1 for x in means):
         means = np.array(means)*100
         if not all(0 <= x <= 100 for x in means): raise ValueError('The values in the list (means) are outside the range between 0 and 100.')

@@ -65,14 +65,15 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes=None, method:str='basic'):
     if method not in ['basic', 'roc']: raise ValueError('The method can only be "basic" or "roc".')
     if method.lower() == 'basic': return base_class_metric('AUC', confusion_obj, classes)
     if confusion_obj.prob_vector is None: raise ValueError('No value for prob vector.')
-    try:
-        label_classes = list(np.unique(confusion_obj.actual_vector))
-        crv = ROCCurve(actual_vector=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=confusion_obj.classes)
-    except:
-        print(confusion_obj.actual_vector[-1])
-        print(confusion_obj.prob_vector[-1])
-        print(confusion_obj.classes, ' & ', label_classes)
-        raise
+    if isinstance(confusion_obj.prob_vector, dict):
+        confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
+    label_classes = list(np.unique(confusion_obj.actual_vector))
+    if list(label_classes) != list(confusion_obj.classes): 
+        if len(label_classes) == 1: # auc 면적을 구할 수 없는 상태
+            if classes is None: return {c:0. for c in confusion_obj.classes}
+            return {c:0. for c in classes}
+        print(f'경고: 현재 label에 존재하는 class({label_classes})와 classes({confusion_obj.classes})가 일치하지 않습니다.')
+    crv = ROCCurve(actual_vector=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=label_classes)
     if classes is None: return crv.area()
     return {classes[class_idx]:v for class_idx, v in enumerate(crv.area().values())}
         

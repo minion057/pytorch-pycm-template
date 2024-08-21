@@ -108,16 +108,23 @@ class Trainer(BaseTrainer):
             self.train_metrics.update('loss', loss.item())
             
             # 5-2. confusion matrix 
+            # -> PPV 점수 제대로인지 확인해야 함
+            # -> 처음에 use_target이 한 클래스만 있는 경우를 고려해야 함! 아니면 마지막 배치에서만 메트릭 점수 업데이트
+            print(f'Now target is {len(use_target)} ({np.unique(use_target)})')
             confusion_content = {'actual':use_target, 'predict':use_predict.tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
             self.train_confusion.update(self.confusion_key, confusion_content, img_update=False)
             
             confusion_obj = self.train_confusion.get_confusion_obj(self.confusion_key)
+            print(f'Updated target is {len(confusion_obj.actual_vector)} ({np.unique(confusion_obj.actual_vector)})')
             for met in self.metric_ftns:# pycm version
                 met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
                 tag = met.__name__ if tag is None else tag
-                use_confusion_obj = deepcopy(confusion_obj)                    
-                if met_kwargs is None: self.train_metrics.update(tag, met(use_confusion_obj, self.classes))
-                else: self.train_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
+                use_confusion_obj = deepcopy(confusion_obj)   
+                met_result = met(use_confusion_obj, self.classes) if met_kwargs is None else met(use_confusion_obj, self.classes, **met_kwargs)
+                self.train_metrics.update(tag, met_result)
+                
+                # if met_kwargs is None: self.train_metrics.update(tag, met(use_confusion_obj, self.classes))
+                # else: self.train_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
             
             # 5-3-1. Projector
             # The data concerning the projector is collected with each batch and will be updated after all batches are completed.
