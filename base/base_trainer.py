@@ -9,7 +9,7 @@ from numpy import inf
 from logger import TensorboardWriter
 from copy import deepcopy
 from pathlib import Path
-from utils import ensure_dir, read_json, write_dict2json, convert_confusion_matrix_to_list
+from utils import ensure_dir, read_json, write_dict2json, convert_confusion_matrix_to_list, convert_days_to_hours
 from utils import plot_confusion_matrix_1, plot_performance_N, close_all_plots
 
 class BaseTrainer:
@@ -273,12 +273,7 @@ class BaseTrainer:
         write_dict2json(result, self.output_metrics)
 
     def _setting_time(self, start, end):        
-        runtime = str(datetime.timedelta(seconds=(end - start)))
-        day_time = runtime.split(', ')
-        if len(day_time)==2: day_time[0] = day_time[0][:day_time[0].index('d')-1]
-        hour_min_sec = day_time[-1].split(":")
-        if len(day_time)==2: runtime = f'{int(day_time[0])*24+int(hour_min_sec[0])}:{hour_min_sec[1]}:{hour_min_sec[-1]}'
-        return runtime
+        return convert_days_to_hours(str(datetime.timedelta(seconds=(end - start))))
 
     def _sum_timelist(self, timelist):
         totalSecs = 0
