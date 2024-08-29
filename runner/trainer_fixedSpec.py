@@ -10,10 +10,10 @@ class FixedSpecTrainer(Trainer):
     """
     Trainer class
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
-                 data_loader, valid_data_loader=None, lr_scheduler=None, len_epoch=None):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, data_loader,
+                 valid_data_loader=None, lr_scheduler=None, len_epoch=None, sampling_ftns=None, da_ftns=None):
         super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
-                         data_loader, valid_data_loader, lr_scheduler, len_epoch)
+                         data_loader, valid_data_loader, lr_scheduler, len_epoch, sampling_ftns, da_ftns)
         self.config = config
         self.device = device
 

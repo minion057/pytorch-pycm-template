@@ -9,16 +9,14 @@ from copy import deepcopy
 from inspect import signature
 import matplotlib.pyplot as plt
 
-import data_loader.data_augmentation as module_DA
-import data_loader.data_sampling as module_sampling
 
 
 class Trainer(BaseTrainer):
     """
     Trainer class
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
-                 data_loader, valid_data_loader=None, lr_scheduler=None, len_epoch=None):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, data_loader, 
+                 valid_data_loader=None, lr_scheduler=None, len_epoch=None, sampling_ftns=None, da_ftns=None):
         super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device)
         self.config = config
         self.device = device
@@ -50,7 +48,16 @@ class Trainer(BaseTrainer):
         self.prediction_preds, self.prediction_probs = None, None
 
         # Hook for DA
-        if self.cfg_da is not None: self.DA_ftns = getattr(module_DA, self.DA)(writer=self.writer, **self.DAargs)  
+        # if self.cfg_da is not None: self.DA_ftns = getattr(module_DA, self.DA)(writer=self.writer, **self.DAargs)  
+        # Sampling And DA
+        self.sampling_ftns, self.sampling_args = sampling_ftns, {}
+        if self.sampling_ftns is not None:
+            if 'args' in config['data_sampling'].keys(): self.sampling_args = config['data_sampling']['args']
+        self.DA_ftns = None
+        if da_ftns is not None:
+            self.hookargs = config['data_augmentation']['hook_args']
+            self.pre_hook = self.hookargs['pre']
+            self.DA_ftns = da_ftns(writer=self.writer, **config['data_augmentation']['args'])  
         
         # Clear the gradients of all optimized variables 
         self.optimizer.zero_grad()
@@ -69,7 +76,7 @@ class Trainer(BaseTrainer):
         data_channel = None
         
         # Hook
-        if self.cfg_da is not None:
+        if self.DA_ftns is not None:
             hook = register_forward_hook_layer(self.model, self.DA_ftns.forward_pre_hook if self.pre_hook else self.DA_ftns.forward_hook, **self.hookargs)
 
         for batch_idx, (data, target) in enumerate(self.data_loader):
@@ -77,14 +84,16 @@ class Trainer(BaseTrainer):
             self.writer.set_step(batch_num, 'batch_train')
                 
             # 1. To move Torch to the GPU or CPU
-            if self.sampling is not None: data, target = self._sampling(data, target)
+            print('\nBefore:', target.shape, np.unique(target, axis=0, return_counts=True)[-1])
+            if self.sampling_ftns is not None: data, target = self.sampling_ftns(data, target, **self.sampling_args)
+            print('After:', target.shape, np.unique(target, axis=0, return_counts=True)[-1])
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
             # 2. Forward pass: compute predicted outputs by passing inputs to the model
             output = self.model(data)
             logit, predict = torch.max(output, 1)
-            if self.cfg_da is None: loss = self._loss(output, target, logit)
+            if self.DA_ftns is None: loss = self._loss(output, target, logit)
             else: loss, target = self._da_loss(output, target, logit)
             if check_onehot_label(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
             
@@ -108,14 +117,10 @@ class Trainer(BaseTrainer):
             self.train_metrics.update('loss', loss.item())
             
             # 5-2. confusion matrix 
-            # -> PPV 점수 제대로인지 확인해야 함
-            # -> 처음에 use_target이 한 클래스만 있는 경우를 고려해야 함! 아니면 마지막 배치에서만 메트릭 점수 업데이트
-            print(f'Now target is {len(use_target)} ({np.unique(use_target)})')
             confusion_content = {'actual':use_target, 'predict':use_predict.tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
             self.train_confusion.update(self.confusion_key, confusion_content, img_update=False)
             
             confusion_obj = self.train_confusion.get_confusion_obj(self.confusion_key)
-            print(f'Updated target is {len(confusion_obj.actual_vector)} ({np.unique(confusion_obj.actual_vector)})')
             for met in self.metric_ftns:# pycm version
                 met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
                 tag = met.__name__ if tag is None else tag
@@ -152,7 +157,7 @@ class Trainer(BaseTrainer):
                 self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
             if batch_idx == self.len_epoch: break
         
-        if self.cfg_da is not None: hook.remove()
+        if self.DA_ftns is not None: hook.remove()
         # 5-3-2. Update the curve plot and projector
         self.writer.set_step(epoch)
         if self.plottable_metric_ftns is not None: 
@@ -280,14 +285,6 @@ class Trainer(BaseTrainer):
             raise ValueError('The loss function in the DA class requires passing values as a dictionary with keys "loss" and "target".')
         self.DA_ftns.reset()
         return result['loss'], result['target']
-    
-    def _sampling(self, data, target):
-        if 'down' in self.sampling_type:
-            if 'random' in self.sampling_name: return module_sampling.random_downsampling(data, target)
-        elif 'up' in self.sampling_type:
-            # data, target = self._upsampling(data, target)
-            pass
-        else: TypeError('The applicable types are up or down.')
         
     def _plottable_metrics(self, actual_vector, probability_vector, mode='training'):
         if np.array(probability_vector).ndim != 2: raise ValueError('The probability vector should be 2D array.')
