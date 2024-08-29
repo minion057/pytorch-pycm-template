@@ -38,7 +38,7 @@ class ConfigParser:
         exper_name += f"/{self.config['arch']['type']}"
         if run_id is None: # use timestamp as default run-id    
             acc_steps = '' if 'accumulation_steps' not in self.config['trainer'].keys() else f"X{self.config['trainer']['accumulation_steps']}"
-            sampling = '' if 'data_sampling' not in self.config.keys() else f"-{self.config['data_sampling']['type']}_{self.config['data_sampling']['name']}"
+            sampling = '' if 'data_sampling' not in self.config.keys() else f"-{self.config['data_sampling']['type']}"
             da = '' if 'data_augmentation' not in self.config.keys() else f"-{self.config['data_augmentation']['type']}"
             run_id =  f"{self.config['data_loader']['args']['batch_size']}batch{acc_steps}"
             run_id += f"-{self.config['trainer']['epochs']}epoch-{self.config['loss']}{da}{sampling}"
