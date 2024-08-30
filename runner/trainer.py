@@ -9,8 +9,6 @@ from copy import deepcopy
 from inspect import signature
 import matplotlib.pyplot as plt
 
-
-
 class Trainer(BaseTrainer):
     """
     Trainer class

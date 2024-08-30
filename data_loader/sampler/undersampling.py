@@ -2,9 +2,9 @@ import torch
 import numpy as np
 
 def balanced_random_undersampling(data, target):
-    class_list, class_count = np.unique(target, axis=0, return_counts=True)
-    min_cnt, max_cnt = min(class_count), max(class_count)
-    del_class_list = class_list[list(filter(lambda x: class_count[x] == max_cnt, range(len(class_count))))]
+    label_class_list, class_counts = np.unique(target, axis=0, return_counts=True)
+    min_cnt, max_cnt = min(class_counts), max(class_counts)
+    del_class_list = label_class_list[list(filter(lambda x: class_counts[x] == max_cnt, range(len(class_counts))))]
     for del_class in del_class_list:
         del_class_item_indices = []
         for idx, item in enumerate(target):
