@@ -69,12 +69,6 @@ def main(config):
     plottable_metric = None
     if 'plottable_metrics' in config.config.keys():
         plottable_metric = [getattr(module_plottable_metric, met) for met in config['plottable_metrics'].keys()]
-
-    # get function handles of sampling
-    if 'data_sampling' in config.config.keys():
-        if 'type' not in config['data_sampling'].keys(): raise ValueError('Data sampling type is not set.')
-        sampling_ftns = getattr(module_sampling, config['data_sampling']['type'])
-    else: sampling_ftns = None
     
     # get function handles of da
     if 'data_augmentation' in config.config.keys():
