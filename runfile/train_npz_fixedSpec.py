@@ -96,7 +96,6 @@ def main(config):
                       data_loader=train_data_loader,
                       valid_data_loader=valid_data_loader,
                       lr_scheduler=lr_scheduler,
-                      sampling_ftns=sampling_ftns,
                       da_ftns=da_ftns)
 
     trainer.train()

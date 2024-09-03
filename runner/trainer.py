@@ -14,7 +14,7 @@ class Trainer(BaseTrainer):
     Trainer class
     """
     def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, data_loader, 
-                 valid_data_loader=None, lr_scheduler=None, len_epoch=None, sampling_ftns=None, da_ftns=None):
+                 valid_data_loader=None, lr_scheduler=None, len_epoch=None, da_ftns=None):
         super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device)
         self.config = config
         self.device = device
@@ -47,10 +47,6 @@ class Trainer(BaseTrainer):
 
         # Hook for DA
         # if self.cfg_da is not None: self.DA_ftns = getattr(module_DA, self.DA)(writer=self.writer, **self.DAargs)  
-        # Sampling And DA
-        self.sampling_ftns, self.sampling_args = sampling_ftns, {}
-        if self.sampling_ftns is not None:
-            if 'args' in config['data_sampling'].keys(): self.sampling_args = config['data_sampling']['args']
         self.DA_ftns = None
         if da_ftns is not None:
             self.hookargs = config['data_augmentation']['hook_args']
@@ -82,9 +78,7 @@ class Trainer(BaseTrainer):
             self.writer.set_step(batch_num, 'batch_train')
                 
             # 1. To move Torch to the GPU or CPU
-            print('\nBefore:', target.shape, np.unique(target, axis=0, return_counts=True)[-1])
-            if self.sampling_ftns is not None: data, target = self.sampling_ftns(data, target, **self.sampling_args)
-            print('After:', target.shape, np.unique(target, axis=0, return_counts=True)[-1])
+            print('tatget:', target.shape, np.unique(target, axis=0, return_counts=True)[-1])
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
