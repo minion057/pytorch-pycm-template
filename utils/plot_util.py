@@ -195,34 +195,35 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
         else: colors.append(palette[3])
     
     close_all_plots()
-    fig = plt.figure(figsize=((2 if len(means) >= 3 else 3)*len(means), 5))
+    fig, ax = plt.subplots(figsize=((2 if len(means) >= 3 else 3)*len(means), 5))
     x = np.arange(len(classes))
-    plt.bar(x, means, width=0.5, color=colors)
-    plt.errorbar(x, means, yerr=errors, color='k', capsize=5, fmt=' ', label=f'Mean {metric_name} (±{CI}% CI)')
-    plt.legend(); plt.ylim(0, 105)
-    plot_styles, plot_labels = plt.gca().get_legend().legendHandles, [t.get_text() for t in plt.gca().get_legend().get_texts()]
+    ax.bar(x, means, width=0.5, color=colors)
+    ax.errorbar(x, means, yerr=errors, color='k', capsize=5, fmt=' ', label=f'Mean {metric_name} (±{CI}% CI)')
+    ax.legend(); ax.set_ylim(0, 105)
+    # plot_styles, plot_labels = plt.gca().get_legend().legendHandles, [t.get_text() for t in plt.gca().get_legend().get_texts()]
+    plot_styles, plot_labels = ax.get_legend_handles_labels()
     legend_kwargs['handles'], legend_kwargs['labels'] = plot_styles + legend_kwargs['handles'], plot_labels + legend_kwargs['labels']
-    plt.legend(**legend_kwargs)
-    plt.title(f'Confidence Interval ({binom_method})', size=17, pad=20)
-    plt.ylabel(metric_name, fontsize=15)
+    ax.legend(**legend_kwargs)
+    ax.set_title(f'Confidence Interval ({binom_method})', size=17, pad=20)
+    ax.set_ylabel(metric_name, fontsize=15)
     if show_bound_text:
         def format_number(num):
             num = round(num, 2)
             return num if isinstance(num, float) and num % 1 != 0 else f'{int(num)}'
-        plt.xticks([])
+        ax.set_xticks([])
         rows = ['Mean', 'Upper', 'Lower']
         table_data = [[], [], []]
         for score, (down_point, up_point) in zip(means, real_bounds):
             table_data[0].append(f'{format_number(score)}%')
             table_data[1].append(f'{format_number(up_point)}%')
             table_data[2].append(f'{format_number(down_point)}%')
-        table = plt.table(cellText=table_data, rowLabels=rows, colLabels=[str(c) for c in classes], loc='bottom', cellLoc='center')
+        table = ax.table(cellText=table_data, rowLabels=rows, colLabels=[str(c) for c in classes], loc='bottom', cellLoc='center')
         table.scale(1,2)
         table.auto_set_font_size(False)
-    else: plt.xticks(x, [str(c) for c in classes], rotation=55, ha='right', fontsize=12)
-    plt.tight_layout(rect=[0, 0, 1, 1])
+    else: ax.xticks(x, [str(c) for c in classes], rotation=55, ha='right', fontsize=12)
+    fig.tight_layout(rect=[0, 0, 1, 1])
     
-    if file_path is not None: plt.savefig(file_path)
+    if file_path is not None: fig.savefig(file_path)
     if return_plot: return fig
     if show: plt.show()  
     close_all_plots()
