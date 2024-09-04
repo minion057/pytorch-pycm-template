@@ -196,7 +196,9 @@ class BaseTrainer:
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
         
         # checkpoint = torch.load(resume_path)
-        checkpoint = torch.load(resume_path, map_location=self.device)
+        # In the future, weights_only will default to True.
+        # If you want to set weights_only is true, Requires the use of "torch.serialization.add_safe_globals" to set to True.
+        checkpoint = torch.load(resume_path, map_location=self.device, weights_only=False)
             
         self.start_epoch = checkpoint['epoch'] + 1
         self.mnt_best = checkpoint['monitor_best']
