@@ -32,8 +32,9 @@ class Trainer(BaseTrainer):
         self.lr_scheduler_name = config['lr_scheduler']['type'] if 'lr_scheduler' in config.config.keys() else None
         self.log_step = int(np.sqrt(data_loader.batch_size))
 
-        self.train_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
-        self.valid_metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
+        self.basic_metrics = ['loss']
+        self.train_metrics = MetricTracker(*self.basic_metrics, *[m.__name__ for m in self.metric_ftns], writer=self.writer)
+        self.valid_metrics = MetricTracker(*self.basic_metrics, *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
         self.train_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
         self.valid_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
