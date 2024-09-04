@@ -112,7 +112,9 @@ class BaseTester:
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
         
         # checkpoint = torch.load(resume_path)
-        checkpoint = torch.load(resume_path, map_location=self.device)
+        # In the future, weights_only will default to True.
+        # If you want to set weights_only is true, Requires the use of "torch.serialization.add_safe_globals" to set to True.
+        checkpoint = torch.load(resume_path, map_location=self.device, weights_only=False)
             
         self.test_epoch = checkpoint['epoch']
         self.output_metrics = self.output_dir / f'metrics-test.json'

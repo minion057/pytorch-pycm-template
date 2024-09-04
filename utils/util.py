@@ -9,6 +9,7 @@ from copy import deepcopy
 from sklearn.preprocessing import OneHotEncoder
 from pycm import ConfusionMatrix as pycmCM
 from datetime import datetime, timedelta
+import importlib.util
 
 def ensure_dir(dirname, exist_ok:bool=False):
     dirname = Path(dirname)
@@ -105,6 +106,16 @@ def check_onehot_label(item, classes):
         raise ValueError(f'It\'s a one-hot encoding format, but only {item_class} exists.')
     return False
 
+def check_onehot_labels(item, classes):
+    item = np.array(item)
+    item_class = np.unique(item, axis=0)
+    if item_class.ndim == 2:
+        if [0, 1] == np.unique(item_class[0], axis=0).tolist(): 
+            if len(classes) == len(item_class): return True
+            else: raise ValueError(f'It\'s a one-hot encoding format, but it\'s not the same size as classes. ({len(classes)} != {len(item_class)})')
+        else: raise ValueError(f'It\'s a one-hot encoding format, but only {item_class} exists.')
+    return False
+
 def onehot_encoding(label, classes):
     if type(classes) == np.ndarray: classes = classes.tolist() # for FutureWarning by numpy
     item = label[0]
@@ -124,8 +135,8 @@ def integer_encoding(label, classes): #  by index of classes
     # Processing based on data type
     if label.ndim == 1:
         # Make sure all data is the same value
-        label_classes = np.unique(label)
-        if len(np.unique(label)) == 1:
+        label_classes = np.unique(label, axis=0)
+        if len(np.unique(label, axis=0)) == 1:
             unique_value = label[0]
             if unique_value in classes:
                 integer_encoded = np.full(len(label), classes.index(unique_value))
@@ -142,9 +153,8 @@ def integer_encoding(label, classes): #  by index of classes
         else:
             raise ValueError(f'Values in the data ({label_classes}) are not present in the class list ({classes}).')
     else: # Two-dimensional data is likely to be one-hot encoding
-        for l in label:
-            if not check_onehot_label(l, classes): 
-                raise ValueError('Invalid data type: must be one-dimensional (label/integer) or two-dimensional (one-hot).')
+        if not check_onehot_labels(label, classes): 
+            raise ValueError('Invalid data type: must be one-dimensional (label/integer) or two-dimensional (one-hot).')
         integer_encoded = np.argmax(label, axis=1)
     return np.array(integer_encoded)
 
@@ -228,3 +238,8 @@ def convert_to_datetime(time_str:str, base_date:tuple=(2024, 1, 1)):
     new_datetime = base_date + timedelta(days=days, hours=remaining_hours, minutes=minutes, seconds=seconds)
 
     return new_datetime
+
+def is_module_installed(module_name):
+    if importlib.util.find_spec(module_name) is None: raise ModuleNotFoundError(f"The {module_name} module does not exist.")
+    return True
+    

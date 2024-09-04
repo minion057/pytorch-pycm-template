@@ -12,9 +12,11 @@ from torchinfo import summary
 from torchviz import make_dot
 import model.model as module_arch
 
-import data_loader.npz_loaders as module_data
 from torchvision import transforms
 import data_loader.transforms as module_transforms
+import data_loader.npz_loaders as module_data
+import data_loader.data_augmentation as module_DA
+import data_loader.data_sampling as module_sampling
 import model.optim as module_optim
 import model.loss as module_loss
 import model.plottable_metrics  as module_plottable_metric
@@ -67,6 +69,17 @@ def main(config):
     plottable_metric = None
     if 'plottable_metrics' in config.config.keys():
         plottable_metric = [getattr(module_plottable_metric, met) for met in config['plottable_metrics'].keys()]
+    
+    # get function handles of da
+    if 'data_augmentation' in config.config.keys():
+        da = config['data_augmentation']
+        if 'type' not in da.keys(): raise ValueError('Data augmentation type is not set.')
+        if 'hook_args' in da.keys():
+            if any(k not in da['hook_args'].keys() for k in ['pre', 'layer_idx']): 
+                raise ValueError('There is no pre-hook information for DA.')
+        else: raise ValueError('There is no hook information for DA.')
+        da_ftns = getattr(module_DA, da['type'])
+    else: da_ftns = None
         
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
@@ -82,7 +95,8 @@ def main(config):
                       device=device,
                       data_loader=train_data_loader,
                       valid_data_loader=valid_data_loader,
-                      lr_scheduler=lr_scheduler)
+                      lr_scheduler=lr_scheduler,
+                      da_ftns=da_ftns)
 
     trainer.train()
 

@@ -11,9 +11,9 @@ import numpy as np
 from torchinfo import summary
 import model.model as module_arch
 
-import data_loader.npz_loaders as module_data
 from torchvision import transforms
 import data_loader.transforms as module_transforms
+import data_loader.npz_loaders as module_data
 import model.loss as module_loss
 import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric

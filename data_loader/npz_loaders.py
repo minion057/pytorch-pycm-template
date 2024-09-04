@@ -1,8 +1,9 @@
 import torch
 import numpy as np
 from torchvision import transforms
-
+from copy import deepcopy
 from base import BaseSplitDataset, DATASET_MODE, BaseSplitDatasetLoader
+import data_loader.data_sampling as module_sampling
 
 class NPZDataset(BaseSplitDataset):
     """
@@ -57,8 +58,14 @@ class NPZDataLoader():
         self.loaderdict = dict()
         self.size, self.classes = None, None
         for m in mode:
-            self.loaderdict[m] = BaseSplitDatasetLoader(NPZDataset(dataset_path, m, trsfm), batch_size, \
-                                                        True if m==DATASET_MODE[0] else False, num_workers, collate_fn, **kwargs)
+            dataset, use_kwargs = NPZDataset(dataset_path, m, trsfm), deepcopy(kwargs)
+            if 'shuffle' not in kwargs.keys(): use_kwargs['shuffle'] = True if m==DATASET_MODE[0] else False
+            if 'sampler' in kwargs.keys(): 
+                if m == DATASET_MODE[0]:
+                    if 'shuffle' in use_kwargs.keys(): use_kwargs['shuffle'] = False
+                    use_kwargs['sampler'] = getattr(module_sampling, kwargs['sampler']['type'])(data_source=dataset, classes=dataset.classes, **kwargs['sampler']['args'])
+                else: del use_kwargs['sampler']
+            self.loaderdict[m] = BaseSplitDatasetLoader(dataset=dataset, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_fn, **use_kwargs)
             print(f'Make a {m} dataloader.')
             size, classes = self._check_dataloader_shape(self.loaderdict[m])
             if self.size is None: self.size = size

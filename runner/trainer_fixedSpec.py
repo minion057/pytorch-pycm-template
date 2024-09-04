@@ -10,10 +10,10 @@ class FixedSpecTrainer(Trainer):
     """
     Trainer class
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
-                 data_loader, valid_data_loader=None, lr_scheduler=None, len_epoch=None):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, data_loader,
+                 valid_data_loader=None, lr_scheduler=None, len_epoch=None, da_ftns=None):
         super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
-                         data_loader, valid_data_loader, lr_scheduler, len_epoch)
+                         data_loader, valid_data_loader, lr_scheduler, len_epoch, da_ftns)
         self.config = config
         self.device = device
 
@@ -51,25 +51,21 @@ class FixedSpecTrainer(Trainer):
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
         '''
-        log, log_confusion = self.train_metrics.result(), self.train_confusion.result()
+        basic_log, basic_confusion = self.train_metrics.result(), self.train_confusion.result()
         if self.do_validation:
             self._valid_epoch(epoch)
-            val_log, val_confusion = self.valid_metrics.result(),  self.valid_confusion.result()
-            log.update(**{'val_'+k : v for k, v in val_log.items()})
-            log_confusion.update(**{'val_'+k : v for k, v in val_confusion.items()})
+            val_basic_log, val_basic_confusion = self.valid_metrics.result(),  self.valid_confusion.result()
+            basic_log.update(**{'val_'+k : v for k, v in val_basic_log.items()})
+            basic_confusion.update(**{'val_'+k : v for k, v in val_basic_confusion.items()})
         
         # Original Result (MaxProb)
-        log[self.original_result_name]={}
-        for met in self.metric_ftns:
-            log[self.original_result_name][met.__name__] = log[met.__name__] 
-            del log[met.__name__]
-        if self.do_validation: 
-            for met in self.metric_ftns:
-                metric_name = f'val_{met.__name__}'
-                log[self.original_result_name][metric_name] = log[metric_name] 
-                del log[metric_name] 
-        log[self.original_result_name].update(log_confusion)
-        log[self.original_result_name] = self._sort_train_val_sequences(log[self.original_result_name])
+        log, original_log = {}, {}
+        for k, v in basic_log.items():
+            if any(basic in k for basic in self.basic_metrics): log[k] = v
+            else: original_log[k] = v
+        original_log.update(basic_confusion)
+        log = self._sort_train_val_sequences(log)
+        log[self.original_result_name] = self._sort_train_val_sequences(original_log)
         
         # Goal Result (FixedSpec)
         log.update(self._summarize_ROCForFixedSpec(mode='training'))
@@ -149,7 +145,7 @@ class FixedSpecTrainer(Trainer):
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
         '''
-        basic_log = {key:val for key, val in log.items() if type(val) != dict} # epoch, loss, val_loss, runtime
+        basic_log = {key:val for key, val in log.items() if not isinstance(val, dict)} # epoch, loss, val_loss, runtime
         auc_log = {key:val for key, val in log.items() if self.AUCNameForFixedSpec in key}
         
         for category, content in log.items():
