@@ -3,8 +3,14 @@ from utils import check_and_import_library, check_onehot_label, integer_encoding
 import numpy as np
 
 class ImbalancedlearnSampler(RandomSampler):
+    # https://imbalanced-learn.org/stable/references/index.html
     def __init__(self, data_source, classes,
                  sampler_type:str, sampler_name:str, sampler_kwargs:dict={}):
+        ''' Sampling Type
+            'under_sampling': The imblearn.under_sampling provides methods to under-sample a dataset.;
+            'over_sampling': The imblearn.over_sampling provides a set of method to perform over-sampling.;
+            'combine': The imblearn.combine provides methods which combine over-sampling and under-sampling.;
+        '''
         module = check_and_import_library(f'imblearn.{sampler_type}')
         if not hasattr(module, sampler_name): raise ValueError('The sampler_name does not exist.')
         
