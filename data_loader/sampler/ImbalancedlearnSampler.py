@@ -1,13 +1,11 @@
 from torch.utils.data import RandomSampler
-from utils import is_module_installed, check_onehot_label, integer_encoding, onehot_encoding
-import imblearn
+from utils import check_and_import_library, check_onehot_label, integer_encoding, onehot_encoding
 import numpy as np
 
 class ImbalancedlearnSampler(RandomSampler):
     def __init__(self, data_source, classes,
                  sampler_type:str, sampler_name:str, sampler_kwargs:dict={}):
-        if is_module_installed(f'imblearn.{sampler_type}'): module = getattr(imblearn, sampler_type)
-        else: raise ValueError('The sampler_type must be "under_sampling", "over_sampling" or "combine".')
+        module = check_and_import_library(f'imblearn.{sampler_type}')
         if not hasattr(module, sampler_name): raise ValueError('The sampler_name does not exist.')
         
         # Pre Processing

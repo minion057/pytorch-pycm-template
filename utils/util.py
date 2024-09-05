@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 import json
+import importlib
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
@@ -9,7 +10,6 @@ from copy import deepcopy
 from sklearn.preprocessing import OneHotEncoder
 from pycm import ConfusionMatrix as pycmCM
 from datetime import datetime, timedelta
-import importlib.util
 
 def ensure_dir(dirname, exist_ok:bool=False):
     dirname = Path(dirname)
@@ -239,7 +239,7 @@ def convert_to_datetime(time_str:str, base_date:tuple=(2024, 1, 1)):
 
     return new_datetime
 
-def is_module_installed(module_name):
-    if importlib.util.find_spec(module_name) is None: raise ModuleNotFoundError(f"The {module_name} module does not exist.")
-    return True
-    
+def check_and_import_library(module_name):
+    if importlib.util.find_spec(module_name) is None: 
+        raise ModuleNotFoundError(f"The {module_name} module does not exist.")
+    return importlib.import_module(module_name)
