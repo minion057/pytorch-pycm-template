@@ -26,7 +26,7 @@ class BaseSplitDataset(Dataset):
             'mode': mode,
             'trsfm': trsfm
         }
-        self.data, self.labels = None, None
+        self.data, self.targets = None, None
 
     def __len__(self):
         return len(self.data)
@@ -39,8 +39,8 @@ class BaseSplitDataset(Dataset):
             
         if self.init_kwargs['transform'] is not None:
             item = self.init_kwargs['transform'](item)
-        label = self.labels[index]
-        return item, label
+        target = self.targets[index]
+        return item, target
         """
         raise NotImplementedError
 

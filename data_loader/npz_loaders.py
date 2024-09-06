@@ -17,7 +17,7 @@ class NPZDataset(BaseSplitDataset):
                 # transforms.Normalize((0.5, ), (0.5, )) # Grayscale
             ])
         super().__init__(dataset_path, mode, trsfm)
-        self.data, self.labels, self.classes, self.data_paths, self.paths = self._load_data_list(self.init_kwargs['dataset_path'])
+        self.data, self.targets, self.classes, self.data_paths, self.paths = self._load_data_list(self.init_kwargs['dataset_path'])
     
     def __getitem__(self, index):
         """
@@ -33,25 +33,25 @@ class NPZDataset(BaseSplitDataset):
             
         if self.init_kwargs['trsfm'] is not None:
             item = self.init_kwargs['trsfm'](item)
-        label = self.labels[index]
-        return item, label
+        target = self.targets[index]
+        return item, target
 
     def _load_data_list(self, _path):
         with np.load(_path, allow_pickle=True) as file:
             classes = file['class_names']
-            data, labels = None, None
+            data, targets = None, None
             data_paths, paths = None, None
             for k in [k for k in file.files if self.init_kwargs['mode'] in k]:
                 if 'x' in k or 'data' in k: data = file[k]
-                elif 'y' in k or 'label' in k: labels = file[k]
+                elif 'y' in k or 'label' in k: targets = file[k] # 추후 수정 label -> targets
                 elif 'path' in k: data_paths = file[k]
             
-            if data is None or labels is None:
-                raise Exception(f'Only data and labels should exist. Currently found values:{keys}')
+            if data is None or targets is None:
+                raise Exception(f'Only data and targets should exist. Currently found values:{keys}')
             if data_paths is not None: paths = file['paths']
             else: print('Warning: No data path information available.')
-        labels = torch.from_numpy(labels)
-        return data, labels, classes, data_paths, paths
+        targets = torch.from_numpy(targets)
+        return data, targets, classes, data_paths, paths
 
 class NPZDataLoader():
     def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):
