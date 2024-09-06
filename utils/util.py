@@ -111,7 +111,7 @@ def check_onehot_encoding_N(item, classes):
     item_class = np.unique(item, axis=0)
     if item_class.ndim == 2:
         if [0, 1] == np.unique(item_class[0], axis=0).tolist(): 
-            if len(classes) == len(item_class): return True
+            if len(classes) == len(item_class[0]): return True
             else: raise ValueError(f'It\'s a one-hot encoding format, but it\'s not the same size as classes. ({len(classes)} != {len(item_class)})')
         else: raise ValueError(f'It\'s a one-hot encoding format, but only {item_class} exists.')
     return False
