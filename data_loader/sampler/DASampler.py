@@ -1,0 +1,77 @@
+import torch
+import numpy as np
+from base import BaseSampler
+from copy import deepcopy
+from utils import check_and_import_library, integer_encoding
+
+class DASampler(BaseSampler):   
+    def _check_kwargs(self):
+        required_kwargs = {'use_balanced_sampler':True, 'sampling_strategy':'auto', 'sampling_multiplier':0.}
+        if self.kwargs == {}: self.kwargs = deepcopy(required_kwargs)
+        for required_param in required_kwargs.keys():
+            if required_param not in self.kwargs.keys(): 
+                raise ValueError(f'The required parameter ({required_param}) is not set. But got {self.kwargs}.')
+            if required_param == 'sampling_multiplier':
+                if not isinstance(self.kwargs[required_param], (int, float, list)):
+                    raise TypeError(f'The required parameter ({required_param}) must be int, float, list type. But got {type(self.kwargs[required_param])}.')
+                if isinstance(self.kwargs[required_param], list):
+                    if list(set(self.kwargs[required_param])) == [0] and not self.kwargs['use_balanced_sampler']:
+                        raise ValueError(f'If use_balanced_sampler is False, the sampling_multiplier must be not equal to 0.')
+                    if len(self.kwargs[required_param]) != len(self.classes):
+                        error_message = f'The length of the required parameter ({required_param}) must be equal to the length of the classes.'
+                        error_message += f'\nBut got {len(self.kwargs[required_param])} and {len(self.classes)}.'
+                        raise ValueError(error_message)
+            elif not isinstance(self.kwargs[required_param], type(required_param)):
+                raise TypeError(f'The required parameter ({required_param}) must be {type(required_param)} type. But got {type(self.kwargs[required_param])}.')
+               
+    def _run(self):
+        targets2integer = self._convert_targets2integer(self.targets)
+        target_indices_per_class_index = {class_index:np.where(targets2integer==class_index)[0] for class_index in range(len(self.classes))}
+        class_sampling_counts = self._calculate_sampling_counts(self.kwargs['use_balanced_sampler'], targets2integer) # {class_index: num_samples_to_generate}
+        sampler = getattr(module, sampler_type)(**sampler_kwargs)
+        
+        for class_index, target_indices in target_indices_per_class_index.items():
+            num_samples_to_generate = class_sampling_counts[class_index]
+            sampler._run(torch.Tensor(self.data[target_indices]))
+            # 여기부터 작성
+      
+    def _calculate_sampling_counts(self, using_imblearn:bool, integer_encoded_targets=None): 
+        ''' 
+         1. Sampling Type
+            'under_sampling': The imblearn.under_sampling provides methods to under-sample a dataset.;
+            'over_sampling': The imblearn.over_sampling provides a set of method to perform over-sampling.;
+            'combine': The imblearn.combine provides methods which combine over-sampling and under-sampling.;
+         2. Sampling Strategy
+            'minority': resample only the minority class;
+            'not minority': resample all classes but the minority class;
+            'not majority': resample all classes but the majority class;
+            'all': resample all classes;
+            'auto': equivalent to 'not majority'.
+        '''
+        if using_imblearn: 
+            if integer_encoded_targets is None: raise ValueError('The integer_encoded_targets must be set via the `_convert_targets2integer` function.')
+            strategy_module = check_and_import_library(f'imblearn.utils')
+            if not hasattr(module, 'check_sampling_strategy'): raise ValueError('This sampler requires imblearn\'s check_sampling_strategy to work.')
+            counts_module =getattr(strategy_module, 'check_sampling_strategy')
+            class_sampling_counts = counts_module(self.kwargs['sampling_strategy'], integer_encoded_targets, self.sampler_type)
+            max_class_cnt = max(self.target_counts)
+            return {class_name:int(class_cnt+(max_class_cnt*self.kwargs['sampling_multiplier'])) for class_name, class_cnt in class_sampling_counts.items()}
+        else:
+            class_sampling_counts = {}
+            for target_class, class_cnt in zip(self.target_classes, self.target_counts):
+                class_index = integer_encoding([target_class], self.classes)
+                if isinstance(self.kwargs['sampling_multiplier'], (int, float)):
+                    class_sampling_counts[class_index] = int(class_cnt * self.kwargs['sampling_multiplier'])
+                elif isinstance(self.kwargs['sampling_multiplier'], list):
+                    class_sampling_counts[class_index] = int(class_cnt * self.kwargs['sampling_multiplier'][class_index])
+                else:
+                    raise TypeError(f'The required parameter (`sampling_multiplier`) must be int, float, list type. But got {type(self.kwargs[required_param])}.')
+            return class_sampling_counts
+    
+    def _get_a_sampler(self):
+        module = check_and_import_library(f'data_loader.data_augmentation')
+        if not hasattr(module, self.sampler_name): raise ValueError('The sampler_name does not exist.')
+        sampler = getattr(module, self.sampler_type)(**self.sampler_kwargs)
+        if not hasattr(sampler, '_run'): raise ValueError('The function (`_run`) that performs DA does not exist.')
+        return sampler
+    
