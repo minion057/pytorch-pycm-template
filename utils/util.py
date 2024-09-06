@@ -83,7 +83,7 @@ def reset_device(mode, show_message:bool=True):
         torch.cuda.empty_cache()
         if show_message: print(f'After cache size : {round(torch.cuda.memory_reserved()/1024**3,1)}GB.\n')
 
-def tb_projector_resize(data, label_img, features):           
+def tb_projector_resize(data, target_img, features):           
     # probs 추가하고 싶으면 metadata_header, zip list 이용해서 수정
     _, c, h, w = data.shape
     resize_h = h
@@ -92,11 +92,11 @@ def tb_projector_resize(data, label_img, features):
         resize_h = resize_h//2  
     data = torch.nn.functional.interpolate(data, (resize_h), mode='bilinear', align_corners=False, antialias=True) 
     _, c, h, w = data.shape                   
-    label_img = torch.cat((label_img, data), 0) if label_img is not None else data
+    target_img = torch.cat((target_img, data), 0) if target_img is not None else data
     features = torch.cat((features, data.clone().view(-1, c*h*w)), 0) if features is not None else data.clone().view(-1, c*h*w) #28*28 -> 90MB
-    return label_img, features
+    return target_img, features
 
-def check_onehot_label(item, classes):
+def check_onehot_encoding_1(item, classes):
     item = np.array(item)
     item_class = np.unique(item, return_counts=True)[0]
     if all([0, 1] == item_class): 
@@ -106,7 +106,7 @@ def check_onehot_label(item, classes):
         raise ValueError(f'It\'s a one-hot encoding format, but only {item_class} exists.')
     return False
 
-def check_onehot_labels(item, classes):
+def check_onehot_encoding_N(item, classes):
     item = np.array(item)
     item_class = np.unique(item, axis=0)
     if item_class.ndim == 2:
@@ -116,46 +116,46 @@ def check_onehot_labels(item, classes):
         else: raise ValueError(f'It\'s a one-hot encoding format, but only {item_class} exists.')
     return False
 
-def onehot_encoding(label, classes):
+def onehot_encoding(targets, classes):
     if type(classes) == np.ndarray: classes = classes.tolist() # for FutureWarning by numpy
-    item = label[0]
-    if not check_onehot_label(item, classes): # label to onehot
+    item = targets[0]
+    if not check_onehot_encoding_1(item, classes): # targets to onehot
         if item not in classes: classes = np.array([idx for idx in range(len(classes))])   
-        label, classes = np.array(label), np.array(classes)
+        targets, classes = np.array(targets), np.array(classes)
         if len(classes.shape)==1: classes = classes.reshape((-1, 1))
-        if len(label.shape)==1: label = label.reshape((-1, 1 if type(item) not in [list, np.ndarray] else len(item)))
+        if len(targets.shape)==1: targets = targets.reshape((-1, 1 if type(item) not in [list, np.ndarray] else len(item)))
         oh = OneHotEncoder()
         oh.fit(classes)
-        label2onehot = oh.transform(label).toarray()
-    else: label2onehot = np.array(label)
-    return label2onehot
+        target2onehot = oh.transform(targets).toarray()
+    else: target2onehot = np.array(targets)
+    return target2onehot
 
-def integer_encoding(label, classes): #  by index of classes
-    label, classes = np.array(label), list(classes)
+def integer_encoding(targets, classes): #  by index of classes
+    targets, classes = np.array(targets), list(classes)
     # Processing based on data type
-    if label.ndim == 1:
+    if targets.ndim == 1:
         # Make sure all data is the same value
-        label_classes = np.unique(label, axis=0)
-        if len(np.unique(label, axis=0)) == 1:
-            unique_value = label[0]
+        target_classes = np.unique(targets, axis=0)
+        if len(np.unique(targets, axis=0)) == 1:
+            unique_value = targets[0]
             if unique_value in classes:
-                integer_encoded = np.full(len(label), classes.index(unique_value))
+                integer_encoded = np.full(len(targets), classes.index(unique_value))
             elif unique_value < len(classes):
-                integer_encoded = label
+                integer_encoded = targets
             else:
                 raise ValueError(f'The unique value {unique_value} in the data is not present in the class list.')
-        elif all([label_class in classes for label_class in label_classes]):
-            # Convert label encoding to integer encoding
-            integer_encoded = np.array([classes.index(label) for label in label])
-        elif all([label_class in list(range(len(classes))) for label_class in label_classes]):    
+        elif all([target_class in classes for target_class in target_classes]):
+            # Convert targets encoding to integer encoding
+            integer_encoded = np.array([classes.index(target) for target in targets])
+        elif all([target_class in list(range(len(classes))) for target_class in target_classes]):    
             # Already an integer index
-            integer_encoded = label
+            integer_encoded = targets
         else:
-            raise ValueError(f'Values in the data ({label_classes}) are not present in the class list ({classes}).')
+            raise ValueError(f'Values in the data ({target_classes}) are not present in the class list ({classes}).')
     else: # Two-dimensional data is likely to be one-hot encoding
-        if not check_onehot_labels(label, classes): 
-            raise ValueError('Invalid data type: must be one-dimensional (label/integer) or two-dimensional (one-hot).')
-        integer_encoded = np.argmax(label, axis=1)
+        if not check_onehot_encoding_N(targets, classes): 
+            raise ValueError('Invalid data type: must be one-dimensional (target/integer) or two-dimensional (one-hot).')
+        integer_encoded = np.argmax(targets, axis=1)
     return np.array(integer_encoded)
 
 
