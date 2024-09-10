@@ -36,9 +36,13 @@ class DASampler(BaseSampler):
         sampled_data, sampled_targets = deepcopy(self.data), deepcopy(targets2integer)
         for class_index, target_indices in target_indices_per_class_index.items():
             num_samples_to_generate = class_sampling_counts[class_index]
-            
-            sampled_data = np.concatenate((sampled_data, sampler._run(torch.Tensor(self.data[target_indices])).detach().cpu().numpy()), axis=0)
-            sampled_targets = np.concatenate((sampled_targets, targets2integer[target_indices]), axis=0)
+            sampled_indices = np.random.choice(
+                target_indices, 
+                size=num_samples_to_generate, 
+                replace=(num_samples_to_generate > len(target_indices)) 
+            )
+            sampled_data = np.concatenate((sampled_data, sampler._run(torch.Tensor(self.data[sampled_indices])).detach().cpu().numpy()), axis=0)
+            sampled_targets = np.concatenate((sampled_targets, targets2integer[sampled_indices]), axis=0)
             
         self.data_source.data = sampled_data
         self.data_source.targets = self._revert_targets(sampled_targets)
