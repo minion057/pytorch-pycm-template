@@ -17,6 +17,13 @@ class CutMix(BaseHook):
         return self._data['rand_index'][self.type]
     
     def forward_hook(self, module, input_data, output_data):
+        # 1. Method for using both original and augmented data.
+        if self.prob is None: 
+            device = output.get_device()
+            da_result = self._run(output.detach().cpu().clone())
+            if device != -1: da_result.cuda()
+            return torch.cat((output, da_result), 0)
+        # 2. Method for using only one of the original or augmented data.
         r = np.random.rand(1)
         if self.beta > 0 and r < self.prob:
             device = output.get_device()
@@ -25,6 +32,14 @@ class CutMix(BaseHook):
             return output
     
     def forward_pre_hook(self, module, input_data):
+        # 1. Method for using both original and augmented data.
+        if self.prob is None: 
+            use_data = input_data[0]
+            device = use_data.get_device()
+            da_result = self._run(use_data.detach().cpu().clone())
+            if device != -1: da_result = da_result.cuda()
+            return (torch.cat((use_data, da_result), 0), )
+        # 2. Method for using only one of the original or augmented data.
         r = np.random.rand(1)
         if self.beta > 0 and r < self.prob:
             use_data = input_data[0]
@@ -83,8 +98,8 @@ class CutMix(BaseHook):
     def loss(self, loss_ftns, output, target, logit):
         random_index, lam = self.rand_index(), self.lam()
         if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
-        basic_loss  = loss_ftns(output, target, logit)
-        if random_index is None: return basic_loss
-        random_loss = loss_ftns(output, target[random_index], logit)
-        loss = basic_loss*lam +  random_loss*(1.-lam)
-        return {'loss':loss, 'target':target}
+        basic_loss  = loss_ftns(output[:len(target)], target, logit)
+        if random_index is None: return {'loss':basic_loss, 'target':target}
+        random_loss = loss_ftns(output[len(target):] if self.prob is None else output, target[random_index], logit)
+        loss = basic_loss*lam + random_loss*(1.-lam) 
+        return {'loss':loss, 'target':torch.cat((target, target[random_index]), 0) if self.prob is None else target}

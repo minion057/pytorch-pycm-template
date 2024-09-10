@@ -86,6 +86,7 @@ class Trainer(BaseTrainer):
             # 2. Forward pass: compute predicted outputs by passing inputs to the model
             output = self.model(data)
             logit, predict = torch.max(output, 1)
+            # DA will be replaced randomly if prob is given, i.e. not incremented. To increment, set no probability or use a sampler.
             if self.DA_ftns is None: loss = self._loss(output, target, logit)
             else: loss, target = self._da_loss(output, target, logit)
             if check_onehot_encoding_1(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
