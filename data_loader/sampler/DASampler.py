@@ -6,6 +6,9 @@ from utils import check_and_import_library, integer_encoding
 
 class DASampler(BaseSampler):   
     def _check_kwargs(self):
+        if self.sampler_type.lower() in ['mixup', 'cutmix']:
+            raise ValueError(f'DASampler does not support {self.sampler_type}. This can be done by utilizing a batch sampler, or by applying prob as a `None` of the DA object.')
+        
         required_kwargs = {'use_balanced_sampler':True, 'sampling_strategy':'auto', 'sampling_multiplier':0.}
         if self.kwargs == {}: self.kwargs = deepcopy(required_kwargs)
         for required_param in required_kwargs.keys():
@@ -28,12 +31,17 @@ class DASampler(BaseSampler):
         targets2integer = self._convert_targets2integer(self.targets)
         target_indices_per_class_index = {class_index:np.where(targets2integer==class_index)[0] for class_index in range(len(self.classes))}
         class_sampling_counts = self._calculate_sampling_counts(self.kwargs['use_balanced_sampler'], targets2integer) # {class_index: num_samples_to_generate}
-        sampler = getattr(module, sampler_type)(**sampler_kwargs)
+        sampler = self._get_a_sampler()
         
+        sampled_data, sampled_targets = deepcopy(self.data), deepcopy(targets2integer)
         for class_index, target_indices in target_indices_per_class_index.items():
             num_samples_to_generate = class_sampling_counts[class_index]
-            sampler._run(torch.Tensor(self.data[target_indices]))
-            # 여기부터 작성
+            
+            sampled_data = np.concatenate((sampled_data, sampler._run(torch.Tensor(self.data[target_indices])).detach().cpu().numpy()), axis=0)
+            sampled_targets = np.concatenate((sampled_targets, targets2integer[target_indices]), axis=0)
+            
+        self.data_source.data = sampled_data
+        self.data_source.targets = self._revert_targets(sampled_targets)
       
     def _calculate_sampling_counts(self, using_imblearn:bool, integer_encoded_targets=None): 
         ''' 
