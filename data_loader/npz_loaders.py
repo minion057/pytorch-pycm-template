@@ -57,13 +57,17 @@ class NPZDataLoader():
     def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):
         self.loaderdict = dict()
         self.size, self.classes = None, None
+        
         for m in mode:
             dataset, use_kwargs = NPZDataset(dataset_path, m, trsfm), deepcopy(kwargs)
             if 'shuffle' not in kwargs.keys(): use_kwargs['shuffle'] = True if m==DATASET_MODE[0] else False
             if 'sampler' in kwargs.keys(): 
                 if m == DATASET_MODE[0]:
                     if 'shuffle' in use_kwargs.keys(): use_kwargs['shuffle'] = False
-                    use_kwargs['sampler'] = getattr(module_sampling, kwargs['sampler']['type'])(data_source=dataset, classes=dataset.classes, **kwargs['sampler']['args'])
+                    sampling_kwargs = kwargs['sampler']['args']
+                    sampling_kwargs['data_source'] = dataset
+                    sampling_kwargs['classes'] = dataset.classes
+                    use_kwargs['sampler'] = getattr(module_sampling, kwargs['sampler']['type'])(**sampling_kwargs)
                 else: del use_kwargs['sampler']
             self.loaderdict[m] = BaseSplitDatasetLoader(dataset=dataset, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_fn, **use_kwargs)
             print(f'Make a {m} dataloader.')
