@@ -19,7 +19,7 @@ class BaseSampler(RandomSampler):
     
     def _set_data_and_targets(self):
         '''
-        You need to set up a `self.dataset` and `self.targets'.
+        You need to set up a `self.data` and `self.targets'.
         '''
         try: self.data, self.targets = self.data_source.data, self.data_source.targets
         except: raise ValueError('data_source must have `data` and `targets` attributes.')
@@ -32,8 +32,8 @@ class BaseSampler(RandomSampler):
         raise NotImplementedError
     
     def _convert_targets2integer(self):
-        if not hasattr(self, 'dataset') or not hasattr(self, 'targets'): 
-            raise RuntimeError('The dataset and targets must be set via the `_set_dataset_and_targets` function.')
+        if not hasattr(self, 'data') or not hasattr(self, 'targets'): \
+            raise RuntimeError('The data and targets must be set via the `_set_data_and_targets` function.')
         self.target_is_onehot = check_onehot_encoding_1(self.targets[0], self.classes)
         self.target_classes, self.target_counts = np.unique(self.targets, axis=0, return_counts=True)
         return integer_encoding(self.targets, self.classes)

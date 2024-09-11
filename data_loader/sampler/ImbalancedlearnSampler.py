@@ -14,9 +14,9 @@ class ImbalancedlearnSampler(BaseSampler):
         return getattr(module, self.sampler_name)(**self.sampler_kwargs)
     
     def _run(self):
-        targets2integer = self._convert_targets2integer(self.targets)
-        data_shape = list(self.dataset.shape)
-        data4sampler = self.dataset.reshape(data_shape[0], -1)
+        targets2integer = self._convert_targets2integer()
+        data_shape = list(self.data.shape)
+        data4sampler = self.data.reshape(data_shape[0], -1)
         X, y = self._get_a_sampler().fit_resample(data4sampler, targets2integer)
         data_shape[0] = len(X)
         self.data_source.data = X.reshape(data_shape)
