@@ -5,7 +5,7 @@ import torch
 from utils import show_mix_result, close_all_plots
 
 class ColorJitter(BaseHook):
-    def __init__(self, prob:float=None, writer=None, **aug_kwargs):
+    def __init__(self, prob:float=0.5, writer=None, **aug_kwargs):
         self.type = 'ColorJitter'
         if aug_kwargs == {}:
             raise ValueError('There are no options available for Colorjitter (torchvision.transforms.ColorJitter).')
