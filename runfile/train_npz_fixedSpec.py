@@ -16,7 +16,6 @@ from torchvision import transforms
 import data_loader.transforms as module_transforms
 import data_loader.npz_loaders as module_data
 import data_loader.data_augmentation as module_DA
-import data_loader.data_sampling as module_sampling
 import model.optim as module_optim
 import model.loss as module_loss
 import model.plottable_metrics  as module_plottable_metric
