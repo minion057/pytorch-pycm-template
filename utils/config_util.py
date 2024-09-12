@@ -1,7 +1,55 @@
 from pathlib import Path
 from .util import ensure_dir
+from collections import OrderedDict
 
 CUSTOM_MASSAGE = 'Please enter the required parameters and their values.'
+
+def set_common_experiment_name(config:dict|OrderedDict):
+    if not isinstance(config, (dict, OrderedDict)):
+        raise TypeError('The config must be a dict or an OrderedDict.')
+    
+    # Option 1. Learning rate scheduler
+    lr_scheduler = '' if 'lr_scheduler' not in config['trainer'].keys() else f"lr_{config['trainer']['lr_scheduler']['type']}"
+    # Option 2. Accumulation steps
+    acc_steps = '' if 'accumulation_steps' not in config['trainer'].keys() else f"X{config['trainer']['accumulation_steps']}"
+    # Option 3. DA (Data Augmentation) 
+    da = '' if 'data_augmentation' not in config.keys() else f"DA_{config['data_augmentation']['type']}"
+    # Option 4. Sampler
+    # Option 4-1. Samplers that use methods that affect the LOSS calculation.
+    sampler_without_dataloader = ''
+    if 'data_augmentation' in config.keys():
+        if 'prob' in config['data_augmentation']['args'].keys():
+            if config['data_augmentation']['args']['prob'] is None:
+                sampler_without_dataloader = f'O_DA'
+    # Option 4-2. Other samplers. (using DA)
+    if 'sampler' in config['data_loader']['args'].keys():
+        sampling_type = config['data_loader']['args']['sampler']['args']['sampler_type']
+        sampling_type = sampling_type.split('-')[0].split('_')[0][0].upper() # Oversampling -> O, Undersampling -> U
+        sampler_with_dataloader = f"{sampling_type}_{config['data_loader']['args']['sampler']['args']['sampler_name']}"
+    else: sampler_with_dataloader = ''
+    if sampler_without_dataloader != '' and sampler_with_dataloader != '':
+        sampling = f"combine_{sampler_with_dataloader}_{sampler_without_dataloader}"
+    elif sampler_without_dataloader != '':
+        sampling = sampler_without_dataloader
+    elif sampler_with_dataloader != '':
+        sampling = sampler_with_dataloader
+    else: sampling = ''
+    
+    exper_name = (
+        # Required elements in the 1st folder: Name of config
+        f"{config['name']}"
+        # Required elements in the 2st folder: Optimizer and learning rate
+        # Optional elements in the 2st folder: Learning rate scheduler that anneals the learning rate                
+        f"/{config['optimizer']['type']}-lr_{config['optimizer']['args']['lr']}{lr_scheduler}"
+        # Required elements in the 3st folder: Batch size and number of epochs
+        # Optional elements in the 3st folder: accumulation steps
+        f"/{config['data_loader']['args']['batch_size']}batch-{config['trainer']['epochs']}epoch{acc_steps}"
+        # Required elements in the 4st folder: Name of dataloader and loss function
+        f"/{config['data_loader']['type']}-{config['loss']}"
+        # Optional elements in the 5st folder: Data augmentation and sampler
+        f"/{'None' if da == '' and sampling == '' else f'{da}-{sampling}'}"
+    )
+    return exper_name
 
 def shutdown_warning(cnt:int, MAX_INPUT_CNT:int=5):
     if cnt == MAX_INPUT_CNT: raise EOFError('You have made a total of 5 incorrect attempts. Forced termination.')

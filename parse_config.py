@@ -5,7 +5,7 @@ from functools import reduce, partial
 from operator import getitem
 from datetime import datetime
 from logger import setup_logging
-from utils import ensure_dir, read_json, write_json
+from utils import ensure_dir, read_json, write_json, set_common_experiment_name
 import shutil
 
 class ConfigParser:
@@ -31,18 +31,9 @@ class ConfigParser:
         # set save_dir where trained model and log will be saved.
         save_dir = Path(self.config['trainer']['save_dir'])
 
-        exper_name = self.config['name']
-        exper_name += f"/{self.config['optimizer']['type']}-lr_{self.config['optimizer']['args']['lr']}"
-        if 'lr_scheduler' in self.config.keys():
-            exper_name += f"_{self.config['lr_scheduler']['type']}"
-        exper_name += f"/{self.config['arch']['type']}"
+        exper_name = set_common_experiment_name(self.config)
         if run_id is None: # use timestamp as default run-id    
-            acc_steps = '' if 'accumulation_steps' not in self.config['trainer'].keys() else f"X{self.config['trainer']['accumulation_steps']}"
-            sampling = '' if 'data_sampling' not in self.config.keys() else f"-{self.config['data_sampling']['type']}"
-            da = '' if 'data_augmentation' not in self.config.keys() else f"-{self.config['data_augmentation']['type']}"
-            run_id =  f"{self.config['data_loader']['args']['batch_size']}batch{acc_steps}"
-            run_id += f"-{self.config['trainer']['epochs']}epoch-{self.config['loss']}{da}{sampling}"
-            run_id += f"-{datetime.now().strftime(r'%m%d_%H%M%S')}"
+            run_id = datetime.now().strftime(r'%m%d_%H%M%S')
         self._checkpoint_dir = save_dir / 'models' / exper_name / run_id
         self._log_dir = save_dir / 'log' / exper_name / run_id
         self._output_dir = save_dir / 'output' / exper_name / run_id
