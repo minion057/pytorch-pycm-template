@@ -39,13 +39,13 @@ def set_common_experiment_name(config:dict|OrderedDict):
         # Required elements in the 1st folder: Name of config
         f"{config['name']}"
         # Required elements in the 2st folder: Name of model and dataloader
-        f"{config['arch']['type']}-{config['data_loader']['type']}"
+        f"/{config['arch']['type']}-{config['data_loader']['type']}"
         # Required elements in the 3st folder: Optimizer and learning rate
         # Optional elements in the 3st folder: Learning rate scheduler that anneals the learning rate                
         f"/{config['optimizer']['type']}-lr_{config['optimizer']['args']['lr']}{lr_scheduler}"
         # Required elements in the 4st folder: Name of loss function
         # Optional elements in the 4st folder: Data augmentation and sampler
-        f"/{config['loss']}-{'' if da == '' and sampling == '' else f'{da}-{sampling}'}"
+        f"/{config['loss']}{'' if da == '' else f'-{da}'}{'' if sampling == ''else f'-{sampling}'}"
         # Required elements in the 5st folder: Batch size and number of epochs
         # Optional elements in the 5st folder: accumulation steps
         f"/{config['data_loader']['args']['batch_size']}batch-{config['trainer']['epochs']}epoch{acc_steps}"
