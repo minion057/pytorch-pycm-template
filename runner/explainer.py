@@ -31,14 +31,14 @@ class TorchcamExplainer(BaseExplainer):
             device: The device used in the model. CUDA or CPU.
             explainset (dict): A dataset to perfome XAI.
                                - The key value is the index of the class, 
-                               - The value is the data to use (Tensor or numpy.ndarray type), labels and paths.
+                               - The value is the data to use (Tensor or numpy.ndarray type), targets and paths.
             explain_methods (list): The XAI technique to perform. Get the methods supported by torchcam by name only (e.g. GradCam).
         """
         if not all(isinstance(class_idx, int) for class_idx in list(explainset.keys())): 
             print('list(explainset.keys()): ', list(explainset.keys()))
             raise ValueError('The keys in the description set must be integers: only the index of the class.')
-        if 'data' not in list(explainset[0].keys()) or 'labels' not in list(explainset[0].keys()):
-            raise ValueError('The explainset requires data and label information.')
+        if 'data' not in list(explainset[0].keys()) or 'targets' not in list(explainset[0].keys()):
+            raise ValueError('The explainset requires data and target information.')
         
         libc = ctypes.CDLL("libc.so.6") # for torchcam
         super().__init__(model, config, classes, device, [])
@@ -155,7 +155,7 @@ class TorchcamExplainer(BaseExplainer):
                 reset_device('cache', False)
                 print(f'\nCurrently, the class that performs XAI is {self.classes[class_idx]}. ({data_idx}/{len(class_explainset["data"])})')
                 self.extractors_result['data'].append(explain_data)
-                self.extractors_result['labels'].append(class_explainset['labels'][data_idx-1])
+                self.extractors_result['labels'].append(class_explainset['targets'][data_idx-1])
                 if 'paths' in list(class_explainset.keys()): self.extractors_result['paths'].append(class_explainset['paths'][data_idx-1])
                 
                 xai_data = torch.Tensor(explain_data).to(self.device).requires_grad_(True)

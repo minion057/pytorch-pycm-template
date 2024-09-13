@@ -16,7 +16,6 @@ from torchvision import transforms
 import data_loader.transforms as module_transforms
 import data_loader.npz_loaders as module_data
 import data_loader.data_augmentation as module_DA
-import data_loader.data_sampling as module_sampling
 import model.optim as module_optim
 import model.loss as module_loss
 import model.plottable_metrics  as module_plottable_metric
@@ -75,10 +74,19 @@ def main(config):
         da = config['data_augmentation']
         if 'type' not in da.keys(): raise ValueError('Data augmentation type is not set.')
         if 'hook_args' in da.keys():
-            if any(k not in da['hook_args'].keys() for k in ['pre', 'layer_idx']): 
-                raise ValueError('There is no pre-hook information for DA.')
+            if isinstance(da['hook_args'], dict): 
+                if any(k not in da['hook_args'].keys() for k in ['pre', 'layer_idx']): 
+                    raise ValueError('There is no pre-hook information for DA.')
         else: raise ValueError('There is no hook information for DA.')
         da_ftns = getattr(module_DA, da['type'])
+        if 'args' in da.keys():
+            if 'prob' in da['args'].keys() and da['args']['prob'] is None:
+                if 'sampler' in config['data_loader']['args']:
+                    sampling_type = config['data_loader']['args']['sampler']['args']['sampler_type']
+                    sampling_type = sampling_type.split('-')[0].split('_')[0][0].upper() # Oversampling -> O, Undersampling -> U
+                    if sampling_type == 'O':
+                        logger.warning('Although the data loader has already been oversampled by the sampler, '\
+                                       'it will be further oversampled by the DA, which may cause errors.')
     else: da_ftns = None
 
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler

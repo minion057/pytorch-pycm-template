@@ -5,7 +5,7 @@ import torch
 from utils import show_mix_result, close_all_plots
 
 class ColorJitter(BaseHook):
-    def __init__(self, prob:float=None, writer=None, **aug_kwargs):
+    def __init__(self, prob:float=0.5, writer=None, **aug_kwargs):
         self.type = 'ColorJitter'
         if aug_kwargs == {}:
             raise ValueError('There are no options available for Colorjitter (torchvision.transforms.ColorJitter).')
@@ -20,36 +20,30 @@ class ColorJitter(BaseHook):
         # brightness=(0.2,0.8), contrast=(0.2,0.8), saturation=(0.2,0.8), hue=(-0.5, 0.5)
     
     def forward_hook(self, module, input_data, output_data):
-        # 1. Method for using both original and augmented data.
-        if self.prob is None: 
-            device = output.get_device()
-            da_result = self._run(output.detach().cpu().clone())
-            if device != -1: da_result.cuda()
-            return torch.cat((output, da_result), 0)
-        # 2. Method for using only one of the original or augmented data.
-        r = np.random.rand(1)
-        if r < self.prob: 
-            device = output.get_device()
-            output = self._run(output.detach().cpu().clone())
-            if device != -1: output.cuda()
-            return output
+        return self.without_hook(output_data)
     
     def forward_pre_hook(self, module, input_data):
-        # 1. Method for using both original and augmented data.
-        if self.prob is None: 
+        r = np.random.rand(1)
+        if self.prob is None or r < self.prob: 
             use_data = input_data[0]
             device = use_data.get_device()
             da_result = self._run(use_data.detach().cpu().clone())
             if device != -1: da_result = da_result.cuda()
-            return (torch.cat((use_data, da_result), 0), )
+        # 1. Method for using both original and augmented data.
+        if self.prob is None: return (torch.cat((use_data, da_result), 0), )
         # 2. Method for using only one of the original or augmented data.
+        if r < self.prob: return (use_data, )
+    
+    def without_hook(self, input_data):
         r = np.random.rand(1)
-        if r < self.prob:
-            use_data = input_data[0]
-            device = use_data.get_device()
-            use_data = self._run(use_data.detach().cpu().clone())
-            if device != -1: use_data = use_data.cuda()
-            return (use_data, )
+        if self.prob is None or (self.beta > 0 and r < self.prob): 
+            device = input_data.get_device()
+            da_result = self._run(input_data.detach().cpu().clone())
+            if device != -1: da_result = da_result.cuda()
+        # 1. Method for using both original and augmented data.
+        if self.prob is None: return torch.cat((data, da_result), 0)
+        # 2. Method for using only one of the original or augmented data.
+        if self.beta > 0 and r < self.prob: return da_result
     
     def _run(self, data):
         size =  data.size()  # B, C, H, W
