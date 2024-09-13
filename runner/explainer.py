@@ -155,7 +155,7 @@ class TorchcamExplainer(BaseExplainer):
                 reset_device('cache', False)
                 print(f'\nCurrently, the class that performs XAI is {self.classes[class_idx]}. ({data_idx}/{len(class_explainset["data"])})')
                 self.extractors_result['data'].append(explain_data)
-                self.extractors_result['labels'].append(class_explainset['labels'][data_idx-1])
+                self.extractors_result['labels'].append(class_explainset['targets'][data_idx-1])
                 if 'paths' in list(class_explainset.keys()): self.extractors_result['paths'].append(class_explainset['paths'][data_idx-1])
                 
                 xai_data = torch.Tensor(explain_data).to(self.device).requires_grad_(True)
