@@ -51,7 +51,6 @@ class Trainer(BaseTrainer):
         self.DA_ftns = None
         if da_ftns is not None:
             self.hookargs = config['data_augmentation']['hook_args']
-            self.pre_hook = self.hookargs['pre']
             self.DA_ftns = da_ftns(writer=self.writer, **config['data_augmentation']['args'])  
         
         # Clear the gradients of all optimized variables 
@@ -70,16 +69,19 @@ class Trainer(BaseTrainer):
         label_img, features, class_labels = None, None, []
         data_channel = None
         
-        # Hook
-        if self.DA_ftns is not None:
-            hook = register_forward_hook_layer(self.model, self.DA_ftns.forward_pre_hook if self.pre_hook else self.DA_ftns.forward_hook, **self.hookargs)
-
+        # # Perform DA with hooking
+        if self.DA_ftns is not None and self.hookargs is not None:
+            hook = register_forward_hook_layer(self.model, 
+                                                self.DA_ftns.forward_pre_hook if self.hookargs['pre']else self.DA_ftns.forward_hook, 
+                                                **self.hookargs)
+                
         for batch_idx, (data, target) in enumerate(self.data_loader):
             batch_num = (epoch - 1) * self.len_epoch + batch_idx + 1
             self.writer.set_step(batch_num, 'batch_train')
                 
             # 1. To move Torch to the GPU or CPU
-            print('tatget:', target.shape, np.unique(target, axis=0, return_counts=True)[-1])
+            if self.DA_ftns is not None and self.hookargs is None: # Perform DA without hooking
+                data = self.DA_ftns.without_hook(data)
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
@@ -151,7 +153,7 @@ class Trainer(BaseTrainer):
                 self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
             if batch_idx == self.len_epoch: break
         
-        if self.DA_ftns is not None: hook.remove()
+        if self.DA_ftns is not None and self.hookargs is not None: hook.remove()
         # 5-3-2. Update the curve plot and projector
         self.writer.set_step(epoch)
         if self.plottable_metric_ftns is not None: 

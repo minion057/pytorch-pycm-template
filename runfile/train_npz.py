@@ -74,8 +74,9 @@ def main(config):
         da = config['data_augmentation']
         if 'type' not in da.keys(): raise ValueError('Data augmentation type is not set.')
         if 'hook_args' in da.keys():
-            if any(k not in da['hook_args'].keys() for k in ['pre', 'layer_idx']): 
-                raise ValueError('There is no pre-hook information for DA.')
+            if isinstance(da['hook_args'], dict): 
+                if any(k not in da['hook_args'].keys() for k in ['pre', 'layer_idx']): 
+                    raise ValueError('There is no pre-hook information for DA.')
         else: raise ValueError('There is no hook information for DA.')
         da_ftns = getattr(module_DA, da['type'])
         if 'args' in da.keys():
