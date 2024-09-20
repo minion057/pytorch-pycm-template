@@ -17,9 +17,8 @@ class ResultBestVisualization(ResultVisualization):
         
     def _get_test_result(self, run_json, basic_data, basic_column_list):
         best_result = None
-        latest = run_json['latest'] if 'latest' in list(run_json.keys()) else None
         for test_json, test_epoch  in run_json['test'].items():
-            _, _, te = self._read_df_result(test_json, 'test', latest)
+            _, _, te = self._read_df_result(test_json, 'test')
             if self.test_file_addtional_name in str(test_json):
                 if best_result is None:
                     best_result = deepcopy(te)
@@ -40,8 +39,7 @@ class ResultFixedVisualization(ResultVisualization):
         
     def _get_test_result(self, run_json, basic_data, basic_column_list):
         te = None
-        latest = run_json['latest'] if 'latest' in list(run_json.keys()) else None
         for test_json, test_epoch in run_json['test'].items():
-            if self.test_file_addtional_name in str(test_json): _, _, te = self._read_df_result(test_json, 'test', latest)
+            if self.test_file_addtional_name in str(test_json): _, _, te = self._read_df_result(test_json, 'test')
         if te is None: raise ValueError(f'Not found {self.test_file_addtional_name} file.')
         return self._list_concat(basic_data, list(te.values())), self._list_concat(basic_column_list, list(te.keys()))

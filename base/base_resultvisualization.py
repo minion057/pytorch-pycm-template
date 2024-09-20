@@ -5,13 +5,14 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from collections import OrderedDict
 from copy import deepcopy
-from utils import ensure_dir, format_elapsed_time, convert_to_datetime, convert_days_to_hours
+from utils import ensure_dir, read_json, format_elapsed_time, convert_to_datetime, convert_days_to_hours, set_common_experiment_name
 
 class ResultVisualization:
     def __init__(self, parent_dir, result_name,
                  test_dirname:str='test', test_filename:str='metrics', test_file_addtional_name:str='test'):
         parent_dir = Path(parent_dir)
         self.name = result_name
+        self.models_dir = parent_dir / 'models' / self.name
         self.output_dir = parent_dir / 'output' / self.name
         
         self.test_dirname = test_dirname
@@ -20,186 +21,166 @@ class ResultVisualization:
         self.sheet_list = ['training', 'validation', 'test']
         
         # output 중, metric.json 경로 정보 가져오기
-        self.result_info = self._get_a_result_info()
+        self.result_info = self._getMetricsFromConfig()
         # self.df_dict = self._json2df()
 
-    # output 중, metric.json 경로 정보 셋팅하는 함수
-    def _read_json(self, json_path):
-        json_content = None
-        try:
-            with open(json_path, 'r') as j:
-                json_content = json.load(j)
-        except Exception as inst: print(inst) 
-        return json_content
-    
-    def _get_a_category_info(self):
-        cate_dict = {cate_path.name:cate_path for cate_path in self.output_dir.iterdir() if cate_path.is_dir()}
-        cate_dict = dict(sorted(cate_dict.items()))
-        return cate_dict
-    
-    def _get_a_cate_model_info(self):
-        cate_dict = self._get_a_category_info()
-        cate_model_dict = {k:None for k in cate_dict.keys()}
-        for category, cate_path in cate_dict.items():
-            _ = {model_path.name.lower():model_path for model_path in cate_path.iterdir() if model_path.is_dir()}
-            cate_model_dict[category] = dict(sorted(_.items()))
-        return cate_model_dict
+    def _getMetricsFromConfig(self):
+        config_name = 'config.json'
+        config_paths = sorted(self.models_dir.glob(f'**/{config_name}'))
+        if len(config_paths) == 0: raise ValueError(f'There is currently no config.json under the path ({self.models_dir}).')
+        
+        metircs_paths = OrderedDict()
+        for config_path in config_paths:
+            # Step 1. config.json를 통해 경로에 공통적으로 쓰이는 실험 경로를 가져옵니다.
+            exper_name = '/'.join(set_common_experiment_name(read_json(config_path)).split('/')[1:])
+            output_path = self.output_dir / exper_name
 
-    def _loss_sampling_da(self, json_path):
-        json_content = self._read_json(json_path)
-        loss = json_content['loss']
-        da = json_content['data_augmentation']['type'] if 'data_augmentation' in json_content.keys() else None
-        sampling =  json_content['data_sampling']['name'] if 'data_sampling' in json_content.keys() else None
-        return loss, da, sampling
-    
-    def _get_a_result_info(self):
-        cate_model_info = self._get_a_cate_model_info()
-        metrics_dict = {k:{m:{} for m in cate_model_info[k].keys()} for k in cate_model_info.keys()}
-        for category, cate_path in cate_model_info.items():
-            for model, model_path in cate_path.items():
-                # 카테고리, 모델마다 기법 적용에 따라 분류합니다.
-                # 현재, 아무것도 적용하지 않은 None, 샘플링, 데이터 증강(DA), 2가지 이상 기법을 적용한 multi로 구분됩니다.
-                tmp_dict = {metrics_path.name:metrics_path for metrics_path in model_path.iterdir() if metrics_path.is_dir()}
-                metrics_None, metrics_sampling, metrics_DA, metrics_multi = OrderedDict(), OrderedDict(), OrderedDict(), OrderedDict()
-                for metrics_cate, metrics_path in tmp_dict.items():
-                    # config를 통해 어떤 기법이 적용되었는지 파악합니다.
-                    config_path = sorted(Path(str(metrics_path).replace('output', 'models')).glob('config.json'))
-                    if len(config_path) != 1: ValueError('The JSON file containing the training information could not be found.')
-                    # 아직 템플릿은 DA, sampling만 지원하기 때문에, 가장 큰 구분자인 loss, DA, sampling 정보만 가져옵니다.
-                    loss, da, sampling = self._loss_sampling_da(config_path[0])
-                    if da is None and sampling is None: metrics_None[metrics_cate] = metrics_path
-                    elif da is None and sampling is not None: metrics_sampling[metrics_cate] = metrics_path
-                    elif da is not None and sampling is None: metrics_DA[metrics_cate] = metrics_path
-                    else: metrics_multi[metrics_cate] = metrics_path
-                metrics_None, metrics_sampling = dict(sorted(metrics_None.items())), dict(sorted(metrics_sampling.items()))
-                metrics_DA, metrics_multi = dict(sorted(metrics_DA.items())), dict(sorted(metrics_multi.items()))
-                metrics_None.update(metrics_sampling)
-                metrics_None.update(metrics_DA)
-                metrics_None.update(metrics_multi)
+            # Step 2. 훈련에 사용된 metrics.json 파일을 찾습니다.
+            training_metrics_path = sorted(output_path.glob('**/training/**/metrics.json')) 
+            if len(training_metrics_path) == 1: training_metrics_path = training_metrics_path[-1]
+            else: raise ValueError('The JSON file containing the training results could not be found.')
+            
+            # Step 3. 훈련이 멈춘 epoch을 찾습니다.
+            latest_txt = sorted(config_path.parent.glob('latest.txt'))
+            if len(latest_txt) == 1: 
+                with open(latest_txt[-1], "r") as f:
+                    latest = f.readlines()[-1].strip().split('epoch')[-1]
+                if not latest.isnumeric(): raise ValueError(f'Warring: The latest epoch is unknown. -> {latest}')
+                latest = int(latest)
+            else: raise ValueError('The txt file containing the training epoch results could not be found.')
+
+            # Step 4. 테스트에 사용된 metrics.json 파일을 찾습니다.
+            test_metrics_path = sorted(output_path.glob(f'**/{self.test_dirname}/**/*{self.test_filename}*.json'))           
+            if len(test_metrics_path) >= 1:
+                test_epochs = []
+                for t in test_metrics_path:
+                    test_epoch = str(t).split('epoch')[-1].split('/')[0]
+                    if not test_epoch.isnumeric(): raise ValueError(f'Warring: The testing epoch is unknown. -> {t.name}')
+                    test_epochs.append(int(test_epoch))
+                use_test_metrics_path = OrderedDict()
+                for sort_index in np.argsort(test_epochs):
+                    use_test_metrics_path[test_metrics_path[sort_index]] = test_epochs[sort_index]
+            else:
+                print(f'The JSON file containing the test results could not be found. -> {exper_name}')
+                continue
+                # raise ValueError('The JSON file containing the test results could not be found.')
+            
+            # Step 5. run id를 찾아, 딕셔너리에 업데이트합니다.
+            run_id = str(training_metrics_path).split(exper_name)[-1].split('/')[0]
+            metircs_paths[exper_name] = {run_id:{'config':config_path, 'train':training_metrics_path,'test':use_test_metrics_path, 'latest': latest}}
         
-                for metrics_cate, metrics_path in metrics_None.items():
-                    run_cate = '-'.join(metrics_cate.split('-')[:-1])
-                    run_id = metrics_cate.split('-')[-1]
-                    if run_cate not in metrics_dict[category][model].keys(): metrics_dict[category][model][run_cate] = {}
-                    
-                    # 훈련의 output을 가져온다. 
-                    train_json = sorted((metrics_path).glob('training/**/metrics.json'))           
-                    if len(train_json) != 1: raise ValueError('The JSON file containing the training results could not be found.')
-                    else: train_json = train_json[-1]
-                        
-                    # 훈련의 마지막 epoch 정보를 가져온다.
-                    latest_txt = sorted(Path(str(metrics_path).replace('output', 'models')).glob('latest.txt'))
-                    if len(latest_txt) != 1: raise ValueError('The txt file containing the training epoch results could not be found.')
-                    else:
-                        with open(latest_txt[-1], "r") as f:
-                            latest = f.readlines()[-1].strip().split('epoch')[-1]
-                        if not latest.isnumeric(): raise ValueError(f'Warring: The latest epoch is unknown. -> {latest}')
-                        latest = int(latest)
-                    
-                    # 테스트 정보를 모두 가져온다.
-                    test_json = sorted((metrics_path/'test').glob(f'**/*{self.test_dirname}*/*{self.test_filename}*.json'))           
-                    if len(test_json) >= 1:
-                        test_epochs = []
-                        for t in test_json:
-                            test_epoch = str(t).split('epoch')[-1].split('/')[0]
-                            # test_epoch = str(t).split(self.test_dirname)[-1].split('epoch')[-1].replace('/metrics-test', '').replace('.json', '')
-                            # test_epoch = test_epoch.split('_')[0]
-                            if not test_epoch.isnumeric(): raise ValueError(f'Warring: The testing epoch is unknown. -> {t.name}')
-                            test_epochs.append(int(test_epoch))
-                        use_test_json = OrderedDict()
-                        for sort_index in np.argsort(test_epochs):
-                            # use_test_json[test_epochs[sort_index]] = test_json[sort_index]
-                            use_test_json[test_json[sort_index]] = test_epochs[sort_index]
-                    else : raise ValueError('The JSON file containing the test results could not be found.')
-                    metrics_dict[category][model][run_cate].update({run_id:{'train':train_json,'test':use_test_json, 'latest': latest}})
-        
-        category_list = list(metrics_dict.keys())
-        use_cate = category_list[0]
-        print(f'Category list : {len(category_list)}cnt -> {category_list}')
-        model_list = list(metrics_dict[use_cate].keys())
-        use_model = model_list[0]
-        print(f'Model_list    : {len(model_list)}cnt -> {model_list}')
-        run_list = list(metrics_dict[use_cate][use_model].keys())
-        use_run = run_list[0]
-        print(f'Run_list      : {len(run_list)}cnt -> {run_list}')
-        for run_id, run_json in metrics_dict[use_cate][use_model][use_run].items():
+        for run_id, run_json in metircs_paths[list(metircs_paths.keys())[0]].items():
             print(f'example run id: {run_id}')
             print(f'- latest epoch : {run_json["latest"]}')
             print(f'- train json file : {run_json["train"]}')
             for test_epoch, test_json in run_json['test'].items():
                 print(f'- test json file : {test_epoch} -> {test_json}')
-        return metrics_dict    
-    # output 중, metric.json 경로 정보 셋팅하는 함수
+        return metircs_paths  
     
-    # 가져온 metric.json 기반으로 정보를 dataframe으로 변환 (테스트는 설정한 best_metric에 맞춰 높은 점수로 결정)
     def _json2df(self, base_date:tuple=(2024, 1, 1)):
+        # 가져온 metric.json 기반으로 정보를 dataframe으로 변환 (테스트는 설정한 best_metric에 맞춰 높은 점수로 결정)
         sheet_data = self._set_a_df_info()
         df_dict = {s:'None' for s in self.sheet_list}
         
         for sheet, d_c in sheet_data.items():
             df = pd.DataFrame(data=d_c['data'], columns=d_c['col'][0])
             model_mean_time = []
-            if 'runtime' in df.columns:
-                df.loc[:, 'runtime'] = pd.to_datetime([convert_to_datetime(convert_days_to_hours(t), base_date) for t in df.loc[:, 'runtime'].tolist()])
-                for model_name in df['model'].unique():
-                    mean_datetime = pd.to_datetime(df[df['model']==model_name]['runtime'].apply(lambda x: x.timestamp()).mean(), unit='s')
+            if 'Runtime' in df.columns:
+                df.loc[:, 'Runtime'] = pd.to_datetime([convert_to_datetime(convert_days_to_hours(t), base_date) for t in df.loc[:, 'Runtime'].tolist()])
+                for model_name in df['Model'].unique():
+                    mean_datetime = pd.to_datetime(df[df['Model']==model_name]['Runtime'].apply(lambda x: x.timestamp()).mean(), unit='s')
                     elapsed_time_str = format_elapsed_time(mean_datetime, base_date) # HH:MM:SS
                     elapsed_time_min  = int(elapsed_time_str.split(':')[0]) * 60 + int(elapsed_time_str.split(':')[1])
                     model_mean_time.append([model_name, elapsed_time_str, elapsed_time_min])
-                df['runtime'] = [format_elapsed_time(t, base_date) for t in df.loc[:, 'runtime'].tolist()] # HH:MM:SS # df['runtime'].time()
+                df['Runtime'] = [format_elapsed_time(t, base_date) for t in df.loc[:, 'Runtime'].tolist()] # HH:MM:SS # df['runtime'].time()
             df_dict[sheet] = deepcopy(df)
             
             if model_mean_time != []:
-                time_df = pd.DataFrame(data=model_mean_time, columns=['model', 'runtime (mean)', 'minutes (mean)']) 
+                time_df = pd.DataFrame(data=model_mean_time, columns=['Model', 'Runtime (mean)', 'Minutes (mean)']) 
                 sheet_name =  str(sheet)+'_runtime'
                 df_dict[sheet_name] = deepcopy(time_df)
-        return df_dict          
+        return df_dict   
     
     def _set_a_df_info(self):
         '''
-        1. SAVE CONTENT - training   : run_id | loss | optim | lr | scheduler | DA | Sampling | batch | acc_step | model | real_epoch | run_time | metrics...
-        2. SAVE CONTENT - validation : run_id | loss | optim | lr | scheduler | DA | Sampling | batch | acc_step | model | real_epoch | metrics...
-        3. SAVE CONTENT - test       : run_id | loss | optim | lr | scheduler | DA | Sampling | batch | acc_step | model | real_epoch | latest | metrics...
-        '''        
-        basic_column_list = ['run_id', 'loss', 'optimizer', 'learning rate (lr)', 'lr scheduler', 'DA', 'Sampling', 'batch size', 'accumulation steps', 'model']
+        0. BASIC CONTENT: See `_read_df_config` function.
+        1. SAVE CONTENT - training   : BASIC CONTENT | real_epoch | Runtime | metrics...
+        2. SAVE CONTENT - validation : BASIC CONTENT | real_epoch | metrics...
+        3. SAVE CONTENT - test       : BASIC CONTENT | real_epoch | metrics...
+        '''
+        basic_column_list = ['Run ID', 
+                             'Model', 'DataLoader',
+                             'Optimizer', 'Learning rate (LR)', 'LR scheduler',
+                             'Loss', 'DA', 'Sampler type', 'Sampler',
+                             'Batch size', 'Accumulation steps', 'Epoch']
         data_dict = {s:{'data':[], 'col':[]} for s in self.sheet_list}
 
-        for category, cate_dict in self.result_info.items():
-            for model, model_dict in cate_dict.items():
-                for run_cate, run_dict in model_dict.items():
-                    for run_id, run_json in run_dict.items():
-                        # 0. get a config
-                        basic_path = str(run_json["train"])[:str(run_json["train"]).index(run_id)+len(run_id)].replace('output', 'models')
-                        basic_data = self._read_df_config(f'{basic_path}/config.json')
-                        basic_data.insert(0, run_id)
-                        # 1. get a train
-                        tr, val, _ = self._read_df_result(run_json['train'])
-                        data_dict['training']['data'].append(self._list_concat(basic_data, list(tr.values())))
-                        data_dict['training']['col'].append(self._list_concat(basic_column_list, list(tr.keys())))
-                        if len(list(val.keys())) != 1:
-                            data_dict['validation']['data'].append(self._list_concat(basic_data, list(val.values())))
-                            data_dict['validation']['col'].append(self._list_concat(basic_column_list, list(val.keys())))
-                        # 2. get a test (Finding the highest score (TNR))
-                        test_data, test_col = self._get_test_result(run_json, basic_data, basic_column_list)
-                        data_dict['test']['data'].append(test_data)
-                        data_dict['test']['col'].append(test_col)
+        for exper_name, run_dict in self.result_info.items():
+            for run_id, run_json in run_dict.items():
+                # 0. get a config
+                basic_data = self._read_df_config(exper_name)
+                basic_data.insert(0, run_id)
+                # 1. get a train
+                tr, val, _ = self._read_df_result(run_json['train'])
+                data_dict['training']['data'].append(self._list_concat(basic_data, list(tr.values())))
+                data_dict['training']['col'].append(self._list_concat(basic_column_list, list(tr.keys())))
+                if len(list(val.keys())) != 1:
+                    data_dict['validation']['data'].append(self._list_concat(basic_data, list(val.values())))
+                    data_dict['validation']['col'].append(self._list_concat(basic_column_list, list(val.keys())))
+                # 2. get a test 
+                test_data, test_col = self._get_test_result(run_json, basic_data, basic_column_list)
+                data_dict['test']['data'].append(test_data)
+                data_dict['test']['col'].append(test_col)
         return data_dict
+    
+    def _read_df_config(self, exper_name):
+        experiment = exper_name.split('/')
+        # 1st folder: Name of config -> Already removed
+        # 2st folder: Name of model and dataloader
+        model, dataloader = experiment[0].split('-')
+        # 3st folder: Optimizer and learning rate (Optional: Learning rate scheduler)
+        tmp = experiment[1].split('-')
+        if len(tmp) == 2: (optim, lr), scheduler = deepcopy(tmp), None
+        elif len(tmp) == 3: optim, lr, scheduler = deepcopy(tmp)
+        else: raise ValueError(f'Required information not found. ({tmp})')
+        lr = lr.split('_')[-1]
+        # 4st folder: Name of loss function (Optional: Data augmentation and sampler)
+        tmp = experiment[2].split('-')
+        loss = tmp[0]
+        if len(tmp) == 1: 
+            da, sampler_type, sampler = None, None, None
+        elif len(tmp) == 2:
+            tmp_add = tmp[1].split('_')
+            if tmp_add[0] == 'DA': da, sampler_type, sampler = tmp_add[-1], None, None
+            else: da, sampler_type, sampler  = None, tmp_add[0], '_'.join(tmp_add[1:])
+        elif len(tmp) == 3: 
+            da = tmp[1].split('_')[-1], 
+            tmp_add = tmp[-1].split('_')
+            sampler_type, sampler = tmp_add[0], '_'.join(tmp_add[1:])
+        else: raise ValueError(f'Required information not found. ({tmp})')
+        if sampler_type not in [None, 'combine']:
+            sampler_type = 'Oversampling' if sampler_type.lower() == 'o' else 'Undersampling'
+        # 5st folder: Batch size and number of epochs (Optional: Accumulation steps)
+        (batch, epoch), acc_step = experiment[3].split('-'), None
+        if len(epoch.split('X')) == 2: epoch, acc_step = epoch.split('X') # 추후 변경 epoch -> batch
+        
+        return [model, dataloader, optim, lr, scheduler, loss, da, sampler_type, sampler, batch, acc_step, epoch]     
     
     def _get_test_result(self, run_json, basic_data, basic_column_list):
         # return data, col
         raise NotImplementedError
         
-    def _read_df_result(self, json_path, mode='train', latest=None):
+    def _read_df_result(self, json_path, mode='train'):
         if mode not in ['train', 'test']: TypeError('The model can only accept "train" and "test" as inputs.')
-        json_content = self._read_json(json_path)
+        json_content = read_json(json_path)
         train_epoch = len(json_content['epoch']) if mode == 'train' else 0
         # test_epoch = json_content['epoch'][0] if mode == 'test' else 0 #-> 나중에 이걸로 수정
         test_epoch = 0
         if mode == 'test': 
             test_epoch = json_content['epoch'][0] if type(json_content['epoch']) == list else json_content['epoch']
-        train, valid, test = {'epoch':train_epoch}, {'epoch':train_epoch}, {'epoch':test_epoch, 'latest':latest}
-        if mode == 'train': train = {'epoch':train_epoch, 'runtime':':'.join(json_content['totaltime'].split('.')[:-1])}
-        
+        train, valid, test = {'Epoch':train_epoch}, {'Epoch':train_epoch}, {'Epoch':test_epoch}
+        if mode == 'train': 
+            train = {'Epoch':train_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
         for k, v in json_content.items():
             if k in ['epoch', 'runtime', 'totaltime', 'loss', 'confusion', 'val_loss', 'val_confusion']: continue
             if mode == 'train':
@@ -215,19 +196,6 @@ class ResultVisualization:
                     for kk, vv in v.items(): test[f'{k}_{kk}'] = vv
                 else: test[k] = v
         return train, valid, test
-
-    def _read_df_config(self, json_path):
-        json_content = self._read_json(json_path)
-        optim = json_content['optimizer']['type']
-        lr = json_content['optimizer']['args']['lr']
-        scheduler = json_content['lr_scheduler']['type'] if 'lr_scheduler' in json_content.keys() else None
-        model = json_content['arch']['type']
-        batch = json_content['data_loader']['args']['batch_size']
-        acc_step = json_content['trainer']['accumulation_steps'] if 'accumulation_steps' in json_content['trainer'].keys() else None
-        loss = json_content['loss']
-        da = json_content['data_augmentation']['type'] if 'data_augmentation' in json_content.keys() else None
-        sampling =  json_content['data_sampling']['name'] if 'data_sampling' in json_content.keys() else None
-        return [loss, optim, lr, scheduler, da, sampling, batch, acc_step, model]
 
     def _list_concat(self, one, two):
         data = deepcopy(one)
