@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 import json
 import matplotlib.pyplot as plt
+import importlib
 from pathlib import Path
 from collections import OrderedDict
 from copy import deepcopy
-from utils import ensure_dir, read_json, format_elapsed_time, convert_to_datetime, convert_days_to_hours, set_common_experiment_name
 
 class ResultVisualization:
     def __init__(self, parent_dir, result_name,
@@ -20,10 +20,17 @@ class ResultVisualization:
         self.test_file_addtional_name = test_file_addtional_name
         self.sheet_list = ['training', 'validation', 'test']
         
+        self.utils = self._import_custom_module()
+        
         # output 중, metric.json 경로 정보 가져오기
         self.result_info = self._getMetricsFromConfig()
         # self.df_dict = self._json2df()
 
+    def _import_custom_module(self, use_custom_module:str='utils'):
+        if importlib.util.find_spec(use_custom_module) is None: 
+            raise ModuleNotFoundError(f"The {module_name} module does not exist.")
+        return importlib.import_module(use_custom_module)
+    
     def _getMetricsFromConfig(self):
         config_name = 'config.json'
         config_paths = sorted(self.models_dir.glob(f'**/{config_name}'))
@@ -32,7 +39,7 @@ class ResultVisualization:
         metircs_paths = OrderedDict()
         for config_path in config_paths:
             # Step 1. config.json를 통해 경로에 공통적으로 쓰이는 실험 경로를 가져옵니다.
-            exper_name = '/'.join(set_common_experiment_name(read_json(config_path)).split('/')[1:])
+            exper_name = '/'.join(self.utils.set_common_experiment_name(self.utils.read_json(config_path)).split('/')[1:])
             output_path = self.output_dir / exper_name
 
             # Step 2. 훈련에 사용된 metrics.json 파일을 찾습니다.
@@ -86,13 +93,13 @@ class ResultVisualization:
             df = pd.DataFrame(data=d_c['data'], columns=d_c['col'][0])
             model_mean_time = []
             if 'Runtime' in df.columns:
-                df.loc[:, 'Runtime'] = pd.to_datetime([convert_to_datetime(convert_days_to_hours(t), base_date) for t in df.loc[:, 'Runtime'].tolist()])
+                df.loc[:, 'Runtime'] = pd.to_datetime([self.utils.convert_to_datetime(self.utils.convert_days_to_hours(t), base_date) for t in df.loc[:, 'Runtime'].tolist()])
                 for model_name in df['Model'].unique():
                     mean_datetime = pd.to_datetime(df[df['Model']==model_name]['Runtime'].apply(lambda x: x.timestamp()).mean(), unit='s')
-                    elapsed_time_str = format_elapsed_time(mean_datetime, base_date) # HH:MM:SS
+                    elapsed_time_str = self.utils.format_elapsed_time(mean_datetime, base_date) # HH:MM:SS
                     elapsed_time_min  = int(elapsed_time_str.split(':')[0]) * 60 + int(elapsed_time_str.split(':')[1])
                     model_mean_time.append([model_name, elapsed_time_str, elapsed_time_min])
-                df['Runtime'] = [format_elapsed_time(t, base_date) for t in df.loc[:, 'Runtime'].tolist()] # HH:MM:SS # df['runtime'].time()
+                df['Runtime'] = [self.utils.format_elapsed_time(t, base_date) for t in df.loc[:, 'Runtime'].tolist()] # HH:MM:SS # df['runtime'].time()
             df_dict[sheet] = deepcopy(df)
             
             if model_mean_time != []:
@@ -172,7 +179,7 @@ class ResultVisualization:
         
     def _read_df_result(self, json_path, mode='train'):
         if mode not in ['train', 'test']: TypeError('The model can only accept "train" and "test" as inputs.')
-        json_content = read_json(json_path)
+        json_content = self.utils.read_json(json_path)
         train_epoch = len(json_content['epoch']) if mode == 'train' else 0
         # test_epoch = json_content['epoch'][0] if mode == 'test' else 0 #-> 나중에 이걸로 수정
         test_epoch = 0
@@ -214,7 +221,7 @@ class ResultVisualization:
         save_name += f'.{extension}' 
         if str(save_name)[0] != '/': save_path = self.output_dir / save_name
         else: save_path = Path(save_name)
-        if not save_path.parent.is_dir(): ensure_dir(save_path.parent, True)
+        if not save_path.parent.is_dir(): self.utils.ensure_dir(save_path.parent, True)
         
         writer=pd.ExcelWriter(save_path, engine='openpyxl')
         for sheet_name, df in self.df_dict.items():
@@ -231,7 +238,7 @@ class ResultVisualization:
         save_name += f'.{extension}' 
         if str(save_name)[0] != '/': save_path = self.output_dir / save_name
         else: save_path = Path(save_name)
-        if not save_path.parent.is_dir(): ensure_dir(save_path.parent, True)
+        if not save_path.parent.is_dir(): self.utils.ensure_dir(save_path.parent, True)
         
         title = (by_metric.lower().capitalize() if by_metric_replace_str is None else by_metric_replace_str) + ' by '
         for idx, b in enumerate(by, 1):
