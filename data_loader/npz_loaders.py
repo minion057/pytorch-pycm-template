@@ -43,9 +43,9 @@ class NPZDataset(BaseSplitDataset):
             data, targets = None, None
             data_paths, paths = None, None
             for k in [k for k in file.files if self.init_kwargs['mode'] in k]:
-                if 'x' in k or 'data' in k: data = file[k]
-                elif 'y' in k or 'target' in k: targets = file[k] # 추후 수정 label -> targets
-                elif 'path' in k: data_paths = file[k]
+                if any(check_item in k for check_item in ['x', 'data']): data = file[k]
+                elif any(check_item in k for check_item in ['y', 'target', 'label']): targets = file[k]
+                elif any(check_item in k for check_item in ['path']): data_paths = file[k]
             if data is None or targets is None:
                 raise Exception(f'Only data and targets should exist. Currently found values:{keys}')
             if data_paths is not None: paths = file['paths_per_class']
