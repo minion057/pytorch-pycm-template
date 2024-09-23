@@ -38,7 +38,8 @@ class NPZDataset(BaseSplitDataset):
 
     def _load_data_list(self, _path):
         with np.load(_path, allow_pickle=True) as file:
-            classes = file['classes']
+            try:classes = file['classes']
+            except: classes = file['class_names']
             data, targets = None, None
             data_paths, paths = None, None
             for k in [k for k in file.files if self.init_kwargs['mode'] in k]:
