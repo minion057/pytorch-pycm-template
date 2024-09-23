@@ -35,7 +35,7 @@ class ResultVisualization:
         config_name = 'config.json'
         config_paths = sorted(self.models_dir.glob(f'**/{config_name}'))
         if len(config_paths) == 0: raise ValueError(f'There is currently no config.json under the path ({self.models_dir}).')
-        
+
         metircs_paths = OrderedDict()
         for config_path in config_paths:
             # Step 1. config.json를 통해 경로에 공통적으로 쓰이는 실험 경로를 가져옵니다.
@@ -73,9 +73,11 @@ class ResultVisualization:
                 # raise ValueError('The JSON file containing the test results could not be found.')
             
             # Step 5. run id를 찾아, 딕셔너리에 업데이트합니다.
-            run_id = str(training_metrics_path).split(exper_name)[-1].split('/')[0]
+            run_id = str(training_metrics_path).split(exper_name)[-1].split('/')[1]
             metircs_paths[exper_name] = {run_id:{'config':config_path, 'train':training_metrics_path,'test':use_test_metrics_path, 'latest': latest}}
         
+        # for idx, (exper_name, exper_result) in enumerate(metircs_paths.items()):
+        #     print(f'{idx}. {exper_name} -> ({len(exper_result)} runs)')
         for run_id, run_json in metircs_paths[list(metircs_paths.keys())[0]].items():
             print(f'example run id: {run_id}')
             print(f'- latest epoch : {run_json["latest"]}')
@@ -110,7 +112,7 @@ class ResultVisualization:
     
     def _set_a_df_info(self):
         '''
-        0. BASIC CONTENT: See `_read_df_config` function.
+        0. BASIC CONTENT: See `set_common_experiment_name` function in utils.config_util.py.
         1. SAVE CONTENT - training   : BASIC CONTENT | real_epoch | Runtime | metrics...
         2. SAVE CONTENT - validation : BASIC CONTENT | real_epoch | metrics...
         3. SAVE CONTENT - test       : BASIC CONTENT | real_epoch | metrics...
@@ -119,14 +121,18 @@ class ResultVisualization:
                              'Model', 'DataLoader',
                              'Optimizer', 'Learning rate (LR)', 'LR scheduler',
                              'Loss', 'DA', 'Sampler type', 'Sampler',
-                             'Batch size', 'Accumulation steps', 'Epoch']
+                             'Batch size', 'Accumulation steps', 'Max Epoch']
         data_dict = {s:{'data':[], 'col':[]} for s in self.sheet_list}
-
+        
         for exper_name, run_dict in self.result_info.items():
             for run_id, run_json in run_dict.items():
                 # 0. get a config
-                basic_data = self._read_df_config(exper_name)
-                basic_data.insert(0, run_id)
+                exper_dict = self.utils.set_common_experiment_name(self.utils.read_json(run_json['config']), return_type=dict)
+                basic_data = [run_id, 
+                              exper_dict['model'], exper_dict['dataloader'],
+                              exper_dict['optimizer'], exper_dict['lr'], exper_dict['lr_scheduler'],
+                              exper_dict['loss'], exper_dict['da'], exper_dict['sampler_type'], exper_dict['sampler'],
+                              exper_dict['batch_size'], exper_dict['accum_steps'], exper_dict['max_epoch']]
                 # 1. get a train
                 tr, val, _ = self._read_df_result(run_json['train'])
                 data_dict['training']['data'].append(self._list_concat(basic_data, list(tr.values())))
@@ -139,39 +145,6 @@ class ResultVisualization:
                 data_dict['test']['data'].append(test_data)
                 data_dict['test']['col'].append(test_col)
         return data_dict
-    
-    def _read_df_config(self, exper_name):
-        experiment = exper_name.split('/')
-        # 1st folder: Name of config -> Already removed
-        # 2st folder: Name of model and dataloader
-        model, dataloader = experiment[0].split('-')
-        # 3st folder: Optimizer and learning rate (Optional: Learning rate scheduler)
-        tmp = experiment[1].split('-')
-        if len(tmp) == 2: (optim, lr), scheduler = deepcopy(tmp), None
-        elif len(tmp) == 3: optim, lr, scheduler = deepcopy(tmp)
-        else: raise ValueError(f'Required information not found. ({tmp})')
-        lr = lr.split('_')[-1]
-        # 4st folder: Name of loss function (Optional: Data augmentation and sampler)
-        tmp = experiment[2].split('-')
-        loss = tmp[0]
-        if len(tmp) == 1: 
-            da, sampler_type, sampler = None, None, None
-        elif len(tmp) == 2:
-            tmp_add = tmp[1].split('_')
-            if tmp_add[0] == 'DA': da, sampler_type, sampler = tmp_add[-1], None, None
-            else: da, sampler_type, sampler  = None, tmp_add[0], '_'.join(tmp_add[1:])
-        elif len(tmp) == 3: 
-            da = tmp[1].split('_')[-1], 
-            tmp_add = tmp[-1].split('_')
-            sampler_type, sampler = tmp_add[0], '_'.join(tmp_add[1:])
-        else: raise ValueError(f'Required information not found. ({tmp})')
-        if sampler_type not in [None, 'combine']:
-            sampler_type = 'Oversampling' if sampler_type.lower() == 'o' else 'Undersampling'
-        # 5st folder: Batch size and number of epochs (Optional: Accumulation steps)
-        (batch, epoch), acc_step = experiment[3].split('-'), None
-        if len(epoch.split('X')) == 2: epoch, acc_step = epoch.split('X') # 추후 변경 epoch -> batch
-        
-        return [model, dataloader, optim, lr, scheduler, loss, da, sampler_type, sampler, batch, acc_step, epoch]     
     
     def _get_test_result(self, run_json, basic_data, basic_column_list):
         # return data, col
