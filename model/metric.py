@@ -19,34 +19,34 @@ Metrics that need to be plotted, such as CI and ROC curves, should be written in
 
 
 """ Accuracy """
-def ACC(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
-    return base_metric('ACC', confusion_obj, positive_class_idx)
-def ACC_class(confusion_obj:pycmCM, classes=None):
-    return base_class_metric('ACC', confusion_obj, classes)
+def ACC(confusion_obj:pycmCM, classes=None, positive_class_idx=None, average_type='Macro'):
+    return base_metric('ACC', confusion_obj, positive_class_idx, average_type)
+def ACC_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None):
+    return base_class_metric('ACC', confusion_obj, classes, positive_class_indices)
 
 """ Sensitivity, hit rate, recall, or true positive rate """
 def TPR(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     return base_metric('TPR', confusion_obj, positive_class_idx)
-def TPR_class(confusion_obj:pycmCM, classes=None):
-    return base_class_metric('TPR', confusion_obj, classes)
+def TPR_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None):
+    return base_class_metric('TPR', confusion_obj, classes, positive_class_indices)
 
 """ Specificity or true negative rate """
 def TNR(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     return base_metric('TNR', confusion_obj, positive_class_idx)
-def TNR_class(confusion_obj:pycmCM, classes=None):
-    return base_class_metric('TNR', confusion_obj, classes)
+def TNR_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None):
+    return base_class_metric('TNR', confusion_obj, classes, positive_class_indices)
     
 """ F1 Score """
 def F1(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     return base_metric('F1', confusion_obj, positive_class_idx)
-def F1_class(confusion_obj:pycmCM, classes=None):
-    return base_class_metric('F1', confusion_obj, classes)
+def F1_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None):
+    return base_class_metric('F1', confusion_obj, classes, positive_class_indices)
     
 """ PPV, Precision or positive predictive value """
 def precision(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
     return base_metric('PPV', confusion_obj, positive_class_idx)
-def precision_class(confusion_obj:pycmCM, classes=None):
-    return base_class_metric('PPV', confusion_obj, classes)
+def precision_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None):
+    return base_class_metric('PPV', confusion_obj, classes, positive_class_indices)
     
 """ 
 AUC (Area under the ROC curve)
@@ -61,9 +61,9 @@ def AUC_OvR(confusion_obj:pycmCM, classes=None, positive_class_idx=None, method:
     auc = AUC_OvR_class(confusion_obj, classes, method)
     if classes is None: return auc[list(acu.keys)[positive_class_idx]] 
     return auc[classes[positive_class_idx]]
-def AUC_OvR_class(confusion_obj:pycmCM, classes=None, method:str='basic'):
+def AUC_OvR_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None, method:str='basic'):
     if method not in ['basic', 'roc']: raise ValueError('The method can only be "basic" or "roc".')
-    if method.lower() == 'basic': return base_class_metric('AUC', confusion_obj, classes)
+    if method.lower() == 'basic': return base_class_metric('AUC', confusion_obj, classes, positive_class_indices)
     if confusion_obj.prob_vector is None: raise ValueError('No value for prob vector.')
     if isinstance(confusion_obj.prob_vector, dict):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']

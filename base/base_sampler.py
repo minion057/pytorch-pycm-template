@@ -43,7 +43,7 @@ class BaseSampler(RandomSampler):
             raise RuntimeError('The `_convert_targets2integer` function was not executed.')
         reverted_targets = onehot_encoding(converted_targets, self.classes) if self.target_is_onehot else converted_targets
         is_class_composition_equal = np.unique(reverted_targets, axis=0) == self.target_classes
-        if is_class_composition_equal.ndim == 1: is_class_composition_equal = all(is_class_composition_equal.ndim)
+        if is_class_composition_equal.ndim == 1: is_class_composition_equal = all(is_class_composition_equal)
         else: is_class_composition_equal = all([all(same) for same in is_class_composition_equal])
         if not is_class_composition_equal: raise ValueError('The reverted targets are not consistent with the original targets.')
         return reverted_targets

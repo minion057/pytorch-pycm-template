@@ -136,6 +136,9 @@ class Trainer(BaseTrainer):
                 
             # 6. Print the result
             if batch_idx % self.log_step == 0 or batch_idx == self.len_epoch-1 or self.len_epoch == 1:
+                if confusion_obj.Overall_ACC=='None':
+                    print(f'Now confusion matrix is\m{confusion_obj.print_matrix()}')
+                    raise ValueError('Confusion matrix calculation failed. Please check the input data.')
                 self.logger.debug(f'Train Epoch: {epoch} {self._progress(batch_idx)} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
                 self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
             
@@ -262,6 +265,9 @@ class Trainer(BaseTrainer):
         
         # 5. Print the result
         confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
+        if confusion_obj.Overall_ACC=='None':
+            print(f'Now confusion matrix is\m{confusion_obj.print_matrix()}')
+            raise ValueError('Confusion matrix calculation failed. Please check the input data.')
         self.logger.debug(f'Valid Epoch: {epoch} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
         
         # add histogram of model parameters to the tensorboard

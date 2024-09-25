@@ -20,12 +20,20 @@ def base_metric(ftns_name, confusion_obj:pycmCM, positive_class_idx=None, averag
         score = score[list(score.keys())[positive_class_idx]]
     return score if score != 'None' else 0.
     
-def base_class_metric(ftns_name, confusion_obj:pycmCM, classes=None, **kwargs):
+def base_class_metric(ftns_name, confusion_obj:pycmCM, classes=None, positive_class_indices=None, **kwargs):
     use_confusion_obj = deepcopy(confusion_obj)
     if ftns_name not in dir(confusion_obj): raise ValueError(f'This metric ({ftns_name}) is not supported by the pycm library.')
     score = eval(f'use_confusion_obj.{ftns_name}') if not kwargs else eval(f'use_confusion_obj.{ftns_name}(**kwargs)')
     score_classes = list(score.keys()) 
     if classes is not None:
-        if len(classes) != len(score_classes): raise ValueError('The number of set classes and the number of classes in the confusion matrix do not match.')
-        if list(classes) != list(score_classes): return {classes[class_idx]:v for class_idx, v in enumerate(score.values())}
+        if 'auc' in ftns_name.lower() or len(classes) == len(score_classes):
+            if score_classes[0] not in classes:
+                score = {classes[class_idx]:v for class_idx, v in enumerate(score.values())}
+        else: 
+            print(ftns_name, score_classes, classes)
+            raise ValueError('The number of set classes and the number of classes in the confusion matrix do not match.')
+    if positive_class_indices is not None:
+        for class_idx, class_name in enumerate(score_classes):
+            if class_idx not in positive_class_indices:
+                del score[class_name if classes is None else classes[class_idx]]
     return score

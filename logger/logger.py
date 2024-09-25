@@ -3,11 +3,13 @@ import logging.config
 from pathlib import Path
 from utils import read_json
 import shutil
+import os
 
-def setup_logging(save_dir, log_config='logger/logger_config.json', default_level=logging.INFO, test_mode=False, resume_epoch=None):
+def setup_logging(save_dir, log_config=None, default_level=logging.INFO, test_mode=False, resume_epoch=None):
     """
     Setup logging configuration
     """
+    if log_config is None: log_config = f'{os.path.dirname(os.path.realpath(__file__))}/logger_config.json'
     log_config = Path(log_config)
     if log_config.is_file():
         config = read_json(log_config)
