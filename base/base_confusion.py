@@ -10,7 +10,7 @@ from utils import integer_encoding
 class ConfusionTracker:
     def __init__(self, *keys, classes, writer=None):
         self.writer = writer
-        self.classes = classes        
+        self.classes = classes   
         self._data = pd.DataFrame(index=keys, columns=['actual', 'predict', 'probability', 'confusion'])
         self.index = self._data.index.values
         self.reset()
@@ -35,7 +35,9 @@ class ConfusionTracker:
         self._data.loc[key, 'probability'].extend(value['probability'])
         
         # A basic confusion matrix is generated based on the class with the highest probability.
-        cm = pycmCM(actual_vector=np.array(self._data.loc[key, 'actual']), predict_vector=np.array(self._data.loc[key, 'predict']))
+        cm = pycmCM(actual_vector=np.array(self._data.loc[key, 'actual']), 
+                    predict_vector=np.array(self._data.loc[key, 'predict']),
+                    classes=list(self.classes))
         cm.prob_vector = self._data.loc[key, 'probability']
         self._data.loc[key, 'confusion'] = deepcopy(cm)
 
