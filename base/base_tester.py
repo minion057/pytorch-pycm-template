@@ -165,9 +165,10 @@ class BaseTester:
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot: plot_performance_1(log, self.metrics_img_dir/'metrics_graphs_test.png')
             
-    def _make_a_confusion_matrix(self, confusion,
+    def _make_a_confusion_matrix(self, confusion, class_labels:list=None,
                                  save_mode:str='Test', save_dir=None, title=None):        
-        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion),
+                       'classes':list(confusion.keys()) if class_labels is None else class_labels}
         if title is not None: plot_kwargs['title'] = title
         if save_dir is None:
             plot_kwargs['return_plot'] = True
