@@ -55,7 +55,7 @@ class ConfigParser:
                 shutil.copytree(copy_dir_path, self.log_dir)
 
         # configure logging module
-        setup_logging(self.log_dir)
+        setup_logging(self.log_dir, test_mode=test_mode, resume_epoch=resume_epoch)
         self.log_levels = {
             0: logging.WARNING,
             1: logging.INFO,
