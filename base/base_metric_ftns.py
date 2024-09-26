@@ -14,6 +14,10 @@ def base_metric(ftns_name, confusion_obj:pycmCM, positive_class_idx=None, averag
         else: metric_name = ftns_name
         if metric_name not in dir(confusion_obj): raise ValueError(f'This metric ({ftns_name}) is not supported by the pycm library.')
         score = eval(f'use_confusion_obj.{metric_name}')
+        if isinstance(score, dict):
+            raise ValueError("Metric requires 'positive_class_idx' but it is not available. "+
+                             "Please provide a valid 'positive_class_idx' to proceed. "+
+                             "Or use the class version of the metrics function.")
     else:
         if ftns_name not in dir(confusion_obj): raise ValueError(f'This metric ({ftns_name}) is not supported by the pycm library.')
         score = eval(f'use_confusion_obj.{ftns_name}')
