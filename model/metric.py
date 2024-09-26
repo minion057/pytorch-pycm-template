@@ -59,7 +59,7 @@ def AUC_OvR(confusion_obj:pycmCM, classes=None, positive_class_idx=None, method:
     if method not in ['basic', 'roc']: raise ValueError('The method can only be "basic" or "roc".')
     if method.lower() == 'basic': return base_metric('AUC', confusion_obj, positive_class_idx)   
     auc = AUC_OvR_class(confusion_obj, classes, method)
-    if classes is None: return auc[list(acu.keys)[positive_class_idx]] 
+    if classes is None: return auc[list(acu.keys())[positive_class_idx]] 
     return auc[classes[positive_class_idx]]
 def AUC_OvR_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None, method:str='basic'):
     if method not in ['basic', 'roc']: raise ValueError('The method can only be "basic" or "roc".')
