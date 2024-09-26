@@ -1,7 +1,8 @@
 from .tester import Tester
 from base import FixedSpecConfusionTracker
 from copy import deepcopy
-from utils import ensure_dir, write_dict2json, plot_confusion_matrix_1, plot_performance_1, close_all_plots
+from utils import ensure_dir, write_dict2json, check_and_import_library
+from utils import plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class FixedSpecTester(Tester):
     """
@@ -11,6 +12,7 @@ class FixedSpecTester(Tester):
         super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader)
         self.config = config
         self.device = device
+        self.metric_ftns_module = check_and_import_library('model.metric')
         
         # Removing duplicate AUC calculation since the trainer already computes it.
         if 'fixed_goal' not in config['trainer'].keys():
@@ -88,18 +90,23 @@ class FixedSpecTester(Tester):
                 use_confusion_obj = deepcopy(confusion_obj) if 'auc' not in met.__name__.lower() else deepcopy(maxprob_confusion)
                 if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)
                 else:
-                    has_index, use_met = False, met
+                    # Optimize metric functions by utilizing positive class index, consolidating function versions
+                    has_index_key, use_met = False, met
                     for key in met_kwargs.keys():
-                        if any(index_key in key for index_key in ['idx', 'indices']): 
-                            del met_kwargs[key]
-                            has_index = True
-                    if has_index and 'class' not in met.__name__: 
-                        change_met_name = f'{met.__name__}_class'
+                        if any(index_key in key for index_key in ['idx', 'indices']):
+                            has_index_key = True
+                            met_kwargs[key] = category_classes.index(pos_class_name)
+                            if 'indices' in key: 
+                                met_kwargs[key.replace('indices', 'idx')] = met_kwargs[key]
+                                del met_kwargs[key]
+                    if has_index_key is not None and 'class' in met.__name__: 
+                        change_met_name = met.__name__.replace('_class', '')
+                        if '_class' in tag: tag = tag.replace('_class', '')
                         if any(m.__name__ == change_met_name for m in self.metric_ftns): continue
                         try: use_met = getattr(self.metric_ftns_module, change_met_name)
-                        except: raise ValueError(f'Unable to find class version of {met.__name__} in metric module. '+
-                                                 'Please ensure the class version is defined and accessible within the module.')
-                    goal_metrics[category][tag] = use_met(use_confusion_obj, category_classes, **met_kwargs)           
+                        except: raise ValueError(f'Unable to find {change_met_name} in metric module. '+
+                                                    'Please ensure the class version is defined and accessible within the module.')
+                    goal_metrics[category][tag] = use_met(use_confusion_obj, category_classes, **met_kwargs)             
             goal_metrics[category][self.confusion_key] = confusion_dict[(goal, pos_class_name, neg_class_name)]
         return goal_metrics
     
