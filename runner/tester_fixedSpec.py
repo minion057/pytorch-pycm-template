@@ -72,6 +72,7 @@ class FixedSpecTester(Tester):
     def _summarize_ROCForFixedSpec(self):        
         self.test_ROCForFixedSpec.update(self.confusion.get_actual_vector(self.confusion_key), 
                                          self.confusion.get_probability_vector(self.confusion_key), img_update=False) 
+        maxprob_confusion = self.confusion.get_confusion_obj(self.confusion_key)
         goal_metrics = {}
         # 1. AUC: Pass
         # 2. Metrics
@@ -79,13 +80,26 @@ class FixedSpecTester(Tester):
         for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
             category = self.test_ROCForFixedSpec.get_tag(goal, pos_class_name, neg_class_name)
             confusion_obj = self.test_ROCForFixedSpec.get_confusion_obj(goal, pos_class_name, neg_class_name)
+            category_classes = deepcopy(confusion_obj.classes)
             goal_metrics[category] = {}
             for met in self.metric_ftns:# pycm version
                 met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
                 tag = met.__name__ if tag is None else tag
-                use_confusion_obj = deepcopy(confusion_obj)                             
+                use_confusion_obj = deepcopy(confusion_obj) if 'auc' not in met.__name__.lower() else deepcopy(maxprob_confusion)
                 if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)
-                else: goal_metrics[category][tag] = met(use_confusion_obj, self.classes, **met_kwargs)                
+                else:
+                    has_index, use_met = False, met
+                    for key in met_kwargs.keys():
+                        if any(index_key in key for index_key in ['idx', 'indices']): 
+                            del met_kwargs[key]
+                            has_index = True
+                    if has_index and 'class' not in met.__name__: 
+                        change_met_name = f'{met.__name__}_class'
+                        if any(m.__name__ == change_met_name for m in self.metric_ftns): continue
+                        try: use_met = getattr(self.metric_ftns_module, change_met_name)
+                        except: raise ValueError(f'Unable to find class version of {met.__name__} in metric module. '+
+                                                 'Please ensure the class version is defined and accessible within the module.')
+                    goal_metrics[category][tag] = use_met(use_confusion_obj, category_classes, **met_kwargs)           
             goal_metrics[category][self.confusion_key] = confusion_dict[(goal, pos_class_name, neg_class_name)]
         return goal_metrics
     
