@@ -49,7 +49,7 @@ class BaseMetricFtns:
         if self.classes is not None:
             if self.confusion_classes_is_index_list:
                 ori_score = {self.classes[class_idx]:v for class_idx, v in score.items()} 
-            else: ori_score = {class_item:v for class_item, v in score.items()}
+            else: ori_score = score
         ori_score = {class_item:v if v != 'None' else 0. for class_item, v in ori_score.items()}
         if positive_class_indices is not None:
             positive_classes = np.array(self.classes)[positive_class_indices]
