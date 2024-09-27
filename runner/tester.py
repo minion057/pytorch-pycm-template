@@ -25,7 +25,8 @@ class Tester(BaseTester):
         for met in self.metric_ftns:
             met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
             metrics_tag.append(met.__name__ if tag is None else tag)
-        self.metrics = MetricTracker('loss', *metrics_tag, writer=self.writer)
+        self.basic_metrics = ['loss']
+        self.metrics = MetricTracker(*self.basic_metrics, *metrics_tag, writer=self.writer)
         self.confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
 
         self.softmax = nn.Softmax(dim=0)
