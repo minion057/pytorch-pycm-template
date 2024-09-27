@@ -1,7 +1,8 @@
+import numpy as np
 from .tester import Tester
 from base import FixedSpecConfusionTracker
 from copy import deepcopy
-from utils import ensure_dir, write_dict2json, check_and_import_library
+from utils import ensure_dir, write_dict2json
 from utils import plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class FixedSpecTester(Tester):
@@ -9,18 +10,21 @@ class FixedSpecTester(Tester):
     Tester class
     """
     def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader):
-        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader)
-        self.config = config
-        self.device = device
-        self.metric_ftns_module = check_and_import_library('model.metric')
-        
         # Removing duplicate AUC calculation since the trainer already computes it.
         if 'fixed_goal' not in config['trainer'].keys():
             raise ValueError('There is no fixed specificity score to track.')
-        self.ROCNameForFixedSpec, self.AUCNameForFixedSpec = 'ROC_OvO', 'AUC_OvO'
-        for met in self.metric_ftns:
-            if self.AUCNameForFixedSpec.lower() in met.__name__.lower(): self.metric_ftns.remove(met)
-            
+        self.ROCNameForFixedSpec, self.AUCNameForFixedSpec= 'ROC_OvO', 'AUC_OvO'
+        _metric_ftns = deepcopy(metric_ftns)
+        for met in metric_ftns:
+            if self.AUCNameForFixedSpec.lower() in met.__name__.lower(): 
+                _metric_ftns.remove(met)
+                del config['metrics'][met.__name__]
+        metric_ftns = _metric_ftns
+        
+        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader)
+        self.config = config
+        self.device = device
+        
         self.ROCForFixedSpecParams, self.original_result_name  = None, 'maxprob'
         if self.plottable_metrics_kwargs is not None:
             if self.ROCNameForFixedSpec in self.plottable_metrics_kwargs.keys(): 
@@ -47,15 +51,15 @@ class FixedSpecTester(Tester):
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
         '''
-        log = self.metrics.result()
-        log_confusion = self.confusion.result()
+        basic_log, basic_confusion = self.metrics.result(), self.confusion.result()
         
         # Original Result (MaxProb)
-        log[self.original_result_name]={}
-        for met in self.metric_ftns:
-            log[self.original_result_name][met.__name__] = log[met.__name__] 
-            del log[met.__name__]
-        log[self.original_result_name].update(log_confusion)
+        log, original_log = {}, {}
+        for k, v in basic_log.items():
+            if any(basic in k for basic in self.basic_metrics): log[k] = v
+            else: original_log[k] = v
+        original_log.update(basic_confusion)
+        log[self.original_result_name] = deepcopy(original_log)
         
         # Goal Result (FixedSpec)
         log.update(self._summarize_ROCForFixedSpec())
@@ -74,39 +78,55 @@ class FixedSpecTester(Tester):
     def _summarize_ROCForFixedSpec(self):        
         self.test_ROCForFixedSpec.update(self.confusion.get_actual_vector(self.confusion_key), 
                                          self.confusion.get_probability_vector(self.confusion_key), img_update=False) 
-        maxprob_confusion = self.confusion.get_confusion_obj(self.confusion_key)
         goal_metrics = {}
-        # 1. AUC: Pass
-        # 2. Metrics
+        
+        # 1. AUCs that exist among the list of metrics
+        # AUC already includes 1, so there is only 1 left to track in the metric. 
+        # Because AUC only supports OVO and OVR methods. Therefore, it uses the index, not the list of indexes.
+        auc_ftns_index = next((i for i, met in enumerate(self.metric_ftns) if 'auc' in met.__name__.lower()), None)
+        auc_score, auc_tag = None, None
+        if auc_ftns_index is not None:
+            maxprob_confusion = deepcopy(self.confusion.get_confusion_obj(self.confusion_key))
+            met_name = self.metric_ftns[auc_ftns_index].__name__
+            met_kwargs, auc_tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met_name]), met_name=met_name)
+            if met_kwargs is None: auc_score = self.metric_ftns[auc_ftns_index](maxprob_confusion, self.classes)
+            else: auc_score = self.metric_ftns[auc_ftns_index](maxprob_confusion, self.classes, **met_kwargs) 
+        
+        # 2. Other metrics
         confusion_dict = self.test_ROCForFixedSpec.result()
         for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
+            pos_class_idx, neg_class_idx = np.where(np.array(self.classes) == pos_class_name)[0][0], np.where(np.array(self.classes) == neg_class_name)[0][0]
             category = self.test_ROCForFixedSpec.get_tag(goal, pos_class_name, neg_class_name)
             confusion_obj = self.test_ROCForFixedSpec.get_confusion_obj(goal, pos_class_name, neg_class_name)
-            category_classes = deepcopy(confusion_obj.classes)
+            confusion_classes = np.array(confusion_obj.classes)
             goal_metrics[category] = {}
-            for met in self.metric_ftns:# pycm version
-                met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
-                tag = met.__name__ if tag is None else tag
-                use_confusion_obj = deepcopy(confusion_obj) if 'auc' not in met.__name__.lower() else deepcopy(maxprob_confusion)
+            for met_idx, met in enumerate(self.metric_ftns): # pycm version
+                if met_idx == auc_ftns_index:
+                    goal_metrics[category][auc_tag] = auc_score
+                    continue
+                met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
+                use_confusion_obj = deepcopy(confusion_obj)
                 if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)
                 else:
-                    # Optimize metric functions by utilizing positive class index, consolidating function versions
-                    has_index_key, use_met = False, met
-                    for key in met_kwargs.keys():
-                        if any(index_key in key for index_key in ['idx', 'indices']):
-                            has_index_key = True
-                            met_kwargs[key] = category_classes.index(pos_class_name)
-                            if 'indices' in key: 
-                                met_kwargs[key.replace('indices', 'idx')] = met_kwargs[key]
-                                del met_kwargs[key]
-                    if has_index_key is not None and 'class' in met.__name__: 
-                        change_met_name = met.__name__.replace('_class', '')
-                        if '_class' in tag: tag = tag.replace('_class', '')
-                        if any(m.__name__ == change_met_name for m in self.metric_ftns): continue
-                        try: use_met = getattr(self.metric_ftns_module, change_met_name)
-                        except: raise ValueError(f'Unable to find {change_met_name} in metric module. '+
-                                                    'Please ensure the class version is defined and accessible within the module.')
-                    goal_metrics[category][tag] = use_met(use_confusion_obj, category_classes, **met_kwargs)             
+                    print(f'Using "{met.__name__}" for {tag} in {category}')
+                    print(f'pos index: {pos_class_idx}, neg index: {neg_class_idx}')
+                    print(f'ori met_kwargs: {met_kwargs}')
+                    run = True
+                    for key, value in met_kwargs.items():
+                        if 'idx' in key:
+                            if value not in [pos_class_idx, neg_class_idx]: 
+                                run = False
+                                break
+                        elif 'indices' in key: 
+                            valid_indices = [index for index in value if index in [pos_class_idx, neg_class_idx]]
+                            print('valid_indices: ', valid_indices)
+                            if valid_indices == []:
+                                run = False
+                                break
+                            else: met_kwargs[key] = valid_indices
+                    if not run: continue
+                    print(f'met_kwargs: {met_kwargs}\n')
+                    goal_metrics[category][tag] = met(use_confusion_obj, self.classes, **met_kwargs)             
             goal_metrics[category][self.confusion_key] = confusion_dict[(goal, pos_class_name, neg_class_name)]
         return goal_metrics
     
@@ -162,4 +182,4 @@ class FixedSpecTester(Tester):
                     # 3. Confusion Matrix
                     self.writer.set_step(self.test_epoch, f'{self.wirter_mode}_{key}', False)
                     self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(value[self.confusion_key]))
-                    close_all_plots()
+                    close_all_plots()()
