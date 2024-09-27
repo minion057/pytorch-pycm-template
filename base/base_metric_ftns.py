@@ -22,7 +22,8 @@ class BaseMetricFtns:
                 self.confusion_classes_is_index_list = True
             else:
                 if self.classes is not None and confusion_class_item not in self.classes:
-                    raise TypeError(f"Classes set in configuration do not match classes present in score.")
+                    raise TypeError(f"Classes set in configuration do not match classes present in score.\n"+
+                                    f"Now, classes: {self.classes}, confusion_classes: {self.confusion_classes}.")
     
     def _check_metric_support(self, ftns_name):
         if ftns_name not in dir(self.confusion_obj): 
@@ -46,11 +47,9 @@ class BaseMetricFtns:
         
     def _format_metric_for_multi_score(self, ftns_name, score, positive_class_indices=None) -> dict:
         if self.classes is not None:
-            if 'auc' in ftns_name.lower() or len(self.classes) == len(list(score.keys())):
-                if self.confusion_classes_is_index_list:
-                    ori_score = {self.classes[class_idx]:v for class_idx, v in score.items()} 
-                else: ori_score = {class_item:v for class_item, v in score.items()}
-            else: raise ValueError('The number of set classes and the number of classes in the confusion matrix do not match.')
+            if self.confusion_classes_is_index_list:
+                ori_score = {self.classes[class_idx]:v for class_idx, v in score.items()} 
+            else: ori_score = {class_item:v for class_item, v in score.items()}
         ori_score = {class_item:v if v != 'None' else 0. for class_item, v in ori_score.items()}
         if positive_class_indices is not None:
             positive_classes = np.array(self.classes)[positive_class_indices]
@@ -61,7 +60,6 @@ class BaseMetricFtns:
     
     def single_class_metric(self, ftns_name:str, positive_class_idx=None, average_type='Macro') -> float:
         # 1. Returning only a single metric score.
-        
         if positive_class_idx is None: return self._format_metric_for_single_score(ftns_name, average_type)
         # 2. Returns the metric score for all classes.
         if positive_class_idx is None: raise ValueError('Single score requires positive_class_idx.')
