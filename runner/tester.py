@@ -21,7 +21,11 @@ class Tester(BaseTester):
         self.log_step = int(np.sqrt(data_loader.batch_size))
         self.wirter_mode = f'test'
 
-        self.metrics = MetricTracker('loss', *[m.__name__ for m in self.metric_ftns], writer=self.writer)
+        metrics_tag = []
+        for met in self.metric_ftns:
+            met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
+            metrics_tag.append(met.__name__ if tag is None else tag)
+        self.metrics = MetricTracker('loss', *metrics_tag, writer=self.writer)
         self.confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
 
         self.softmax = nn.Softmax(dim=0)
@@ -64,8 +68,7 @@ class Tester(BaseTester):
 
                 confusion_obj = self.confusion.get_confusion_obj(self.confusion_key)
                 for met in self.metric_ftns:
-                    met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
-                    tag = met.__name__ if tag is None else tag
+                    met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
                     use_confusion_obj = deepcopy(confusion_obj)                             
                     if met_kwargs is None: self.metrics.update(tag, met(use_confusion_obj, self.classes))
                     else: self.metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
@@ -116,8 +119,7 @@ class Tester(BaseTester):
         actual_vector = self.confusion.get_actual_vector(self.confusion_key)
         probability_vector = self.confusion.get_probability_vector(self.confusion_key)
         for met in self.plottable_metric_ftns:
-            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
-            tag = met.__name__ if tag is None else tag
+            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]), met_name=met.__name__)
             save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
             if met_kwargs is None: fig = met(actual_vector, probability_vector, self.classes)
             else: fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
@@ -126,12 +128,14 @@ class Tester(BaseTester):
                 if not save_dir.is_dir(): save_dir.mkdir(parents=True, exist_ok=True)
                 fig.savefig(save_dir / f'{tag}_test.png', bbox_inches='tight') # -epoch{self.test_epoch}
     
-    def _set_metric_kwargs(self, met_kwargs):
+    def _set_metric_kwargs(self, met_kwargs, met_name:str=None):
         if met_kwargs is None: return None, None, None
         if 'tag' in met_kwargs: 
             tag = met_kwargs['tag']
             met_kwargs.pop('tag')  
-        else: tag = None
+        else:
+            if met_name is None: raise ValueError("Expected 'met_name' to be not None, but received None.")
+            tag = met_name
         if 'save_dir' in met_kwargs: 
             save_dir = met_kwargs['save_dir']
             met_kwargs.pop('save_dir') 
