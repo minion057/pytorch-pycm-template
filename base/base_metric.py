@@ -35,7 +35,7 @@ class MetricTracker:
                     self._data.loc[new_index, 'total'] = (prev_score+(v-prev_score))*n
             for new_index in self._original_to_combined_index[key]: 
                 self._data.loc[new_index, 'counts'] += n
-                self._data.loc[new_index, 'average'] = v
+                self._data.loc[new_index, 'average'] = self._data.loc[new_index, 'total']
         else:
             value = value if value != 'None' else 0
             if self.writer is not None:
@@ -43,7 +43,7 @@ class MetricTracker:
             self._data.loc[key, 'total'] += value*n if key == 'loss' else (value-self._data.loc[key, 'total'])*n
             self._data.loc[key, 'counts'] += n
             self._data.loc[key, 'average'] = self._data.loc[key, 'total'] / self._data.loc[key, 'counts'] if key == 'loss' else value
-            
+        
     def avg(self, key):
         return self._data.loc[key, 'average']
 
