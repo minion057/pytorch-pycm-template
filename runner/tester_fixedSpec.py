@@ -2,21 +2,26 @@ import numpy as np
 from .tester import Tester
 from base import FixedSpecConfusionTracker
 from copy import deepcopy
-from utils import ensure_dir, write_dict2json
+from utils import ensure_dir, write_dict2json, check_and_import_library
 from utils import plot_confusion_matrix_1, plot_performance_1, close_all_plots
 
 class FixedSpecTester(Tester):
     """
     Tester class
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader, ROCNameForFixedSpec='ROC_OvO'):
         # Removing duplicate AUC calculation since the trainer already computes it.
         if 'fixed_goal' not in config['trainer'].keys():
             raise ValueError('There is no fixed specificity score to track.')
-        self.ROCNameForFixedSpec, self.AUCNameForFixedSpec= 'ROC_OvO', 'AUC_OvO'
+        self.ROCNameForFixedSpec, fixedSpecType = ROCNameForFixedSpec, ROCNameForFixedSpec.split('_')[-1]
+        self.AUCNameForFixedSpec, self.AUCNameForReference = f'AUC_{fixedSpecType}', f'AUC_{"OvR" if fixedSpecType=="OvO" else "OvO"}'
+        self.AUCForReferenceftns, metrics_module = f'{self.AUCNameForReference}_class', check_and_import_library('model.metric')
+        if self.AUCForReferenceftns not in dir(metrics_module):
+            raise ValueError(f'Warring: {self.AUCForReferenceftns} is not in the model.metric library.')
+        self.AUCForReferenceftns = getattr(metrics_module, self.AUCForReferenceftns)
         _metric_ftns = deepcopy(metric_ftns)
         for met in metric_ftns:
-            if self.AUCNameForFixedSpec.lower() in met.__name__.lower(): 
+            if any(auc_name.lower() in met.__name__.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference]):
                 _metric_ftns.remove(met)
                 del config['metrics'][met.__name__]
         metric_ftns = _metric_ftns
@@ -45,53 +50,56 @@ class FixedSpecTester(Tester):
             'epoch':1,
             'loss':0.5,
             'val_loss':1.0,
-            'self.AUCNameForFixedSpec':{class_name:0.9},
-            'val_self.AUCNameForFixedSpec':{class_name:0.7},
+            'auc':{class_name:0.9},
+            'val_auc':{class_name:0.7},
             'maxprob':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... },
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
         '''
         basic_log, basic_confusion = self.metrics.result(), self.confusion.result()
         
-        # Original Result (MaxProb)
+        # Update Confusion Matrix for FixedSpec
+        self.test_ROCForFixedSpec.update(self.confusion.get_actual_vector(self.confusion_key), 
+                                         self.confusion.get_probability_vector(self.confusion_key), img_update=False) 
+        
+        # Basic Result
         log, original_log = {}, {}
         for k, v in basic_log.items():
             if any(basic in k for basic in self.basic_metrics): log[k] = v
             else: original_log[k] = v
         original_log.update(basic_confusion)
-        log[self.original_result_name] = deepcopy(original_log)
+        
+        # AUC Result
+        log.update(self._get_auc())
+        
+        # Original Result (MaxProb)
+        log[self.original_result_name] = original_log
         
         # Goal Result (FixedSpec)
         log.update(self._summarize_ROCForFixedSpec())
-        
-        # AUC Result
-        log[self.AUCNameForFixedSpec], use_pair = {}, []
-        for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
-            if (pos_class_name, neg_class_name) in use_pair: continue
-            use_pair.append((pos_class_name, neg_class_name))
-            use_tag = f'P-{pos_class_name}_N-{neg_class_name}'
-            log[self.AUCNameForFixedSpec][use_tag] = self.test_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
             
         self.test_ROCForFixedSpec.reset()
         return log
     
+    def _get_auc(self):
+        # The AUC is calculated in the `_get_auc` function only for what is set via self.AUCNameForFixedSpec.
+        auc_metrics = {}
+        # 1. AUC calculated from the ROC curve, which is used for a fixed specificity.
+        auc_metrics[self.AUCNameForFixedSpec], use_pair = {}, []
+        for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
+            if (pos_class_name, neg_class_name) in use_pair: continue
+            use_pair.append((pos_class_name, neg_class_name))
+            use_tag = f'P-{pos_class_name}_N-{neg_class_name}'
+            auc_metrics[self.AUCNameForFixedSpec][use_tag] = self.test_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
+        
+        # 2. Reference AUC to be calculated in other ways 
+        auc_metrics[self.AUCNameForReference] = self.AUCForReferenceftns(self.confusion.get_confusion_obj(self.confusion_key), self.classes, method='roc')       
+        
+        return auc_metrics
+    
     def _summarize_ROCForFixedSpec(self):        
-        self.test_ROCForFixedSpec.update(self.confusion.get_actual_vector(self.confusion_key), 
-                                         self.confusion.get_probability_vector(self.confusion_key), img_update=False) 
         goal_metrics = {}
-        
-        # 1. AUCs that exist among the list of metrics
-        # AUC already includes 1, so there is only 1 left to track in the metric. 
-        # Because AUC only supports OVO and OVR methods. Therefore, it uses the index, not the list of indexes.
-        auc_ftns_index = next((i for i, met in enumerate(self.metric_ftns) if 'auc' in met.__name__.lower()), None)
-        auc_score, auc_tag = None, None
-        if auc_ftns_index is not None:
-            maxprob_confusion = deepcopy(self.confusion.get_confusion_obj(self.confusion_key))
-            met_name = self.metric_ftns[auc_ftns_index].__name__
-            met_kwargs, auc_tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met_name]), met_name=met_name)
-            if met_kwargs is None: auc_score = self.metric_ftns[auc_ftns_index](maxprob_confusion, self.classes)
-            else: auc_score = self.metric_ftns[auc_ftns_index](maxprob_confusion, self.classes, **met_kwargs) 
-        
+        # 1. AUCs : Pass (The AUC is calculated in the `_get_auc` function only for what is set via self.AUCNameForFixedSpec.)
         # 2. Other metrics
         confusion_dict = self.test_ROCForFixedSpec.result()
         for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
@@ -101,16 +109,10 @@ class FixedSpecTester(Tester):
             confusion_classes = np.array(confusion_obj.classes)
             goal_metrics[category] = {}
             for met_idx, met in enumerate(self.metric_ftns): # pycm version
-                if met_idx == auc_ftns_index:
-                    goal_metrics[category][auc_tag] = auc_score
-                    continue
                 met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
                 use_confusion_obj = deepcopy(confusion_obj)
                 if met_kwargs is None: goal_metrics[category][tag] = met(use_confusion_obj, self.classes)
                 else:
-                    print(f'Using "{met.__name__}" for {tag} in {category}')
-                    print(f'pos index: {pos_class_idx}, neg index: {neg_class_idx}')
-                    print(f'ori met_kwargs: {met_kwargs}')
                     run = True
                     for key, value in met_kwargs.items():
                         if 'idx' in key:
@@ -136,17 +138,17 @@ class FixedSpecTester(Tester):
             'epoch':1,
             'loss':0.5,
             'val_loss':1.0,
-            'self.AUCNameForFixedSpec':{class_name:0.9},
-            'val_self.AUCNameForFixedSpec':{class_name:0.7},
+            'auc':{class_name:0.9},
+            'val_auc':{class_name:0.7},
             'maxprob':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... },
             'Fixed_spec_goal':{'metrics':..., 'val_metrics':..., 'confusion':..., 'val_confusion':... }
         }
         '''
         basic_log = {key:val for key, val in log.items() if type(val) != dict} # epoch, loss, val_loss, runtime
-        auc_log = {key:val for key, val in log.items() if self.AUCNameForFixedSpec in key}
+        auc_log = {key:val for key, val in log.items() if any(auc_name.lower() in key.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference])}
         
         for category, content in log.items():
-            if type(content) != dict or self.AUCNameForFixedSpec in category: continue # basic_log, auc_log
+            if type(content) != dict or any(auc_name.lower() in category.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference]): continue # basic_log, auc_log
             save_metrics_path = self.output_metrics
             if category != self.original_result_name: save_metrics_path = str(save_metrics_path).replace('.json', f'_{category}.json')
             
@@ -169,7 +171,7 @@ class FixedSpecTester(Tester):
                 if key in ['epoch', 'confusion'] or 'time' in key: continue
                 if type(value) != dict: # loss
                     self.writer.add_scalar(key, value)
-                elif self.AUCNameForFixedSpec in key:
+                elif any(auc_name.lower() in key.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference]): # auc
                     self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
                 else: # maxprob, Fixed_spec_goal
                     for new_key, new_value in value.items():
@@ -182,4 +184,4 @@ class FixedSpecTester(Tester):
                     # 3. Confusion Matrix
                     self.writer.set_step(self.test_epoch, f'{self.wirter_mode}_{key}', False)
                     self.writer.add_figure('ConfusionMatrix', self._make_a_confusion_matrix(value[self.confusion_key]))
-                    close_all_plots()()
+                    close_all_plots()
