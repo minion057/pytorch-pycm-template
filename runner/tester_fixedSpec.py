@@ -175,7 +175,7 @@ class FixedSpecTester(Tester):
                     for new_key, new_value in value.items():
                         if new_key in ['epoch', 'confusion'] or 'time' in new_key: continue
                         # 1. All metrics
-                        if '_class' not in new_key: self.writer.add_scalar(new_key, new_value)
+                        if not isinstance(new_value, dict): self.writer.add_scalar(new_key, new_value)
                         # 2. All metrics per class
                         else: self.writer.add_scalars(new_key, {str(k):v for k, v in new_value.items()})
             
