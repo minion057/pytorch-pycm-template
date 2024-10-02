@@ -87,7 +87,7 @@ class Trainer(BaseTrainer):
             if self.DA_ftns is not None and self.hookargs is None: # Perform DA without hooking
                 data = self.DA_ftns.without_hook(data)
             # if batch_idx == 0: target[target == 2] = 1
-            # target_classes, target_cnt = np.unique(target, return_counts=True)
+            # target_classes, target_cnt = np.unique(target, axis=0, return_counts=True)
             # print(f'target classes: {target_classes.tolist()}, target cnt: {target_cnt.tolist()}')
             data, target = data.to(self.device), target.to(self.device)
 
@@ -198,14 +198,14 @@ class Trainer(BaseTrainer):
         self.valid_confusion.reset()
         label_img, features, class_labels = None, None, []
         data_channel = None
-        print('\n\n\nValid!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        # print('\n\n\nValid!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 batch_num = (epoch - 1) * len(self.valid_data_loader) + batch_idx + 1
                 self.writer.set_step(batch_num, 'batch_valid')
                 
                 # 1. To move Torch to the GPU or CPU
-                # target_classes, target_cnt = np.unique(target, return_counts=True)
+                # target_classes, target_cnt = np.unique(target, axis=0, return_counts=True)
                 # print(f'target classes: {target_classes.tolist()}, target cnt: {target_cnt.tolist()}')
                 data, target = data.to(self.device), target.to(self.device)
 
