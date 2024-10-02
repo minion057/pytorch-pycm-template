@@ -166,14 +166,14 @@ class FixedSpecTester(Tester):
         if self.tensorboard:
             for key, value in log.items():
                 self.writer.set_step(self.test_epoch, self.wirter_mode)
-                if any(item in name.lower() for item in ['epoch', 'confusion', 'time']): continue
+                if any(item in key.lower() for item in ['epoch', 'confusion', 'time']): continue
                 if type(value) != dict: # loss
                     self.writer.add_scalar(key, value)
                 elif any(auc_name.lower() in key.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference]): # auc
                     self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
                 else: # maxprob, Fixed_spec_goal
                     for new_key, new_value in value.items():
-                        if any(item in name.lower() for item in ['epoch', 'confusion', 'time']): continue
+                        if any(item in key.lower() for item in ['epoch', 'confusion', 'time']): continue
                         # 1. All metrics
                         if not isinstance(new_value, dict): self.writer.add_scalar(new_key, new_value)
                         # 2. All metrics per class
