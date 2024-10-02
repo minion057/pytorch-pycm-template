@@ -64,7 +64,7 @@ class CutMix(BaseHook):
 
         mix_data = data.detach().clone()
         mix_data[:, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2] = mix_data[rand_index, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2]
-        if self.writer is not None:
+        if self.writer is not None and B > 1:
             img_cnt = B if B < 5 else 5
             cut_data = []
             for idx in range(img_cnt):

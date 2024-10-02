@@ -58,7 +58,7 @@ class MixUp(BaseHook):
         mix_data = data.detach().clone()
         mix_data = self.lam() * mix_data + (1 - self.lam()) * mix_data[self.rand_index(), :]
         
-        if self.writer is not None and self.lam() != 1:
+        if self.writer is not None and self.lam() != 1 and B > 1:
             img_cnt = B if B < 5 else 5
             da_data = []
             for idx in range(img_cnt):
