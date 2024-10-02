@@ -198,8 +198,6 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
             metric_name:str, CI:int, binom_method:str, show_bound_text:bool=True,
             file_path=None, show:bool=False, return_plot:bool=True):
     if len(means) != len(bounds) != len(classes): raise ValueError('All three lists (means, bounds, and classes) must be the same length.')
-    # means = np.array([float(m) if m != 'None' else 0. for m in means])
-    # bounds = [tuple([float(x) if x != 'None' else 0. for x in b]) for b in bounds]
     if all(0 <= x <= 1 for x in means):
         means = np.array(means)*100
         if not all(0 <= x <= 100 for x in means): raise ValueError('The values in the list (means) are outside the range between 0 and 100.')
@@ -208,13 +206,12 @@ def plot_CI(means:[list, np.ndarray], bounds:[list, np.ndarray], classes:[list, 
         if not all((0 <= l <= 100 or 0 <= u <= 100) for l, u in bounds): raise ValueError('The values in the list (bounds) are outside the range between 0 and 100.')
     errors, real_bounds = [[], []], []
     for score, (lower, upper) in zip(means, bounds): # 메트릭 점수를 사용하기 때문에 범위를 0~100으로 고정
-        lower_error, upper_error  = score - lower, upper - score
+        lower_error, upper_error = score - lower, max(upper - score, 0)
         if score-lower_error < 0 or lower_error < 0: lower_error = score
         if score+upper_error > 100: upper_error = 100 - score
         real_bounds.append((score-lower_error, score+upper_error))
         errors[0].append(lower_error); errors[1].append(upper_error)
     errors = np.array(errors)
-    
     colors, palette = [], ['#D7E1EE', '#B1C9F5', '#6F8CE7', '#8B8BB7'] # ['lightsteelblue', 'cornflowerblue', 'royalblue', 'midnightblue']
     legend_kwargs = {
         'loc':'upper left', 'bbox_to_anchor':(1, 1.02), 'ncol':1,
