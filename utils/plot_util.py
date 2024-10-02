@@ -91,59 +91,92 @@ def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=
     color_list.extend(list(plt.cm.Pastel1.colors)); del color_list[-1]
     color_list.extend(list(plt.cm.Pastel2.colors)); del color_list[-1]
 
-    xticks, values = [], []    
+    yticks, values = [], []    
     for name, score in logs.items():
-        if name in ['epoch', 'loss', 'val_loss', 'confusion', 'val_confusion']: continue
-        if '_class' in name or 'time' in name or 'auc' in name.lower(): continue
-        if isinstance(score, dict): continue
-        xticks.append(name)
-        values.append(score[0] if type(score) == list else score)
-    x = np.arange(len(xticks))
-    if figsize is None: figsize = (len(x)*1.5, 5)
+        if any(item in name.lower() for item in ['epoch', 'loss', 'confusion', 'time', 'val']): continue
+        if isinstance(score, dict):
+            for new_name, new_score in score.items():
+                yticks.append(f'{name.replace("_class", "")} {new_name}'.replace('_', ' '))
+                values.append(new_score[0] if type(new_score) == list else new_score)
+        else:
+            yticks.append(name)
+            values.append(score[0] if type(score) == list else score)
+    y = np.arange(len(yticks))
+    if figsize is None: figsize = (7, len(y))
     plt.figure(figsize=figsize)
-    plt.suptitle('Test Result', size=15)
+    plt.title(f'Test Result\nTesting from epoch {logs["epoch"]}.', size=15)
     
-    plt.subplot(1,1,1)
-    plt.title(f'Testing from epoch {logs["epoch"]}.'); plt.xlabel('Metrics'); plt.ylabel('Score')
-    
-    bar = plt.bar(x, values, color=color_list, width=0.45)
-    plt.ylim(0,1.05)
+    plt.subplot(1,1,1); plt.xlabel('Score', fontsize=12)
+    bar = plt.barh(y, values, color=color_list, height=0.3)
+    plt.xlim(0,1.05)
     for rect, v in zip(bar, values):
-        height = rect.get_height()-0.1 if rect.get_height() < 1 else 0.95
-        height = height if height > 0 else 0.1
-        plt.text(rect.get_x() + rect.get_width()/2.0, height, '%.3f' % v, ha='center', va='bottom', size=12)
-    plt.xticks(x, xticks)
+        score = rect.get_width()-0.1 if rect.get_width() < 1 else 0.95
+        score = score if score > 0 else 0.05
+        text = f'{v:.3f}'.rstrip('0').rstrip('.')
+        plt.text(score, rect.get_y(), text, ha='center', va='bottom', size=12)
+    plt.yticks(y, yticks, fontsize=12)
         
     plt.tight_layout()
     if file_path is not None: plt.savefig(file_path, bbox_inches='tight')
     if show: plt.show()  
     close_all_plots()
 
-def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(15,5), show:bool=False):
+def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool=False):
     close_all_plots()
-    plt.figure(figsize=figsize)
-
-    plt.subplot(1,3,1)
-    plt.title('Loss'); plt.xlabel('Epochs'); plt.ylabel('Loss')
-    plt.plot(logs['epoch'], logs['loss'], label='Loss')
-    if 'val_loss' in list(logs.keys()): plt.plot(logs['epoch'], logs['val_loss'], label = 'Val_Loss')
-    plt.legend(loc='lower left', bbox_to_anchor=(0,1.15,1,0.2), ncol=2, mode='expand')
-    if logs['epoch'][0]!=len(logs['epoch']): plt.xlim([logs['epoch'][0],len(logs['epoch'])])
-    if len(logs['epoch']) <= 10: plt.xticks(logs['epoch'])
-    
-    plt.subplot(1,3,2)
-    plt.title('Metrics'); plt.xlabel('Epochs'); plt.ylabel('Score')
+    pass_items = ['epoch', 'loss', 'confusion', 'time']
+    title_size, bbox_to_anchor = 15, (0,1.1,1,0.2)
+    log_items = [k.lower() for k in logs.keys()]
+    width, height = figsize
+    row, col, dictitem = 1, 2, 0
     for name, score in logs.items():
-        if name in ['epoch', 'loss', 'val_loss', 'confusion', 'val_confusion']: continue
-        if '_class' in name or 'time' in name or 'auc' in name: continue
-        if isinstance(score, dict): continue
-        plt.plot(logs['epoch'], score, label=str(name))
-    plt.legend(loc='lower left', bbox_to_anchor=(0,1.15,1,0.2), ncol=3, mode='expand')
-    if logs['epoch'][0]!=len(logs['epoch']): plt.xlim([logs['epoch'][0],len(logs['epoch'])])
-    if len(logs['epoch']) <= 10: plt.xticks(logs['epoch'])
-        
-    plt.tight_layout()
-    if file_path is not None: plt.savefig(file_path, bbox_inches='tight')
+        if any(item in name.lower() for item in pass_items): continue
+        if isinstance(score, dict) and 'val' not in name.lower(): dictitem += 1
+    row = row + dictitem//col + dictitem%col
+    fig = plt.figure(figsize=(col*width, row*height), layout="constrained")
+    gs = GridSpec(row, col, figure=fig, wspace=0.05, hspace=0.05)
+    
+    # 1. Basic plot: Loss information
+    ax = fig.add_subplot(gs[0, 0])
+    ax.set_title('Loss', fontsize=title_size); ax.set_xlabel('Epochs'); ax.set_ylabel('Loss')
+    ax.plot(logs['epoch'], logs['loss'], label='Loss')
+    if 'val_loss'.lower() in log_items: 
+        val_index = log_items.index('val_loss'.lower())
+        ax.plot(logs['epoch'], logs[list(logs.keys())[val_index]], label = 'Val Loss')
+    ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=2, mode='expand')
+    if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
+    if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
+    
+    # 2. Non-class versions of metrics
+    ax = fig.add_subplot(gs[0, 1])
+    ax.set_title('Metrics', fontsize=title_size); ax.set_xlabel('Epochs'); ax.set_ylabel('Score')
+    for name, score in logs.items():
+        if any(item in name.lower() for item in pass_items): continue
+        elif isinstance(score, dict): continue
+        ax.plot(logs['epoch'], score, label=str(name).replace('_', ' '))
+    ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=3, mode='expand')
+    if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
+    if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
+    
+    # 3. Class versions of metrics
+    if dictitem > 0:
+        classrow, classcol = 1, 0
+        for name, score in logs.items():
+            if any(item in name.lower() for item in pass_items): continue
+            if isinstance(score, dict) and 'val' not in name.lower(): 
+                ax = fig.add_subplot(gs[classrow, classcol])
+                if classcol < col-1: classcol += 1
+                else: classrow, classcol = classrow+1, 0
+                ax.set_title(name.replace('_class', ''), fontsize=title_size); ax.set_xlabel('Epochs'); ax.set_ylabel('Score')
+                for subname, subscore in score.items():
+                    ax.plot(logs['epoch'], subscore, label=str(subname).replace('_', ' '))
+                if f'val_{name}'.lower() in log_items: 
+                    for subname, subscore in logs[f'val_{name}'].items():
+                        ax.plot(logs['epoch'], subscore, label=f'Val {subname}'.replace('_', ' '))
+                ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=len(score) if len(score) < 4 else 3, mode='expand')
+                if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
+                if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
+    
+    if file_path is not None: ax.figure.savefig(file_path)
     if show: plt.show()  
     close_all_plots()
     
