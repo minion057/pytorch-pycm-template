@@ -155,7 +155,10 @@ def ROC_OvO(labels, probs, classes:list,
         fpr_neg, tpr_neg, threshold_neg = _roc_data(neg_labels, neg_probs, [False, True], True)
         # fpr_pos_sk, tpr_pos_sk, threshold_pos_sk = metrics.roc_curve(pos_labels, pos_probs) 
         # fpr_neg_sk, tpr_neg_sk, threshold_neg_sk = metrics.roc_curve(neg_labels, neg_probs)
-        auc_pos, auc_neg = metrics.auc(fpr_pos, tpr_pos), metrics.auc(fpr_neg, tpr_neg)
+        try: auc_pos = metrics.auc(fpr_pos, tpr_pos)
+        except: auc_pos = 0 # Uncomputable state. -> There must be at least two values.
+        try: auc_neg = metrics.auc(fpr_neg, tpr_neg)
+        except: auc_neg = 0 # Uncomputable state. -> There must be at least two values.
         
         positive_roc_dict['fpr'].append(fpr_pos); negative_roc_dict['fpr'].append(fpr_neg)
         positive_roc_dict['tpr'].append(tpr_pos); negative_roc_dict['tpr'].append(tpr_neg)
