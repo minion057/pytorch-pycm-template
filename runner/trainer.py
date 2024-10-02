@@ -86,6 +86,9 @@ class Trainer(BaseTrainer):
             # 1. To move Torch to the GPU or CPU
             if self.DA_ftns is not None and self.hookargs is None: # Perform DA without hooking
                 data = self.DA_ftns.without_hook(data)
+            # if batch_idx == 0: target[target == 2] = 1
+            # target_classes, target_cnt = np.unique(target, return_counts=True)
+            # print(f'target classes: {target_classes.tolist()}, target cnt: {target_cnt.tolist()}')
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
@@ -126,9 +129,6 @@ class Trainer(BaseTrainer):
                 use_confusion_obj = deepcopy(confusion_obj)   
                 met_result = met(use_confusion_obj, self.classes) if met_kwargs is None else met(use_confusion_obj, self.classes, **met_kwargs)
                 self.train_metrics.update(tag, met_result)
-                
-                # if met_kwargs is None: self.train_metrics.update(tag, met(use_confusion_obj, self.classes))
-                # else: self.train_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
             
             # 5-3-1. Projector
             # The data concerning the projector is collected with each batch and will be updated after all batches are completed.
@@ -205,6 +205,8 @@ class Trainer(BaseTrainer):
                 self.writer.set_step(batch_num, 'batch_valid')
                 
                 # 1. To move Torch to the GPU or CPU
+                # target_classes, target_cnt = np.unique(target, return_counts=True)
+                # print(f'target classes: {target_classes.tolist()}, target cnt: {target_cnt.tolist()}')
                 data, target = data.to(self.device), target.to(self.device)
 
                 # Compute prediction error

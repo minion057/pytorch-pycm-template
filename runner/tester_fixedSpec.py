@@ -121,13 +121,11 @@ class FixedSpecTester(Tester):
                                 break
                         elif 'indices' in key: 
                             valid_indices = [index for index in value if index in [pos_class_idx, neg_class_idx]]
-                            print('valid_indices: ', valid_indices)
                             if valid_indices == []:
                                 run = False
                                 break
                             else: met_kwargs[key] = valid_indices
                     if not run: continue
-                    print(f'met_kwargs: {met_kwargs}\n')
                     goal_metrics[category][tag] = met(use_confusion_obj, self.classes, **met_kwargs)             
             goal_metrics[category][self.confusion_key] = confusion_dict[(goal, pos_class_name, neg_class_name)]
         return goal_metrics
