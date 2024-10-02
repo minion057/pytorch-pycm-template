@@ -173,11 +173,11 @@ class FixedSpecTester(Tester):
                     self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
                 else: # maxprob, Fixed_spec_goal
                     for new_key, new_value in value.items():
-                        if any(item in key.lower() for item in ['epoch', 'confusion', 'time']): continue
-                        # 1. All metrics
-                        if not isinstance(new_value, dict): self.writer.add_scalar(new_key, new_value)
-                        # 2. All metrics per class
-                        else: self.writer.add_scalars(new_key, {str(k):v for k, v in new_value.items()})
+                        if any(item in new_key.lower() for item in ['epoch', 'loss', 'confusion', 'time']): continue
+                        if not isinstance(new_value, dict): # 1. All metrics
+                            self.writer.add_scalar(new_key, new_value)
+                        else: # 2. All metrics per class
+                            self.writer.add_scalars(new_key, {str(k):v for k, v in new_value.items()})
             
                     # 3. Confusion Matrix
                     self.writer.set_step(self.test_epoch, f'{self.wirter_mode}_{key}', False)
