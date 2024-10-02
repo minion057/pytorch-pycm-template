@@ -21,26 +21,29 @@ class CutMix(BaseHook):
     
     def forward_pre_hook(self, module, input_data):
         r = np.random.rand(1)
-        if self.prob is None or (self.beta > 0 and r < self.prob): 
-            use_data = input_data[0]
-            device = use_data.get_device()
-            da_result = self._run(use_data.detach().cpu().clone())
-            if device != -1: da_result = da_result.cuda()
-        # 1. Method for using both original and augmented data.
-        if self.prob is None:  return (torch.cat((use_data, da_result), 0), )
-        # 2. Method for using only one of the original or augmented data.
-        if self.beta > 0 and r < self.prob: return (da_result,)
+        use_data = input_data[0]
+        if use_data.size()[0] > 1:
+            if self.prob is None or (self.beta > 0 and r < self.prob): 
+                device = use_data.get_device()
+                da_result = self._run(use_data.detach().cpu().clone())
+                if device != -1: da_result = da_result.cuda()
+            # 1. Method for using both original and augmented data.
+            if self.prob is None:  return (torch.cat((use_data, da_result), 0), )
+            # 2. Method for using only one of the original or augmented data.
+            if self.beta > 0 and r < self.prob: return (da_result,)
     
     def without_hook(self, input_data):
         r = np.random.rand(1)
-        if self.prob is None or (self.beta > 0 and r < self.prob): 
-            device = input_data.get_device()
-            da_result = self._run(input_data.detach().cpu().clone())
-            if device != -1: da_result = da_result.cuda()
-        # 1. Method for using both original and augmented data.
-        if self.prob is None: return torch.cat((data, da_result), 0)
-        # 2. Method for using only one of the original or augmented data.
-        if self.beta > 0 and r < self.prob: return da_result
+        if input_data.size()[0] > 1:
+            if self.prob is None or (self.beta > 0 and r < self.prob): 
+                device = input_data.get_device()
+                da_result = self._run(input_data.detach().cpu().clone())
+                if device != -1: da_result = da_result.cuda()
+            # 1. Method for using both original and augmented data.
+            if self.prob is None: return torch.cat((input_data, da_result), 0)
+            # 2. Method for using only one of the original or augmented data.
+            if self.beta > 0 and r < self.prob: return da_result
+        else: return input_data
         
     def _run(self, data):
         # Original code: https://github.com/clovaai/CutMix-PyTorch/blob/master/train.py#L229
