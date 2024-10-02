@@ -12,9 +12,10 @@ class CutMix(BaseHook):
         self.init_lam = np.random.beta(beta, beta)
 
     def lam(self):
-        return self._data['lam'][self.type]
+        return self._data.loc[self.type, 'lam']
+    
     def rand_index(self):
-        return self._data['rand_index'][self.type]
+        return self._data.loc[self.type, 'rand_index']
     
     def forward_hook(self, module, input_data, output_data):
         return self.without_hook(output_data)
@@ -52,14 +53,14 @@ class CutMix(BaseHook):
         
         rand_index = np.arange(0, B)
         np.random.shuffle(rand_index)
-        self._data['rand_index'][self.type] = rand_index
+        self._data.loc[self.type, 'rand_index'] = rand_index
 
         bbox_W1, bbox_H1, bbox_W2, bbox_H2 = self._rand_bbox(H, W, self.init_lam)
         if bbox_H1==bbox_H2: bbox_H2+=1
         if bbox_W1==bbox_W2: bbox_W2+=1
         
         # adjust lambda to exactly match pixel ratio
-        self._data['lam'][self.type] = 1 - ((bbox_H2 - bbox_H1) * (bbox_W2 - bbox_W1) / (H*W))
+        self._data.loc[self.type, 'lam'] = 1 - ((bbox_H2 - bbox_H1) * (bbox_W2 - bbox_W1) / (H*W))
 
         mix_data = data.detach().clone()
         mix_data[:, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2] = mix_data[rand_index, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2]
@@ -94,9 +95,9 @@ class CutMix(BaseHook):
     
     def loss(self, loss_ftns, output, target, logit):
         random_index, lam = self.rand_index(), self.lam()
-        if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
         basic_loss  = loss_ftns(output[:len(target)], target, logit)
         if random_index is None: return {'loss':basic_loss, 'target':target}
+        if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
         random_loss = loss_ftns(output[len(target):] if self.prob is None else output, target[random_index], logit)
         loss = basic_loss*lam + random_loss*(1.-lam) 
         return {'loss':loss, 'target':torch.cat((target, target[random_index]), 0) if self.prob is None else target}
