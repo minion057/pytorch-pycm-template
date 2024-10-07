@@ -11,8 +11,8 @@ class Tester(BaseTester):
     """
     Trainer class
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader):
-        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device)
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader, is_test:bool=True):
+        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, is_test)
         self.config = config
         self.device = device
         

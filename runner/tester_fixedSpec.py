@@ -9,7 +9,7 @@ class FixedSpecTester(Tester):
     """
     Tester class
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader, ROCNameForFixedSpec='ROC_OvO'):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader, is_test:bool=True, ROCNameForFixedSpec='ROC_OvO'):
         # Removing duplicate AUC calculation since the trainer already computes it.
         if 'fixed_goal' not in config['trainer'].keys():
             raise ValueError('There is no fixed specificity score to track.')
@@ -26,7 +26,7 @@ class FixedSpecTester(Tester):
                 del config['metrics'][met.__name__]
         metric_ftns = _metric_ftns
         
-        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader)
+        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, data_loader, is_test)
         self.config = config
         self.device = device
         

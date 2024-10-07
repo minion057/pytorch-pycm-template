@@ -14,7 +14,7 @@ class BaseTester:
     """
     Base class for all testers
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, is_test:bool=True):
         self.config = config
         self.logger = config.get_logger('tester', 2)
         
@@ -31,10 +31,11 @@ class BaseTester:
         self.confusion_key, self.confusion_tag_for_writer = 'confusion', 'ConfusionMatrix'
 
         self.test_epoch = 1
+        self.test_dir_name = 'test' if is_test else 'valid'
 
         # Setting the save directory path
         self.checkpoint_dir = config.checkpoint_dir
-        self.output_dir = Path(config.output_dir) / 'test' / f'epoch{self.test_epoch}'
+        self.output_dir = Path(config.output_dir) / self.test_dir_name / f'epoch{self.test_epoch}'
         
         # setup visualization writer instance
         # log_dir is set to "[save_dir]/log/[name]/start_time" in advance when parsing in the config file.
@@ -47,7 +48,7 @@ class BaseTester:
         
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
-            self.output_dir = Path(config.output_dir) / 'test' / f'epoch{self.test_epoch}'
+            self.output_dir = Path(config.output_dir) / self.test_dir_name / f'epoch{self.test_epoch}'
         else: self.logger.warning("Warning: Pre-trained model is not use.\n")
         
         # Setting the save directory path
