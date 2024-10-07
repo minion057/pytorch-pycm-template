@@ -152,9 +152,7 @@ class Trainer(BaseTrainer):
                 data_channel = self.prediction_images.shape[1]
                 preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
                 preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
-                if self.plottable_metric_ftns is not None:
-                    use_prob = self.train_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                else: use_prob = [self.softmax(el).tolist() for el in use_output[-len(preds):]]
+                use_prob = self.train_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
                 self.prediction_preds = [self.classes[lab] for lab in preds]
                 self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
             if batch_idx == self.len_epoch: break
@@ -245,9 +243,7 @@ class Trainer(BaseTrainer):
                     data_channel = self.prediction_images.shape[1]
                     preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
                     preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1  
-                    if self.plottable_metric_ftns is not None: 
-                        use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                    else: use_prob = [self.softmax(el).tolist() for el in use_output[-len(preds):]]
+                    use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
                     
