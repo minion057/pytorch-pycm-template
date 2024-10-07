@@ -66,11 +66,17 @@ def main(config):
         for k, v in config['data_loader']['args']['trsfm'].items():
             if v is None: tf_list.append(getattr(module_transforms, k)())
             else: tf_list.append(getattr(module_transforms, k)(**v))
-        config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)  
-    config.config['data_loader']['args']['mode'] = ['test']
-    config.config['data_loader']['args']['batch_size'] = 1
-    data_loader = config.init_obj('data_loader', module_data)
-    test_data_loader = data_loader.loaderdict['test'].dataloader
+        config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list) 
+    try: 
+        config.config['data_loader']['args']['mode'] = ['test']
+        config.config['data_loader']['args']['batch_size'] = 1
+        data_loader = config.init_obj('data_loader', module_data)
+        test_data_loader = data_loader.loaderdict['test'].dataloader
+    except:
+        config.config['data_loader']['args']['mode'] = ['valid']
+        config.config['data_loader']['args']['batch_size'] = 1
+        data_loader = config.init_obj('data_loader', module_data)
+        test_data_loader = data_loader.loaderdict['valid'].dataloader
     
     classes = test_data_loader.dataset.classes
     n_samples_per_class = 5
