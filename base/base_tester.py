@@ -14,7 +14,7 @@ class BaseTester:
     """
     Base class for all testers
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, config, classes, device, is_test:bool=True):
         self.config = config
         self.logger = config.get_logger('tester', 2)
         
@@ -31,10 +31,11 @@ class BaseTester:
         self.confusion_key, self.confusion_tag_for_writer = 'confusion', 'ConfusionMatrix'
 
         self.test_epoch = 1
+        self.test_dir_name = 'test' if is_test else 'valid'
 
         # Setting the save directory path
         self.checkpoint_dir = config.checkpoint_dir
-        self.output_dir = Path(config.output_dir) / 'test' / f'epoch{self.test_epoch}'
+        self.output_dir = Path(config.output_dir) / self.test_dir_name / f'epoch{self.test_epoch}'
         
         # setup visualization writer instance
         # log_dir is set to "[save_dir]/log/[name]/start_time" in advance when parsing in the config file.
@@ -47,7 +48,7 @@ class BaseTester:
         
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
-            self.output_dir = Path(config.output_dir) / 'test' / f'epoch{self.test_epoch}'
+            self.output_dir = Path(config.output_dir) / self.test_dir_name / f'epoch{self.test_epoch}'
         else: self.logger.warning("Warning: Pre-trained model is not use.\n")
         
         # Setting the save directory path
@@ -165,9 +166,10 @@ class BaseTester:
         # Save the reuslt of metrics graphs.
         if self.save_performance_plot: plot_performance_1(log, self.metrics_img_dir/'metrics_graphs_test.png')
             
-    def _make_a_confusion_matrix(self, confusion,
+    def _make_a_confusion_matrix(self, confusion, class_labels:list=None,
                                  save_mode:str='Test', save_dir=None, title=None):        
-        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion), 'classes':self.classes}
+        plot_kwargs = {'confusion':convert_confusion_matrix_to_list(confusion),
+                       'classes':list(confusion.keys()) if class_labels is None else class_labels}
         if title is not None: plot_kwargs['title'] = title
         if save_dir is None:
             plot_kwargs['return_plot'] = True

@@ -33,8 +33,12 @@ class Trainer(BaseTrainer):
         self.log_step = int(np.sqrt(data_loader.batch_size))
 
         self.basic_metrics = ['loss']
-        self.train_metrics = MetricTracker(*self.basic_metrics, *[m.__name__ for m in self.metric_ftns], writer=self.writer)
-        self.valid_metrics = MetricTracker(*self.basic_metrics, *[m.__name__ for m in self.metric_ftns], writer=self.writer)
+        metrics_tag = []
+        for met in self.metric_ftns:
+            met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
+            metrics_tag.append(met.__name__ if tag is None else tag)
+        self.train_metrics = MetricTracker(*self.basic_metrics, *metrics_tag, writer=self.writer)
+        self.valid_metrics = MetricTracker(*self.basic_metrics, *metrics_tag, writer=self.writer)
 
         self.train_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
         self.valid_confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
@@ -82,6 +86,9 @@ class Trainer(BaseTrainer):
             # 1. To move Torch to the GPU or CPU
             if self.DA_ftns is not None and self.hookargs is None: # Perform DA without hooking
                 data = self.DA_ftns.without_hook(data)
+            # if batch_idx == 0: target[target == 2] = 1
+            # target_classes, target_cnt = np.unique(target, axis=0, return_counts=True)
+            # print(f'target classes: {target_classes.tolist()}, target cnt: {target_cnt.tolist()}')
             data, target = data.to(self.device), target.to(self.device)
 
             # Compute prediction error
@@ -118,14 +125,10 @@ class Trainer(BaseTrainer):
             
             confusion_obj = self.train_confusion.get_confusion_obj(self.confusion_key)
             for met in self.metric_ftns:# pycm version
-                met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
-                tag = met.__name__ if tag is None else tag
+                met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
                 use_confusion_obj = deepcopy(confusion_obj)   
                 met_result = met(use_confusion_obj, self.classes) if met_kwargs is None else met(use_confusion_obj, self.classes, **met_kwargs)
                 self.train_metrics.update(tag, met_result)
-                
-                # if met_kwargs is None: self.train_metrics.update(tag, met(use_confusion_obj, self.classes))
-                # else: self.train_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
             
             # 5-3-1. Projector
             # The data concerning the projector is collected with each batch and will be updated after all batches are completed.
@@ -149,9 +152,7 @@ class Trainer(BaseTrainer):
                 data_channel = self.prediction_images.shape[1]
                 preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
                 preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
-                if self.plottable_metric_ftns is not None:
-                    use_prob = self.train_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                else: use_prob = [self.softmax(el).tolist() for el in use_output[-len(preds):]]
+                use_prob = self.train_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
                 self.prediction_preds = [self.classes[lab] for lab in preds]
                 self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]          
             if batch_idx == self.len_epoch: break
@@ -195,13 +196,15 @@ class Trainer(BaseTrainer):
         self.valid_confusion.reset()
         label_img, features, class_labels = None, None, []
         data_channel = None
-        
+        # print('\n\n\nValid!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 batch_num = (epoch - 1) * len(self.valid_data_loader) + batch_idx + 1
                 self.writer.set_step(batch_num, 'batch_valid')
                 
                 # 1. To move Torch to the GPU or CPU
+                # target_classes, target_cnt = np.unique(target, axis=0, return_counts=True)
+                # print(f'target classes: {target_classes.tolist()}, target cnt: {target_cnt.tolist()}')
                 data, target = data.to(self.device), target.to(self.device)
 
                 # Compute prediction error
@@ -222,8 +225,7 @@ class Trainer(BaseTrainer):
                     
                 confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
                 for met in self.metric_ftns:# pycm version
-                    met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]))
-                    tag = met.__name__ if tag is None else tag
+                    met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
                     use_confusion_obj = deepcopy(confusion_obj)          
                     if met_kwargs is None: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes))
                     else: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))               
@@ -241,9 +243,7 @@ class Trainer(BaseTrainer):
                     data_channel = self.prediction_images.shape[1]
                     preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
                     preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1  
-                    if self.plottable_metric_ftns is not None: 
-                        use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                    else: use_prob = [self.softmax(el).tolist() for el in use_output[-len(preds):]]
+                    use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
                     self.prediction_preds = [self.classes[lab] for lab in preds]
                     self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
                     
@@ -291,8 +291,7 @@ class Trainer(BaseTrainer):
     def _plottable_metrics(self, actual_vector, probability_vector, mode='training'):
         if np.array(probability_vector).ndim != 2: raise ValueError('The probability vector should be 2D array.')
         for met in self.plottable_metric_ftns:            
-            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]))
-            tag = met.__name__ if tag is None else tag
+            met_kwargs, tag, save_dir = self._set_metric_kwargs(deepcopy(self.plottable_metrics_kwargs[met.__name__]), met_name=met.__name__)
             save_dir = self.output_dir / 'plottable_metrics' if save_dir is None else self.output_dir / save_dir
             if met_kwargs is None: fig = met(actual_vector, probability_vector, self.classes)
             else: fig = met(actual_vector, probability_vector, self.classes, **met_kwargs)
@@ -301,12 +300,14 @@ class Trainer(BaseTrainer):
                 if not save_dir.is_dir(): ensure_dir(save_dir, True)
                 fig.savefig(save_dir / f'{tag}_{mode}.png', bbox_inches='tight')
         
-    def _set_metric_kwargs(self, met_kwargs):
+    def _set_metric_kwargs(self, met_kwargs, met_name:str=None):
         if met_kwargs is None: return None, None, None
         if 'tag' in met_kwargs: 
             tag = met_kwargs['tag']
-            met_kwargs.pop('tag')  
-        else: tag = None
+            met_kwargs.pop('tag')
+        else: 
+            if met_name is None: raise ValueError("Expected 'met_name' to be not None, but received None.")
+            tag = met_name
         if 'save_dir' in met_kwargs: 
             save_dir = met_kwargs['save_dir']
             met_kwargs.pop('save_dir') 

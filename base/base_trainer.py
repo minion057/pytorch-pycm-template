@@ -241,7 +241,7 @@ class BaseTrainer:
         for key, value in log.items():
             if key in ['epoch', self.confusion_key, f'val_{self.confusion_key}']: continue
             if 'val_' in key or 'time' in key: continue
-            if '_class' not in key: # 1. All metrics
+            if not isinstance(value, dict): # 1. All metrics
                 if f'val_{key}' in log.keys():
                     scalars = {key:value, f'val_{key}':log[f'val_{key}']}
                     self.writer.add_scalars(key, {str(k):v for k, v in scalars.items()})

@@ -107,6 +107,7 @@ class DASampler(BaseSampler):
             elif len(item.shape) != 3: 
                 raise ValueError('The data must have 2 or 3 dimensions.')
             else:
+                if item.shape[-1] == 4: item = item[..., :3]
                 item = np.moveaxis(item, -1, 0)
             converted_data.append(item)
         return torch.from_numpy(np.array(converted_data))
