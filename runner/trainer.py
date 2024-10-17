@@ -79,7 +79,11 @@ class Trainer(BaseTrainer):
                                                 self.DA_ftns.forward_pre_hook if self.hookargs['pre']else self.DA_ftns.forward_hook, 
                                                 **self.hookargs)
                 
-        for batch_idx, (data, target) in enumerate(self.data_loader):
+        for batch_idx, load_data in enumerate(self.data_loader):
+            if len(load_data) == 3: data, target, path = load_data
+            elif len(load_data) == 2: data, target, path = load_data, None
+            else: raise Exception('The length of load_data should be 2 or 3.')
+            
             batch_num = (epoch - 1) * self.len_epoch + batch_idx + 1
             self.writer.set_step(batch_num, 'batch_train')
                 
@@ -198,7 +202,11 @@ class Trainer(BaseTrainer):
         data_channel = None
         # print('\n\n\nValid!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(self.valid_data_loader):
+            for batch_idx, load_data in enumerate(self.valid_data_loader):
+                if len(load_data) == 3: data, target, path = load_data
+                elif len(load_data) == 2: data, target, path = load_data, None
+                else: raise Exception('The length of load_data should be 2 or 3.')
+                
                 batch_num = (epoch - 1) * len(self.valid_data_loader) + batch_idx + 1
                 self.writer.set_step(batch_num, 'batch_valid')
                 

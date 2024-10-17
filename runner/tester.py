@@ -44,7 +44,11 @@ class Tester(BaseTester):
         label_img, features, class_labels = None, None, []
         data_channel = None
         with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(tqdm(self.data_loader)):
+            for batch_idx, load_data in enumerate(tqdm(self.data_loader)):
+                if len(load_data) == 3: data, target, path = load_data
+                elif len(load_data) == 2: data, target, path = load_data, None
+                else: raise Exception('The length of load_data should be 2 or 3.')
+                
                 batch_num = batch_idx + 1
                 
                 # 1. To move Torch to the GPU or CPU
