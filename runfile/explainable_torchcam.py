@@ -67,14 +67,13 @@ def main(config):
             if v is None: tf_list.append(getattr(module_transforms, k)())
             else: tf_list.append(getattr(module_transforms, k)(**v))
         config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list) 
+    config.config['data_loader']['args']['batch_size'] = 1
     try: 
         config.config['data_loader']['args']['mode'] = ['test']
-        config.config['data_loader']['args']['batch_size'] = 1
         data_loader = config.init_obj('data_loader', module_data)
         test_data_loader = data_loader.loaderdict['test'].dataloader
     except:
         config.config['data_loader']['args']['mode'] = ['valid']
-        config.config['data_loader']['args']['batch_size'] = 1
         data_loader = config.init_obj('data_loader', module_data)
         test_data_loader = data_loader.loaderdict['valid'].dataloader
     
@@ -112,7 +111,8 @@ def main(config):
                     classes=classes,
                     device=device,
                     explainset=explainset,
-                    explain_methods=all_methods)
+                    explain_methods=all_methods,
+                    output_dir_name=str(config.config['data_loader']['args']['mode'][0]))
     exp.explain(save_type='all') # exp.explain(xai_layers=xai_layers)
 
 
