@@ -114,9 +114,7 @@ class Tester(BaseTester):
         return self._get_a_log()
 
     def _loss(self, output, target, logit):
-        if self.loss_fn_name != 'bce_loss': loss = self.criterion(output, target)
-        else: loss =  self.criterion(logit, target.type(torch.DoubleTensor).to(self.device))
-        return loss
+        self.criterion(output, target, self.classes, self.device)
     
     def _plottable_metrics(self):
         actual_vector = self.confusion.get_actual_vector(self.confusion_key)
