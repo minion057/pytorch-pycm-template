@@ -93,7 +93,7 @@ class FixedSpecTester(Tester):
             auc_metrics[self.AUCNameForFixedSpec][use_tag] = self.test_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
         
         # 2. Reference AUC to be calculated in other ways 
-        auc_metrics[self.AUCNameForReference] = self.AUCForReferenceftns(self.confusion.get_confusion_obj(self.confusion_key), self.classes, method='roc')       
+        auc_metrics[self.AUCNameForReference] = self.AUCForReferenceftns(self.confusion.get_confusion_obj(self.confusion_key), self.classes)       
         
         return auc_metrics
     
