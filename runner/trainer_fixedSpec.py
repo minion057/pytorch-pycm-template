@@ -118,7 +118,7 @@ class FixedSpecTrainer(Trainer):
         # 2. Reference AUC to be calculated in other ways     
         if mode=='training': maxprob_confusion = self.train_confusion.get_confusion_obj(self.confusion_key)
         else: maxprob_confusion = self.valid_confusion.get_confusion_obj(self.confusion_key)  
-        auc_metrics[self.AUCNameForReference] = self.AUCForReferenceftns(maxprob_confusion, self.classes, method='roc')       
+        auc_metrics[self.AUCNameForReference] = self.AUCForReferenceftns(maxprob_confusion, self.classes)       
         
         return auc_metrics
     
