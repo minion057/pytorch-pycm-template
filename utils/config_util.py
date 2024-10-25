@@ -27,8 +27,7 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
     })
     
     # Option 1. Learning rate scheduler
-    # exper_dict['lr_scheduler'] = '' if 'lr_scheduler' not in config.keys() else config['lr_scheduler']['type']
-    exper_dict['lr_scheduler'] = ''
+    exper_dict['lr_scheduler'] = '' if 'lr_scheduler' not in config.keys() else config['lr_scheduler']['type']
     # Option 2. Data Augmentation
     exper_dict['da'] = '' if 'data_augmentation' not in config.keys() else config['data_augmentation']['type']
     # Option 3. Sampling
