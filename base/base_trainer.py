@@ -52,7 +52,11 @@ class BaseTrainer:
                 self.mnt_mode, self.mnt_metric, self.mnt_metric_name = monitor_values
             else:
                 raise ValueError('monitor option in config file is not valid')
-
+            
+            self.mnt_best = inf if self.mnt_mode == 'min' else -inf
+            self.early_stop = cfg_trainer.get('early_stop', inf)
+            if self.early_stop <= 0: self.early_stop = inf
+            
         self.start_epoch = 1
 
         # Setting the save directory path
