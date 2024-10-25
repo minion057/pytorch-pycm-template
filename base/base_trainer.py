@@ -44,12 +44,14 @@ class BaseTrainer:
             self.mnt_mode = 'off'
             self.mnt_best = 0
         else:
-            self.mnt_mode, self.mnt_metric = self.monitor.split()
-            assert self.mnt_mode in ['min', 'max']
-
-            self.mnt_best = inf if self.mnt_mode == 'min' else -inf
-            self.early_stop = cfg_trainer.get('early_stop', inf)
-            if self.early_stop <= 0: self.early_stop = inf
+            monitor_values = self.monitor.split()
+            assert monitor_values[0] in ['min', 'max']
+            if len(monitor_values) == 2: 
+                self.mnt_mode, self.mnt_metric, self.mnt_metric_name = monitor_values[0], monitor_values[1], None
+            elif len(monitor_values) == 3:
+                self.mnt_mode, self.mnt_metric, self.mnt_metric_name = monitor_values
+            else:
+                raise ValueError('monitor option in config file is not valid')
 
         self.start_epoch = 1
 
@@ -127,8 +129,8 @@ class BaseTrainer:
             if self.mnt_mode != 'off':
                 try:
                     # check whether model performance improved or not, according to specified metric (mnt_metric -> e.g., loss of validation)
-                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] <= self.mnt_best) or \
-                               (self.mnt_mode == 'max' and log[self.mnt_metric] >= self.mnt_best)
+                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name] <= self.mnt_best) or \
+                               (self.mnt_mode == 'max' and log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name] >= self.mnt_best)
                 except KeyError:
                     self.logger.warning("Warning: Metric '{}' is not found. "
                                         "Model performance monitoring is disabled.".format(self.mnt_metric))
@@ -136,7 +138,7 @@ class BaseTrainer:
                     improved = False
 
                 if improved:
-                    self.mnt_best = log[self.mnt_metric]
+                    self.mnt_best = log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name]
                     not_improved_count = 0
                     best = True
                 else:
