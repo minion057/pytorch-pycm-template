@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torchvision.utils import make_grid
-from base import BaseTester, MetricTracker, ConfusionTracker
+from base import BaseTester, MetricTracker, ConfusionTracker, BaseTracker
 from utils import tb_projector_resize, plot_classes_preds, close_all_plots, save_pycm_object, check_onehot_encoding_1
 import numpy as np
 from copy import deepcopy
@@ -29,6 +29,11 @@ class Tester(BaseTester):
         self.metrics = MetricTracker(*self.basic_metrics, *metrics_tag, writer=self.writer)
         self.confusion = ConfusionTracker(*[self.confusion_key], writer=self.writer, classes=self.classes)
 
+        # Additional Tracking
+        self.additionalTracking_key, self.additionalTracking_columns = 'meta', ['path', 'target', 'pred']
+        self.additionalTracking_columns.extend([f'prob:{c}' for c in self.classes])
+        self.additionalTracking = BaseTracker(*[self.additionalTracking_key], columns=self.additionalTracking_columns)
+        
         self.softmax = nn.Softmax(dim=0)
         self.preds_item_cnt = 5
         self.prediction_images, self.prediction_labels = None, None
@@ -81,6 +86,21 @@ class Tester(BaseTester):
                 if batch_idx % self.log_step == 0:
                     self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
                 
+                # 4-0. Additional tracking
+                for col in self.additionalTracking_columns:
+                    if 'path' in col.lower() and path is not None: 
+                        for p in path: self.additionalTracking.update(self.additionalTracking_key, col, str(p))
+                    elif 'target' in col.lower():
+                        for p in confusion_content['actual']: self.additionalTracking.update(self.additionalTracking_key, col, p)
+                    elif 'pred' in col.lower():
+                        for p in confusion_content['predict']: self.additionalTracking.update(self.additionalTracking_key, col, self.classes[p])
+                    elif 'prob' in col.lower():
+                        class_idx = [i for i, c in enumerate(self.classes) if c in col]
+                        if len(class_idx) != 1: 
+                            raise ValueError(f'All class names could not be found in the name of the column ({col}) where the probability value is to be stored.')
+                        for p in confusion_content['probability']: 
+                            self.additionalTracking.update(self.additionalTracking_key, col, p[class_idx[0]])
+            
                 # 4-1. Update the Projector
                 if self.projector:                    
                     label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
@@ -114,7 +134,7 @@ class Tester(BaseTester):
         return self._get_a_log()
 
     def _loss(self, output, target, logit):
-        self.criterion(output, target, self.classes, self.device)
+        return self.criterion(output, target, self.classes, self.device)
     
     def _plottable_metrics(self):
         actual_vector = self.confusion.get_actual_vector(self.confusion_key)
@@ -151,6 +171,10 @@ class Tester(BaseTester):
     
     def _save_other_output(self, log):
         self._save_confusion_obj()
+        self._save_path_infomation()
         
     def _save_confusion_obj(self, filename='cm', message='Saving checkpoint for Confusion Matrix'):
         save_pycm_object(self.confusion.get_confusion_obj(self.confusion_key), save_dir=self.output_dir, save_name= filename)
+            
+    def _save_path_infomation(self, filename:str='result'):
+        self.additionalTracking.save2excel(savedir=self.output_dir, savename=filename, excel_type='xlsx')
