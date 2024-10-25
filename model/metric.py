@@ -11,6 +11,10 @@ Metrics that need to be plotted, such as CI and ROC curves, should be written in
 
 
 """ Accuracy """
+def CBA(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    # Class balance accuracy
+    ftns = BaseMetricFtns(confusion_obj=confusion_obj, classes=classes)
+    return ftns.single_class_metric('CBA', positive_class_idx)
 def ACC(confusion_obj:pycmCM, classes=None, positive_class_idx=None, average_type='Macro'):
     # Instantiate objects and verify class correctness
     ftns = BaseMetricFtns(confusion_obj=confusion_obj, classes=classes)
