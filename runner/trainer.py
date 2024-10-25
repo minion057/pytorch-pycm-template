@@ -323,7 +323,7 @@ class Trainer(BaseTrainer):
             self.writer.add_histogram(name, p, bins='auto')
 
     def _loss(self, output, target, logit):
-        self.criterion(output, target, self.classes, self.device)
+        return self.criterion(output, target, self.classes, self.device)
         
     def _da_loss(self, output, target, logit):     
         if 'loss' not in dir(self.DA_ftns):
