@@ -78,7 +78,7 @@ class NPZDataLoader():
             elif all(self.classes != classes): raise ValueError('The classes in the data loader do not match in different modes.')
         
     def _check_dataloader_shape(self, dataloader):
-        X, y = next(iter(dataloader.dataloader))
+        X, y, path = next(iter(dataloader.dataloader))
         if X.shape[1] != 3: raise Exception(f'Shape of batch is [N, C, H, W]. Please recheck.')
         _, C, H, W = X.shape
         return (C, H, W), dataloader.dataloader.dataset.classes
