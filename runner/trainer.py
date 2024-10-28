@@ -89,7 +89,9 @@ class Trainer(BaseTrainer):
                                                 **self.hookargs)
                 
         for batch_idx, load_data in enumerate(self.data_loader):
-            if len(load_data) == 3: data, target, path = load_data
+            if len(load_data) == 3: 
+                data, target, path = load_data
+                if path == '': path = None
             elif len(load_data) == 2: data, target, path = load_data, None
             else: raise Exception('The length of load_data should be 2 or 3.')
             

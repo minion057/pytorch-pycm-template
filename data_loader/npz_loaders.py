@@ -34,7 +34,8 @@ class NPZDataset(BaseSplitDataset):
         if self.init_kwargs['trsfm'] is not None:
             item = self.init_kwargs['trsfm'](item)
         target = self.targets[index]
-        return item, target, None if self.data_paths is None else self.data_paths[index]
+        
+        return item, target, '' if self.data_paths is None else self.data_paths[index]
 
     def _load_data_list(self, _path):
         with np.load(_path, allow_pickle=True) as file:
