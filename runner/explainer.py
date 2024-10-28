@@ -21,7 +21,7 @@ from pathlib import Path # 나중에 삭제
 class TorchcamExplainer(BaseExplainer):
     """ XAI logic using TorchCAM. (https://github.com/frgfm/torch-cam) """
     def __init__(self, model, config, classes, device, 
-                 explainset:dict, explain_methods:list):
+                 explainset:dict, explain_methods:list, output_dir_name:str='explanation'):
         """ Logic to initialize to perform XAI using TorchCAM.
 
         Args:
@@ -41,7 +41,7 @@ class TorchcamExplainer(BaseExplainer):
             raise ValueError('The explainset requires data and target information.')
         
         libc = ctypes.CDLL("libc.so.6") # for torchcam
-        super().__init__(model, config, classes, device, [])
+        super().__init__(model, config, classes, device, [], output_dir_name)
         self.config = config
         self.device = device
         self.xai_layers = None

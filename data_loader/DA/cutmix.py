@@ -12,35 +12,39 @@ class CutMix(BaseHook):
         self.init_lam = np.random.beta(beta, beta)
 
     def lam(self):
-        return self._data['lam'][self.type]
+        return self._data.loc[self.type, 'lam']
+    
     def rand_index(self):
-        return self._data['rand_index'][self.type]
+        return self._data.loc[self.type, 'rand_index']
     
     def forward_hook(self, module, input_data, output_data):
         return self.without_hook(output_data)
     
     def forward_pre_hook(self, module, input_data):
         r = np.random.rand(1)
-        if self.prob is None or (self.beta > 0 and r < self.prob): 
-            use_data = input_data[0]
-            device = use_data.get_device()
-            da_result = self._run(use_data.detach().cpu().clone())
-            if device != -1: da_result = da_result.cuda()
-        # 1. Method for using both original and augmented data.
-        if self.prob is None:  return (torch.cat((use_data, da_result), 0), )
-        # 2. Method for using only one of the original or augmented data.
-        if self.beta > 0 and r < self.prob: return (da_result,)
+        use_data = input_data[0]
+        if use_data.size()[0] > 1:
+            if self.prob is None or (self.beta > 0 and r < self.prob): 
+                device = use_data.get_device()
+                da_result = self._run(use_data.detach().cpu().clone())
+                if device != -1: da_result = da_result.cuda()
+            # 1. Method for using both original and augmented data.
+            if self.prob is None:  return (torch.cat((use_data, da_result), 0), )
+            # 2. Method for using only one of the original or augmented data.
+            if self.beta > 0 and r < self.prob: return (da_result,)
     
     def without_hook(self, input_data):
         r = np.random.rand(1)
-        if self.prob is None or (self.beta > 0 and r < self.prob): 
-            device = input_data.get_device()
-            da_result = self._run(input_data.detach().cpu().clone())
-            if device != -1: da_result = da_result.cuda()
-        # 1. Method for using both original and augmented data.
-        if self.prob is None: return torch.cat((data, da_result), 0)
-        # 2. Method for using only one of the original or augmented data.
-        if self.beta > 0 and r < self.prob: return da_result
+        if input_data.size()[0] > 1:
+            if self.prob is None or (self.beta > 0 and r < self.prob): 
+                device = input_data.get_device()
+                da_result = self._run(input_data.detach().cpu().clone())
+                if device != -1: da_result = da_result.cuda()
+            # 1. Method for using both original and augmented data.
+            if self.prob is None: return torch.cat((input_data, da_result), 0)
+            # 2. Method for using only one of the original or augmented data.
+            if self.beta > 0 and r < self.prob: return da_result
+        else: return input_data
         
     def _run(self, data):
         # Original code: https://github.com/clovaai/CutMix-PyTorch/blob/master/train.py#L229
@@ -49,18 +53,18 @@ class CutMix(BaseHook):
         
         rand_index = np.arange(0, B)
         np.random.shuffle(rand_index)
-        self._data['rand_index'][self.type] = rand_index
+        self._data.loc[self.type, 'rand_index'] = rand_index
 
         bbox_W1, bbox_H1, bbox_W2, bbox_H2 = self._rand_bbox(H, W, self.init_lam)
         if bbox_H1==bbox_H2: bbox_H2+=1
         if bbox_W1==bbox_W2: bbox_W2+=1
         
         # adjust lambda to exactly match pixel ratio
-        self._data['lam'][self.type] = 1 - ((bbox_H2 - bbox_H1) * (bbox_W2 - bbox_W1) / (H*W))
+        self._data.loc[self.type, 'lam'] = 1 - ((bbox_H2 - bbox_H1) * (bbox_W2 - bbox_W1) / (H*W))
 
         mix_data = data.detach().clone()
         mix_data[:, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2] = mix_data[rand_index, :, bbox_H1:bbox_H2, bbox_W1:bbox_W2]
-        if self.writer is not None:
+        if self.writer is not None and B > 1:
             img_cnt = B if B < 5 else 5
             cut_data = []
             for idx in range(img_cnt):
@@ -91,9 +95,9 @@ class CutMix(BaseHook):
     
     def loss(self, loss_ftns, output, target, logit):
         random_index, lam = self.rand_index(), self.lam()
-        if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
         basic_loss  = loss_ftns(output[:len(target)], target, logit)
         if random_index is None: return {'loss':basic_loss, 'target':target}
+        if len(random_index) != len(target): raise ValueError('Target and the number of shuffled indexes do not match.')
         random_loss = loss_ftns(output[len(target):] if self.prob is None else output, target[random_index], logit)
         loss = basic_loss*lam + random_loss*(1.-lam) 
         return {'loss':loss, 'target':torch.cat((target, target[random_index]), 0) if self.prob is None else target}

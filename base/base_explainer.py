@@ -8,20 +8,23 @@ from pathlib import Path
 from utils import ensure_dir, get_layers
 
 class BaseExplainer:
-    def __init__(self, model, config, classes, device, xai_layers:list=None):
+    def __init__(self, model, config, classes, device, 
+                 xai_layers:list=None, output_dir_name:str='explanation'):
         self.config = config
         self.device = device
         
         # load architecture params from checkpoint.
         self.model = model
         self.test_epoch = 1
-        self.output_dir_name = 'explanation'
-        self.output_dir = Path(config.output_dir) / self.output_dir_name / f'epoch{self.test_epoch}'
-        # self.output_dir = Path(config.explanation_dir) / f'epoch{self.test_epoch}'
+        self.output_dir_name = output_dir_name
+        self.output_dir = Path(config.output_dir) / self.output_dir_name
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
-            self.output_dir = Path(config.output_dir) / self.output_dir_name / f'epoch{self.test_epoch}'
-        else: print("Warning: Pre-trained model is not use.\n")
+            self.output_dir = self.output_dir / f'epoch{self.test_epoch}'
+        else: 
+            self.output_dir = self.output_dir / f'Initial_State'
+            print("Warning: Pre-trained model is not use.\n")
+        if self.output_dir_name in ['test', 'valid', 'training']: self.output_dir = self.output_dir / 'explanation'
         
         # Set up your data and model layers for XAI.
         self.classes = classes

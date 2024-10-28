@@ -34,9 +34,17 @@ def main(config):
             if v is None: tf_list.append(getattr(module_transforms, k)())
             else: tf_list.append(getattr(module_transforms, k)(**v))
         config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)  
-    config.config['data_loader']['args']['mode'] = ['test']
-    data_loader = config.init_obj('data_loader', module_data)
-    test_data_loader = data_loader.loaderdict['test'].dataloader
+    try:
+        is_test = True
+        config.config['data_loader']['args']['mode'] = ['test']
+        data_loader = config.init_obj('data_loader', module_data)
+        test_data_loader = data_loader.loaderdict['test'].dataloader
+    except:
+        is_test = False
+        logger.warning('No test mode dataset. Thus, validation mode will be used.')
+        config.config['data_loader']['args']['mode'] = ['valid']
+        data_loader = config.init_obj('data_loader', module_data)
+        test_data_loader = data_loader.loaderdict['valid'].dataloader
 
     # build model architecture, then print to console
     classes = test_data_loader.dataset.classes
@@ -68,7 +76,8 @@ def main(config):
                     config=config,
                     classes=classes,
                     device=device,
-                    data_loader=test_data_loader)
+                    data_loader=test_data_loader,
+                    is_test=is_test)
 
     tester.test()
 

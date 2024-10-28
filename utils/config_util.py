@@ -27,8 +27,7 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
     })
     
     # Option 1. Learning rate scheduler
-    # exper_dict['lr_scheduler'] = '' if 'lr_scheduler' not in config.keys() else config['lr_scheduler']['type']
-    exper_dict['lr_scheduler'] = ''
+    exper_dict['lr_scheduler'] = '' if 'lr_scheduler' not in config.keys() else config['lr_scheduler']['type']
     # Option 2. Data Augmentation
     exper_dict['da'] = '' if 'data_augmentation' not in config.keys() else config['data_augmentation']['type']
     # Option 3. Sampling
@@ -57,6 +56,11 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
     # Option 4. Accumulation steps
     exper_dict['accum_steps'] = '' if 'accumulation_steps' not in config['trainer'].keys() else config['trainer']['accumulation_steps']
     
+    # Option for duplicate naming
+    npz_file_name = ''
+    if 'fold' in config['data_loader']['args']['dataset_path']:
+        npz_file_name = '/' + config['data_loader']['args']['dataset_path'].split('/')[-1].split('.')[0]
+        
     # return config information
     if return_type is str:
         lr_scheduler, da, accum_steps = exper_dict['lr_scheduler'], exper_dict['da'], exper_dict['accum_steps']
@@ -75,7 +79,7 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
             # Required elements in the 5st folder: Batch size and number of epochs
             # Optional elements in the 5st folder: accumulation steps
             # f"/{exper_dict['batch_size']}batch{'' if accum_steps == '' else f'X{accum_steps}'}-{exper_dict['max_epoch']}epoch"
-            f"/{exper_dict['batch_size']}batch-{exper_dict['max_epoch']}epoch{'' if accum_steps == '' else f'X{accum_steps}'}"
+            f"/{exper_dict['batch_size']}batch-{exper_dict['max_epoch']}epoch{'' if accum_steps == '' else f'X{accum_steps}'}{npz_file_name}"
         )
         return exper_name
     elif return_type is list:

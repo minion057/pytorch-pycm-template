@@ -34,7 +34,7 @@ class NPZDataset(BaseSplitDataset):
         if self.init_kwargs['trsfm'] is not None:
             item = self.init_kwargs['trsfm'](item)
         target = self.targets[index]
-        return item, target
+        return item, target, None if self.data_paths is None else self.data_paths[index]
 
     def _load_data_list(self, _path):
         with np.load(_path, allow_pickle=True) as file:
@@ -47,7 +47,7 @@ class NPZDataset(BaseSplitDataset):
                 elif any(check_item in k for check_item in ['y', 'target', 'label']): targets = file[k]
                 elif any(check_item in k for check_item in ['path']): data_paths = file[k]
             if data is None or targets is None:
-                raise Exception(f'Only data and targets should exist. Currently found values:{keys}')
+                raise Exception(f'Only data and targets should exist. Currently found values:{file.files}')
             if data_paths is not None: paths = file['paths_per_class']
             else: print('Warning: No data path information available.')
         targets = torch.from_numpy(targets)
@@ -78,7 +78,7 @@ class NPZDataLoader():
             elif all(self.classes != classes): raise ValueError('The classes in the data loader do not match in different modes.')
         
     def _check_dataloader_shape(self, dataloader):
-        X, y = next(iter(dataloader.dataloader))
+        X, y, path = next(iter(dataloader.dataloader))
         if X.shape[1] != 3: raise Exception(f'Shape of batch is [N, C, H, W]. Please recheck.')
         _, C, H, W = X.shape
         return (C, H, W), dataloader.dataloader.dataset.classes
