@@ -133,8 +133,11 @@ class BaseTrainer:
             if self.mnt_mode != 'off':
                 try:
                     # check whether model performance improved or not, according to specified metric (mnt_metric -> e.g., loss of validation)
-                    improved = (self.mnt_mode == 'min' and log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name] <= self.mnt_best) or \
-                               (self.mnt_mode == 'max' and log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name] >= self.mnt_best)
+                    improved = False
+                    if self.mnt_mode == 'min':
+                        improved = (log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name]) <= self.mnt_best
+                    elif self.mnt_mode == 'max':
+                        improved = (log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name]) >= self.mnt_best
                 except KeyError:
                     self.logger.warning("Warning: Metric '{}' is not found. "
                                         "Model performance monitoring is disabled.".format(self.mnt_metric))
