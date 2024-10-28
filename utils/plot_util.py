@@ -93,7 +93,7 @@ def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=
 
     yticks, values = [], []    
     for name, score in logs.items():
-        if any(item in name.lower() for item in ['epoch', 'loss', 'confusion', 'time', 'val']): continue
+        if any(item in name.lower() for item in ['epoch', 'confusion', 'time', 'val']): continue
         if isinstance(score, dict):
             for new_name, new_score in score.items():
                 yticks.append(f'{name.replace("_class", "")} {new_name}'.replace('_', ' '))
@@ -121,7 +121,42 @@ def plot_performance_1(logs:dict, file_path=None, figsize:tuple=None, show:bool=
     if show: plt.show()  
     close_all_plots()
 
-def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool=False):
+def plot_performance_N_only_loss(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool=False):
+    if 'loss' not in logs.keys(): raise ValueError('\'loss\' not in logs.keys()')
+    close_all_plots()
+    title_size = 15
+    width, height = figsize
+    log_items = [k.lower() for k in logs.keys()]
+    row, col = 1, 2 if 'val_loss'.lower() in log_items else 1
+    fig = plt.figure(figsize=(col*width, row*height), layout="constrained")
+    gs = GridSpec(row, col, figure=fig, wspace=0.05, hspace=0.05)
+    
+    # 1. Basic plot: Loss information 
+    ax = fig.add_subplot(gs[0, 0]) if 'val_loss'.lower() in log_items else fig.add_subplot(gs[0, :])
+    ax.set_title('Loss', fontsize=title_size); ax.set_xlabel('Epochs'); ax.set_ylabel('Loss')
+    ax.plot(logs['epoch'], logs['loss'], label='Loss')
+    if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
+    if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
+    if 'val_loss'.lower() in log_items: 
+        ax = fig.add_subplot(gs[0, 1])
+        ax.set_title('Validation Loss', fontsize=title_size); ax.set_xlabel('Epochs'); ax.set_ylabel('Loss')
+        val_index = log_items.index('val_loss'.lower())
+        ax.plot(logs['epoch'], logs[list(logs.keys())[val_index]], label = 'Val Loss')
+        if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
+        if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
+    
+    if file_path is not None: ax.figure.savefig(file_path)
+    if show: plt.show() 
+    close_all_plots()
+    # 플롯만 수정하세요 loss 따로 저장하도록
+
+def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool=False, loss_plot:bool=True):
+    file_path_list = str(file_path).split('/')
+    # 1. Basic plot: Loss information 
+    if loss_plot:
+        loss_file_path = '/'.join(file_path_list[:-1]) + f'/Loss_{file_path_list[-1]}'
+        plot_performance_N_only_loss(logs, loss_file_path, figsize, show)
+    
     close_all_plots()
     pass_items = ['epoch', 'loss', 'confusion', 'time']
     title_size, bbox_to_anchor = 15, (0,1.1,1,0.2)
@@ -135,25 +170,18 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool
     fig = plt.figure(figsize=(col*width, row*height), layout="constrained")
     gs = GridSpec(row, col, figure=fig, wspace=0.05, hspace=0.05)
     
-    # 1. Basic plot: Loss information
-    ax = fig.add_subplot(gs[0, 0])
-    ax.set_title('Loss', fontsize=title_size); ax.set_xlabel('Epochs'); ax.set_ylabel('Loss')
-    ax.plot(logs['epoch'], logs['loss'], label='Loss')
-    if 'val_loss'.lower() in log_items: 
-        val_index = log_items.index('val_loss'.lower())
-        ax.plot(logs['epoch'], logs[list(logs.keys())[val_index]], label = 'Val Loss')
-    ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=2, mode='expand')
-    if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
-    if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
     
     # 2. Non-class versions of metrics
-    ax = fig.add_subplot(gs[0, 1])
+    ax = fig.add_subplot(gs[0, :])
     ax.set_title('Metrics', fontsize=title_size); ax.set_xlabel('Epochs'); ax.set_ylabel('Score')
+    plot_item_cnt = 0
     for name, score in logs.items():
         if any(item in name.lower() for item in pass_items): continue
         elif isinstance(score, dict): continue
         ax.plot(logs['epoch'], score, label=str(name).replace('_', ' '))
-    ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=3, mode='expand')
+        plot_item_cnt += 1
+    ncol = int(plot_item_cnt//2)
+    ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=ncol if ncol <= 5 else 5, mode='expand')
     if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
     if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
     

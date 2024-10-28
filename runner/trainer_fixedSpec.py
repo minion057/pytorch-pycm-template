@@ -215,7 +215,8 @@ class FixedSpecTrainer(Trainer):
                 self._make_a_confusion_matrix(content[f'val_{self.confusion_key}'], 
                                               save_mode=f'Validation {category}', save_dir=self.confusion_img_dir)
             # Save the reuslt of metrics graphs.
-            if self.save_performance_plot: plot_performance_N(result, self.metrics_img_dir/f'metrics_graphs_{category}.png')
+            if self.save_performance_plot: 
+                plot_performance_N(result, self.metrics_img_dir/f'metrics_graphs_{category}.png', loss_plot=False if category != self.original_result_name else True)
             close_all_plots()
             
     def _save_tensorboard(self, log):
