@@ -1,3 +1,5 @@
+import numpy as np
+from copy import deepcopy
 from base import BaseSampler
 from utils import check_and_import_library
 
@@ -18,8 +20,8 @@ class ImbalancedlearnSampler(BaseSampler):
         targets2integer = self._convert_targets2integer()
         data_shape = list(self.data.shape)
         data4sampler = self.data.reshape(data_shape[0], -1)
-        smapler = self._get_a_sampler()
-        X, y = smapler.fit_resample(data4sampler, targets2integer)
+        sampler = self._get_a_sampler()
+        X, y = sampler.fit_resample(data4sampler, targets2integer)
         data_shape[0] = len(X)
         if self.paths is not None:
             ori_indices = np.array(list(range(len(data4sampler))))
