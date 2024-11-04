@@ -34,6 +34,7 @@ class DASampler(BaseSampler):
         sampler = self._get_a_sampler()
 
         sampled_data, sampled_targets = data2tensor.detach().cpu().numpy(), deepcopy(targets2integer)
+        if self.paths is not None: sampled_paths = deepcopy(self.paths)
         self.da_indices = {}
         for class_index, target_indices in target_indices_per_class_index.items():
             if class_index not in class_sampling_counts: continue
@@ -52,9 +53,12 @@ class DASampler(BaseSampler):
             
             sampled_data = np.concatenate((sampled_data, np.array(numpy_data)), axis=0)
             sampled_targets = np.concatenate((sampled_targets, targets2integer[sampled_indices]), axis=0)
-        
+            if self.paths is not None: 
+                append_paths = [f'{self.sampler_name}_{self.paths[sampled_index]}' for sampled_index in sampled_indices]
+                sampled_paths = np.concatenate((sampled_paths, append_paths), axis=0)
         self.data_source.data = self._revert_data(sampled_data)
         self.data_source.targets = self._revert_targets(sampled_targets)
+        if self.paths is not None: self.data_source.paths = sampled_paths
       
     def _calculate_sampling_counts(self, using_imblearn:bool, integer_encoded_targets=None): 
         ''' 

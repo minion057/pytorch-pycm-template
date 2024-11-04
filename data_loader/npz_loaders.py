@@ -17,7 +17,7 @@ class NPZDataset(BaseSplitDataset):
                 # transforms.Normalize((0.5, ), (0.5, )) # Grayscale
             ])
         super().__init__(dataset_path, mode, trsfm)
-        self.data, self.targets, self.classes, self.data_paths, self.paths = self._load_data_list(self.init_kwargs['dataset_path'])
+        self.data, self.targets, self.classes, self.paths, self.paths_per_class = self._load_data_list(self.init_kwargs['dataset_path'])
     
     def __getitem__(self, index):
         """
@@ -35,24 +35,24 @@ class NPZDataset(BaseSplitDataset):
             item = self.init_kwargs['trsfm'](item)
         target = self.targets[index]
         
-        return item, target, '' if self.data_paths is None else self.data_paths[index]
+        return item, target, f'Data {index}' if self.paths is None else self.paths[index]
 
     def _load_data_list(self, _path):
         with np.load(_path, allow_pickle=True) as file:
             try:classes = file['classes']
             except: classes = file['class_names']
             data, targets = None, None
-            data_paths, paths = None, None
+            paths, paths_per_class = None, None
             for k in [k for k in file.files if self.init_kwargs['mode'] in k]:
                 if any(check_item in k for check_item in ['x', 'data']): data = file[k]
                 elif any(check_item in k for check_item in ['y', 'target', 'label']): targets = file[k]
-                elif any(check_item in k for check_item in ['path']): data_paths = file[k]
+                elif any(check_item in k for check_item in ['path']): paths = file[k]
             if data is None or targets is None:
                 raise Exception(f'Only data and targets should exist. Currently found values:{file.files}')
-            if data_paths is not None: paths = file['paths_per_class']
+            if paths is not None: paths_per_class = file['paths_per_class']
             else: print('Warning: No data path information available.')
         targets = torch.from_numpy(targets)
-        return data, targets, classes, data_paths, paths
+        return data, targets, classes, paths, paths_per_class
 
 class NPZDataLoader():
     def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):
@@ -79,7 +79,11 @@ class NPZDataLoader():
             elif all(self.classes != classes): raise ValueError('The classes in the data loader do not match in different modes.')
         
     def _check_dataloader_shape(self, dataloader):
-        X, y, path = next(iter(dataloader.dataloader))
+        # X, y, path = next(iter(dataloader.dataloader))
+        _ = next(iter(dataloader.dataloader))
+        if len(_) == 2: (X, y), path = _, ''
+        elif len(_) == 3: X, y, path = _
+        else: raise Exception('Unsupported dataloader shape.')
         if X.shape[1] != 3: raise Exception(f'Shape of batch is [N, C, H, W]. Please recheck.')
         _, C, H, W = X.shape
         return (C, H, W), dataloader.dataloader.dataset.classes
