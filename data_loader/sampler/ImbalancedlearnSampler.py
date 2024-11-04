@@ -36,8 +36,8 @@ class ImbalancedlearnSampler(BaseSampler):
             else: # combine
                 # Oversampled and then undersampled -> only 2 cases (SMOTEENN, SMOTETomek)
                 # So clear the path for deleted data and fill the newly created path with sampler name
-                if self.sampler_name == 'SMOTEENN': use_indices = np.array(smapler.enn_.sample_indices_)
-                elif self.sampler_name == 'SMOTETomek': use_indices = np.array(smapler.tomek_.sample_indices_)
+                if self.sampler_name == 'SMOTEENN': use_indices = np.array(sampler.enn_.sample_indices_)
+                elif self.sampler_name == 'SMOTETomek': use_indices = np.array(sampler.tomek_.sample_indices_)
                 use_indices_in_real_data = use_indices[use_indices < len(ori_indices)]
                 sampled_paths = sampled_paths[use_indices_in_real_data]
                 new_paths = np.array([str(self.sampler_name)] * (len(X) - len(sampled_paths)))
