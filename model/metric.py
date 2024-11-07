@@ -82,10 +82,7 @@ def AUC_class(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
 def AUC_OvR(confusion_obj:pycmCM, classes, positive_class_idx=None):
     if positive_class_idx is None: raise ValueError('AUC requires positive_class_idx.')
     return list(AUC_OvR_class(confusion_obj, classes, [positive_class_idx]).values())[0]
-def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
-    # Instantiate objects and verify class correctness
-    ftns = BaseMetricFtns(confusion_obj=confusion_obj, classes=classes)
-    
+def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):    
     if classes is None: raise ValueError('CLASSES is required to be entered in order to calculate with the ROC version.')
     ftns_name, metrics_module = 'ROC_OvR', check_and_import_library('model.plottable_metrics')
     if ftns_name not in dir(metrics_module): raise ValueError(f'Warring: {ftns_name} is not in the model.metric library.')
@@ -102,15 +99,17 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
         
     roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
-    return ftns._format_metric_for_multi_score('AUC', {t_c:auc for t_c, auc in zip(classes, roc_dict['auc'])}, positive_class_indices)
+    score = {f'{classes[pos]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    if positive_class_indices is not None: 
+        positive_classes = np.array(classes)[positive_class_indices]
+        for class_item in list(score.keys()):
+            if class_item not in positive_classes: del score[class_item]
+    return score
 
 def AUC_OvO(confusion_obj:pycmCM, classes, positive_class_idx=None):
     if positive_class_idx is None: raise ValueError('AUC requires positive_class_idx.')
     return list(AUC_OvO_class(confusion_obj, classes, [positive_class_idx]).values())[0]
-def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
-    # Instantiate objects and verify class correctness
-    ftns = BaseMetricFtns(confusion_obj=confusion_obj, classes=classes)
-    
+def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):    
     if classes is None: raise ValueError('CLASSES is required to be entered in order to calculate with the ROC version.')
     ftns_name, metrics_module = 'ROC_OvO', check_and_import_library('model.plottable_metrics')
     if ftns_name not in dir(metrics_module): raise ValueError(f'Warring: {ftns_name} is not in the model.metric library.')
@@ -127,4 +126,10 @@ def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
         
     roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
-    return ftns._format_metric_for_multi_score('AUC', {t_c:auc for t_c, auc in zip(classes, roc_dict['auc'])}, positive_class_indices)
+    score = {f'{classes[pos]} vs {classes[neg]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    if positive_class_indices is not None: 
+        positive_classes = np.array(classes)[positive_class_indices]
+        for class_item in list(score.keys()):
+            pos_class = class_item.split(' vs ')[0]
+            if pos_class not in positive_classes: del score[class_item]
+    return score
