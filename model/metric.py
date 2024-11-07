@@ -1,7 +1,7 @@
 import numpy as np
 from pycm import ConfusionMatrix as pycmCM
 from base import BaseMetricFtns
-from utils import check_and_import_library
+from utils import check_and_import_library, close_all_plots
 
 """ 
 All metrics use the one-vs-rest strategy. 
@@ -99,6 +99,7 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
         
     roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
+    close_all_plots()
     score = {f'{classes[pos]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
     if positive_class_indices is not None: 
         positive_classes = np.array(classes)[positive_class_indices]
@@ -126,6 +127,7 @@ def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
         
     roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
+    close_all_plots()
     score = {f'{classes[pos]} vs {classes[neg]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
     if positive_class_indices is not None: 
         positive_classes = np.array(classes)[positive_class_indices]
