@@ -78,7 +78,6 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
             f"/{exper_dict['loss']}{'' if da == '' else f'-DA_{da}'}{'' if sampler_type == '' else f'-{sampler_type}_{sampler}'}"
             # Required elements in the 5st folder: Batch size and number of epochs
             # Optional elements in the 5st folder: accumulation steps
-            # f"/{exper_dict['batch_size']}batch{'' if accum_steps == '' else f'X{accum_steps}'}-{exper_dict['max_epoch']}epoch"
             f"/{exper_dict['batch_size']}batch{'' if accum_steps == '' else f'X{accum_steps}'}-{exper_dict['max_epoch']}epoch{npz_file_name}"
         )
         return exper_name
