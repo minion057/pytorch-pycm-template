@@ -48,9 +48,8 @@ class BaseMetricFtns:
     def _format_metric_for_multi_score(self, ftns_name, score, positive_class_indices=None) -> dict:
         if self.classes is not None:
             if self.confusion_classes_is_index_list:
-                ori_score = {self.classes[class_idx]:v for class_idx, v in score.items()} 
-            else: ori_score = score
-        ori_score = {class_item:v if v != 'None' else 0. for class_item, v in ori_score.items()}
+                score = {self.classes[class_idx]:v for class_idx, v in score.items()} 
+        ori_score = {class_item:v if v != 'None' else 0. for class_item, v in score.items()}
         if positive_class_indices is not None:
             positive_classes = np.array(self.classes)[positive_class_indices]
             score = deepcopy(ori_score)
@@ -59,11 +58,13 @@ class BaseMetricFtns:
         return score
     
     def single_class_metric(self, ftns_name:str, positive_class_idx=None, average_type='Macro') -> float:
-        # 1. Returning only a single metric score.
-        if positive_class_idx is None: return self._format_metric_for_single_score(ftns_name, average_type)
-        # 2. Returns the metric score for all classes.
-        if positive_class_idx is None: raise ValueError('Single score requires positive_class_idx.')
-        return list(self.multi_class_metric(ftns_name, positive_class_indices=[positive_class_idx]).values())[0]
+        try: 
+            # 1. Returning only a single metric score.
+            return self._format_metric_for_single_score(ftns_name, average_type)
+        except:
+            # 2. Returns the metric score for all classes.
+            if positive_class_idx is None: raise ValueError('Single score requires positive_class_idx.')
+            return list(self.multi_class_metric(ftns_name, positive_class_indices=[positive_class_idx]).values())[0]
     
     def multi_class_metric(self, ftns_name:str, positive_class_indices=None, **kwargs) -> dict:
         # Returns the metric score for all classes.
