@@ -5,7 +5,7 @@ from pathlib import Path
 from pycm import ConfusionMatrix as pycmCM
 from pycm.pycm_util import threshold_func
 import model.plottable_metrics  as module_plottable_metric
-from utils import integer_encoding
+from utils import integer_encoding, close_all_plots
 
 class ConfusionTracker:
     def __init__(self, *keys, classes, writer=None):
@@ -127,6 +127,7 @@ class FixedSpecConfusionTracker:
                                                             positive_class_indices=list(self.positive_class_indices.keys()), 
                                                             negative_class_indices=list(self.negative_class_indices.keys()),
                                                             return_result=True)
+        close_all_plots()
         for goal, pos_class_name, neg_class_name in self.index:
             goal2fpr = 1-goal # spec+fpr = 1
             try: 
