@@ -5,7 +5,7 @@ from pathlib import Path
 from pycm import ConfusionMatrix as pycmCM
 from pycm.pycm_util import threshold_func
 import model.plottable_metrics  as module_plottable_metric
-from utils import integer_encoding, close_all_plots
+from utils import integer_encoding
 
 class ConfusionTracker:
     def __init__(self, *keys, classes, writer=None):
@@ -102,13 +102,14 @@ class FixedSpecConfusionTracker:
                     self.index[0].append(goal)
                     self.index[1].append(pos_class_name)
                     self.index[2].append(neg_class_name)
-        self._data = pd.DataFrame(index=self.index, columns=['confusion', 'auc', 'fixed_score', 'refer_score', 'tag'])
+        self._data = pd.DataFrame(index=self.index, columns=['confusion', 'auc', 'basic_acc', 'fixed_score', 'refer_score', 'tag'])
         self.index = self._data.index.values
         self.reset()
     
     def reset(self):
         self._data.loc[:, 'confusion'] = None
         self._data.loc[:, 'auc'] = 0. 
+        self._data.loc[:, 'basic_acc'] = 0. 
         self._data.loc[:, 'refer_score'] = None
         self._data.loc[:, 'tag'] = ''
         for goal, p, n in self.index: 
@@ -127,7 +128,6 @@ class FixedSpecConfusionTracker:
                                                             positive_class_indices=list(self.positive_class_indices.keys()), 
                                                             negative_class_indices=list(self.negative_class_indices.keys()),
                                                             return_result=True)
-        close_all_plots()
         for goal, pos_class_name, neg_class_name in self.index:
             goal2fpr = 1-goal # spec+fpr = 1
             try: 
@@ -154,10 +154,12 @@ class FixedSpecConfusionTracker:
             
             # A basic confusion matrix is generated based on the class with the highest probability.
             pos_labels = [pos_class_name if p else neg_class_name for p in pos_labels]
+            pos_preds = [pos_class_name if p > 1-p else neg_class_name for p in pos_probs]
             best_cm = self._createConfusionMatrixobj(pos_labels, pos_probs, thresholds[best_idx], [neg_class_name, pos_class_name])
             best_cm.prob_vector = {'pos_probs':pos_probs, 'all_probs':probability_vector[all_idx, :], 'pos_class_idx': pos_class_idx, 'neg_class_idx': neg_class_idx}
             self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = deepcopy(best_cm)
             self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][list(self.positive_class_indices.keys()).index(pos_class_idx)]
+            self._data.loc[(goal, pos_class_name, neg_class_name), 'basic_acc'] = pycmCM(np.array(pos_labels), np.array(pos_preds), classes=[neg_class_name, pos_class_name]).ACC[pos_class_name]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'refer_score'] = tpr[best_idx]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'tag'] = f'FixedSpec-{str(goal).replace("0.", "")}_Positive-{pos_class_name}_Negative-{neg_class_name}'
             
@@ -171,6 +173,8 @@ class FixedSpecConfusionTracker:
     
     def get_auc(self, goal, pos_class_name, neg_class_name):
         return self._data.loc[(goal, pos_class_name, neg_class_name), 'auc']
+    def get_basic_acc(self, goal, pos_class_name, neg_class_name):
+        return self._data.loc[(goal, pos_class_name, neg_class_name), 'basic_acc']
     def get_fixed_score(self, goal, pos_class_name, neg_class_name):
         return self._data.loc[(goal, pos_class_name, neg_class_name), 'fixed_score']
     def get_refer_score(self, goal, pos_class_name, neg_class_name):
