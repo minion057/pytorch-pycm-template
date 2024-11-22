@@ -82,9 +82,13 @@ class BaseTrainer:
         
         self.tensorboard_pred_plot = cfg_trainer['tensorboard_pred_plot']
         self.save_performance_plot = cfg_trainer['save_performance_plot']
-        
-        if config.resume is not None: self._resume_checkpoint(config.resume)
-    
+
+        self.use_resume = False
+        if config.resume is not None: 
+            self.use_resume = True
+            self.not_improved_cnt = 0
+            self._resume_checkpoint(config.resume)
+            
     @abstractmethod
     def _train_epoch(self, epoch):
         """
@@ -99,7 +103,8 @@ class BaseTrainer:
         Full training logic
         """
         start = time.time()
-        not_improved_count = 0
+        not_improved_count = 0 if not self.use_resume else self.not_improved_cnt
+        print(f'train `not_improved_count` start: {not_improved_count}\n')
         for epoch in range(self.start_epoch, self.epochs + 1):
             epoch_start = time.time()
             result = self._train_epoch(epoch)
@@ -157,13 +162,13 @@ class BaseTrainer:
                     break
            
             if epoch % self.save_period == 0:
-                self._save_checkpoint(epoch, save_best=best)
+                self._save_checkpoint(epoch, save_best=best, not_improved_count=not_improved_count)
                 self._save_other_output(epoch, log, save_best=best)
             
         end = time.time()
         self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
 
-    def _save_checkpoint(self, epoch, save_best=False, filename='latest', message='Saving checkpoint'):
+    def _save_checkpoint(self, epoch, save_best=False, filename='latest', message='Saving checkpoint', not_improved_count=None):
         """
         Saving checkpoints
 
@@ -182,7 +187,8 @@ class BaseTrainer:
             'state_dict': state_dict,
             'optimizer': self.optimizer.state_dict(),
             'monitor_best': self.mnt_best,
-            'config': self.config
+            'config': self.config,
+            'not_improved_count':not_improved_count
         }
         if filename == 'latest':
             with open(str(self.checkpoint_dir / f'{filename}.txt'), "a") as f:
@@ -211,7 +217,9 @@ class BaseTrainer:
             
         self.start_epoch = checkpoint['epoch'] + 1
         self.mnt_best = checkpoint['monitor_best']
-
+        try: self.not_improved_cnt = checkpoint['not_improved_count']
+        except: self.not_improved_cnt = 0
+            
         # load architecture params from checkpoint.
         if checkpoint['config']['arch'] != self.config['arch']:
             self.logger.warning("Warning: Architecture configuration given in config file is different from that of "
