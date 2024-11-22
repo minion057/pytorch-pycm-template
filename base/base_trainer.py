@@ -104,7 +104,7 @@ class BaseTrainer:
         """
         start = time.time()
         not_improved_count = 0 if not self.use_resume else self.not_improved_cnt
-        print(f'train `not_improved_count` start: {not_improved_count}\n')
+        self.logger.info(f'\ntrain `not_improved_count` start: {not_improved_count}\n')
         for epoch in range(self.start_epoch, self.epochs + 1):
             epoch_start = time.time()
             result = self._train_epoch(epoch)
