@@ -57,13 +57,13 @@ class BaseMetricFtns:
         return score
     
     def single_class_metric(self, ftns_name:str, positive_class_idx=None, average_type='Macro') -> float:
-        try: 
-            # 1. Returning only a single metric score.
-            return self._format_metric_for_single_score(ftns_name, average_type)
-        except:
-            # 2. Returns the metric score for all classes.
-            if positive_class_idx is None: raise ValueError('Single score requires positive_class_idx.')
+        if positive_class_idx is not None:
+            # 1. Returns the metric score for all classes.
             return list(self.multi_class_metric(ftns_name, positive_class_indices=[positive_class_idx]).values())[0]
+        else: 
+            # 2. Returning only a single metric score.
+            try: return self._format_metric_for_single_score(ftns_name, average_type)
+            except: raise ValueError('Single score requires positive_class_idx. Or use metrics that support averaging.')
     
     def multi_class_metric(self, ftns_name:str, positive_class_indices=None, **kwargs) -> dict:
         # Returns the metric score for all classes.
