@@ -162,16 +162,33 @@ class FixedSpecTrainer(Trainer):
     def _save_BestFixedSpecModel(self, epoch): 
         # Determines model saving based on improvement in AUC (Area Under Curve) score.
         self.logger.info('')
-        ROCForFixedSpec = self.train_ROCForFixedSpec if self.do_validation else self.valid_ROCForFixedSpec
+        ROCForFixedSpec = self.valid_ROCForFixedSpec if self.do_validation else self.train_ROCForFixedSpec
         use_pair = []
         for goal, pos_class_name, neg_class_name in ROCForFixedSpec.index:
             if (pos_class_name, neg_class_name) in use_pair: continue
             use_pair.append((pos_class_name, neg_class_name))
             auc = ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
+            filename=f'model_best_AUC_{pos_class_name}VS{neg_class_name}'
+            improve_hisyory_path = self.checkpoint_dir / f'{filename}.txt'
+            if improve_hisyory_path.is_file() and self.best_auc[f'{pos_class_name} VS {neg_class_name}'] is None:
+                if epoch != 1: 
+                    with open(str(improve_hisyory_path), 'r') as f:
+                        improve_auc = f.readlines()[-1].strip().split(self.AUCNameForFixedSpec)[-1]
+                    try: 
+                        self.best_auc[f'{pos_class_name} VS {neg_class_name}'] = float(deepcopy(improve_auc))
+                        self.logger.info("Loading the highest AUC: {} ...".format(self.best_auc[f'{pos_class_name} VS {neg_class_name}']))
+                    except: 
+                        self.logger.info("The highest AUC are not saved. So set to Null.")
+                        self.best_auc[f'{pos_class_name} VS {neg_class_name}'] = None
+                else: 
+                    self.logger.info("Delete the previous material because you're starting the training from scratch... {}".format(improve_hisyory_path))
+                    improve_hisyory_path.unlink()
+            
             if self.best_auc[f'{pos_class_name} VS {neg_class_name}'] is None or self.best_auc[f'{pos_class_name} VS {neg_class_name}'] < auc:
+                with open(str(improve_hisyory_path), "a") as f:
+                    f.write(f'{filename}.pth -> epoch{epoch} | {self.AUCNameForFixedSpec}{auc}\n')
                 self.best_auc[f'{pos_class_name} VS {neg_class_name}'] = auc
-                self._save_checkpoint(epoch, filename=f'model_best_AUC_{pos_class_name}VS{neg_class_name}', 
-                                      message=f'Saving current best AUC model... ({self.ROCNameForFixedSpec}, {pos_class_name}(+) VS {neg_class_name}(-))')
+                self._save_checkpoint(epoch, filename=filename, message=f'Saving current best AUC model... ({self.ROCNameForFixedSpec}, {pos_class_name}(+) VS {neg_class_name}(-))')
     
     def _save_output(self, log):
         '''
