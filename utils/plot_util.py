@@ -148,7 +148,6 @@ def plot_performance_N_only_loss(logs:dict, file_path=None, figsize:tuple=(5,5),
     if file_path is not None: ax.figure.savefig(file_path)
     if show: plt.show() 
     close_all_plots()
-    # 플롯만 수정하세요 loss 따로 저장하도록
 
 def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool=False, loss_plot:bool=True):
     file_path_list = str(file_path).split('/')

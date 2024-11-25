@@ -109,7 +109,10 @@ def ROC_OvO(labels, probs, classes:list,
     # print(f'init class_indices: {positive_class_indices} & {negative_class_indices}')
     # Calculate ROC curve for each class combination
     if positive_class_indices is None and negative_class_indices is None: 
-        raise ValueError("positive_class_indices and negative_class_indices cannot be None at the same time.")
+        # raise ValueError("positive_class_indices and negative_class_indices cannot be None at the same time.")
+        print('Both positive_class_indices and negative_class_indices are None. Use all classes.')
+        positive_class_indices = list(range(len(label_classes)))
+        negative_class_indices = list(range(len(label_classes)))
     if positive_class_indices is not None:
         if not isinstance(positive_class_indices, (int, list, np.ndarray)): 
             raise TypeError("positive_class_indices must be an int, list, or np.ndarray")

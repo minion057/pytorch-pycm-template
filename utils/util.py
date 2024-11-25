@@ -184,7 +184,7 @@ def save_pycm_object(cm:pycmCM, save_dir, save_name:str='cm'):
 def load_pycm_object(object_path:str):
     if Path(object_path).suffix != '.obj': raise TypeError('Only pycm objects saved as `obj` can be loaded.')
     try: json_obj = read_json(object_path)
-    except Exception as e: print(f'Unexpected errors: {str(e)}')
+    except Exception as e: raise Exception(f'Unexpected errors: {str(e)}')
     # 객체에서 classes를 변경했다면, json으로 불러와야지만 확인할 수 있음
     # 바로 pycm 객체로 불러온다면, 변경된 classes가 아닌, 원래 classes로 불러와짐
     # 따라서 변경해주는 작업 진행

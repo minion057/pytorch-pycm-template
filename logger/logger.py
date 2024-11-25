@@ -23,7 +23,7 @@ def setup_logging(save_dir, log_config=None, default_level=logging.INFO, test_mo
                     if test_mode: log_file_path.unlink()
                     else:
                         ori_log_file_path = Path(f'{log_file_path}.resume.{resume_epoch}')
-                        if not Path(ori_log_file_path).is_file(): shutil.copy(log_file_path, ori_logqkdlqk_file_path)
+                        if not Path(ori_log_file_path).is_file(): shutil.copy(log_file_path, ori_log_file_path)
                         else: shutil.copy(ori_log_file_path, log_file_path)
                 
                 handler['filename'] = str(save_dir / filename)

@@ -89,7 +89,9 @@ class Trainer(BaseTrainer):
                                                 **self.hookargs)
                 
         for batch_idx, load_data in enumerate(self.data_loader):
-            if len(load_data) == 3: data, target, path = load_data
+            if len(load_data) == 3: 
+                data, target, path = load_data
+                path = list(path)
             elif len(load_data) == 2: data, target, path = load_data, None
             else: raise Exception('The length of load_data should be 2 or 3.')
             
@@ -110,7 +112,10 @@ class Trainer(BaseTrainer):
             logit, predict = torch.max(output, 1)
             # DA will be replaced randomly if prob is given, i.e. not incremented. To increment, set no probability or use a sampler.
             if self.DA_ftns is None: loss = self._loss(output, target, logit)
-            else: loss, target = self._da_loss(output, target, logit)
+            else: 
+                if path is not None:
+                    path.extend([f'{self.DA_ftns.type}_{p}' for p in np.array(path)[self.DA_ftns.rand_index()]])
+                loss, target = self._da_loss(output, target, logit)
             if check_onehot_encoding_1(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
             
             # 3. Backward pass: compute gradient of the loss with respect to model parameters

@@ -11,9 +11,11 @@ class BaseSampler(RandomSampler):
         self.sampler_kwargs, self.kwargs = sampler_kwargs, kwargs
         
         self._set_data_and_targets()
+        self._set_paths()
         self._check_kwargs()
         self._run()
         self._set_data_and_targets()
+        self._set_paths()
         
         super().__init__(data_source=data_source)
     
@@ -23,6 +25,10 @@ class BaseSampler(RandomSampler):
         '''
         try: self.data, self.targets = self.data_source.data, self.data_source.targets
         except: raise ValueError('data_source must have `data` and `targets` attributes.')
+        
+    def _set_paths(self):
+        try: self.paths = self.data_source.paths
+        except: self.paths = None
     
     def _check_kwargs(self):
         pass

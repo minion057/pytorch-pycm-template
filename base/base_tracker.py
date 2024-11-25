@@ -57,6 +57,6 @@ class BaseTracker:
                 print(f'The Excel type is set to {excel_type}, but this is an unsupported format, so it is saved as CSV.')
                 print('Please modify the function and rerun if you require this format.')
             self._data.to_csv(f'{str(file_path)}.csv', index=True, header=True)
-        print(f'\nSave... {file_path}.{excel_type}')
+        print(f'\nSave... {file_path}.{excel_type}\n')
         
     

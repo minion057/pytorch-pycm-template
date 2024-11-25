@@ -15,6 +15,7 @@ class FixedSpecTester(Tester):
             raise ValueError('There is no fixed specificity score to track.')
         self.ROCNameForFixedSpec, fixedSpecType = ROCNameForFixedSpec, ROCNameForFixedSpec.split('_')[-1]
         self.AUCNameForFixedSpec, self.AUCNameForReference = f'AUC_{fixedSpecType}', f'AUC_{"OvR" if fixedSpecType=="OvO" else "OvO"}'
+        self.ACCAtAUC = self.AUCNameForFixedSpec.replace('AUC', 'ACC')
         self.AUCForReferenceftns, metrics_module = f'{self.AUCNameForReference}_class', check_and_import_library('model.metric')
         if self.AUCForReferenceftns not in dir(metrics_module):
             raise ValueError(f'Warring: {self.AUCForReferenceftns} is not in the model.metric library.')
@@ -86,11 +87,13 @@ class FixedSpecTester(Tester):
         auc_metrics = {}
         # 1. AUC calculated from the ROC curve, which is used for a fixed specificity.
         auc_metrics[self.AUCNameForFixedSpec], use_pair = {}, []
+        auc_metrics[self.ACCAtAUC] = {}
         for goal, pos_class_name, neg_class_name in self.test_ROCForFixedSpec.index:
             if (pos_class_name, neg_class_name) in use_pair: continue
             use_pair.append((pos_class_name, neg_class_name))
             use_tag = f'P-{pos_class_name}_N-{neg_class_name}'
             auc_metrics[self.AUCNameForFixedSpec][use_tag] = self.test_ROCForFixedSpec.get_auc(goal, pos_class_name, neg_class_name)
+            auc_metrics[self.ACCAtAUC][use_tag] = self.test_ROCForFixedSpec.get_basic_acc(goal, pos_class_name, neg_class_name)
         
         # 2. Reference AUC to be calculated in other ways 
         auc_metrics[self.AUCNameForReference] = self.AUCForReferenceftns(self.confusion.get_confusion_obj(self.confusion_key), self.classes)       
@@ -143,10 +146,11 @@ class FixedSpecTester(Tester):
         }
         '''
         basic_log = {key:val for key, val in log.items() if type(val) != dict} # epoch, loss, val_loss, runtime
-        auc_log = {key:val for key, val in log.items() if any(auc_name.lower() in key.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference])}
+        auc_basic_pass_items = [self.AUCNameForFixedSpec, self.AUCNameForReference, self.ACCAtAUC]
+        auc_log = {key:val for key, val in log.items() if any(auc_name.lower() in key.lower() for auc_name in auc_basic_pass_items)}
         
         for category, content in log.items():
-            if type(content) != dict or any(auc_name.lower() in category.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference]): continue # basic_log, auc_log
+            if type(content) != dict or any(auc_name.lower() in category.lower() for auc_name in auc_basic_pass_items): continue # basic_log, auc_log
             save_metrics_path = self.output_metrics
             if category != self.original_result_name: save_metrics_path = str(save_metrics_path).replace('.json', f'_{category}.json')
             
@@ -169,7 +173,7 @@ class FixedSpecTester(Tester):
                 if any(item in key.lower() for item in ['epoch', 'confusion', 'time']): continue
                 if type(value) != dict: # loss
                     self.writer.add_scalar(key, value)
-                elif any(auc_name.lower() in key.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference]): # auc
+                elif any(auc_name.lower() in key.lower() for auc_name in [self.AUCNameForFixedSpec, self.AUCNameForReference, self.ACCAtAUC]): # auc
                     self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
                 else: # maxprob, Fixed_spec_goal
                     for new_key, new_value in value.items():
