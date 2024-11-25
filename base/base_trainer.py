@@ -104,7 +104,6 @@ class BaseTrainer:
         """
         start = time.time()
         not_improved_count = 0 if not self.use_resume else self.not_improved_cnt
-        self.logger.info(f'\ntrain `not_improved_count` start: {not_improved_count}\n')
         for epoch in range(self.start_epoch, self.epochs + 1):
             epoch_start = time.time()
             result = self._train_epoch(epoch)
@@ -217,8 +216,12 @@ class BaseTrainer:
             
         self.start_epoch = checkpoint['epoch'] + 1
         self.mnt_best = checkpoint['monitor_best']
-        try: self.not_improved_cnt = checkpoint['not_improved_count']
-        except: self.not_improved_cnt = 0
+        try: 
+            self.not_improved_cnt = checkpoint['not_improved_count']
+            self.logger.info("Loading Unimproved counts: {} ...".format(self.not_improved_cnt))
+        except: 
+            self.logger.info("Unimproved counts are not saved. So set to 0.")
+            self.not_improved_cnt = 0
             
         # load architecture params from checkpoint.
         if checkpoint['config']['arch'] != self.config['arch']:
