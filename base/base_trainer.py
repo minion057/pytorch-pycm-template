@@ -38,6 +38,7 @@ class BaseTrainer:
         self.accumulation_steps = cfg_trainer['accumulation_steps'] if 'accumulation_steps' in cfg_trainer.keys() else None
         self.save_period = cfg_trainer['save_period']
         self.monitor = cfg_trainer.get('monitor', 'off')
+        self.monitor_min_delta = 1e-4
 
         # configuration to monitor model performance and save best
         if self.monitor == 'off':
@@ -138,10 +139,11 @@ class BaseTrainer:
                 try:
                     # check whether model performance improved or not, according to specified metric (mnt_metric -> e.g., loss of validation)
                     improved = False
+                    current_metric = log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name]
                     if self.mnt_mode == 'min':
-                        improved = (log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name]) <= self.mnt_best
+                        improved =  (self.mnt_best - current_metric) > self.monitor_min_delta
                     elif self.mnt_mode == 'max':
-                        improved = (log[self.mnt_metric] if self.mnt_metric_name is None else log[self.mnt_metric][self.mnt_metric_name]) >= self.mnt_best
+                        improved = (current_metric - self.mnt_best) > self.monitor_min_delta
                 except KeyError:
                     self.logger.warning("Warning: Metric '{}' is not found. "
                                         "Model performance monitoring is disabled.".format(self.mnt_metric))
