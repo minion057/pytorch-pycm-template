@@ -29,10 +29,10 @@ class Trainer(BaseTrainer):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.lr_scheduler_name = config['lr_scheduler']['type'] if 'lr_scheduler' in config.config.keys() else None
         self.log_step = int(np.sqrt(data_loader.batch_size))
 
-        self.basic_metrics = ['loss']
+        self.metric_loss_key = 'loss'
+        self.basic_metrics = [self.metric_loss_key]
         metrics_tag = []
         for met in self.metric_ftns:
             met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
@@ -208,11 +208,9 @@ class Trainer(BaseTrainer):
         self.prediction_preds, self.prediction_probs = None, None   
         
         # 6. Upate the lr scheduler
-        if self.lr_scheduler is not None:
+        if self.lr_scheduler is not None and not self.do_validation:
             self.writer.set_step(epoch)
-            self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
-            if self.lr_scheduler_name == 'ReduceLROnPlateau': self.lr_scheduler.step(val_log['loss'])
-            else: self.lr_scheduler.step()
+            self._lr_scheduler.step(mode='train')
 
         # 7. setting result     
         return self._get_a_log(epoch)
@@ -323,9 +321,14 @@ class Trainer(BaseTrainer):
             raise ValueError('Confusion matrix calculation failed. Please check the input data.')
         self.logger.debug(f'Valid Epoch: {epoch} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
         
-        # add histogram of model parameters to the tensorboard
+        # 6. add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
             self.writer.add_histogram(name, p, bins='auto')
+        
+        # 7. Upate the lr scheduler
+        if self.lr_scheduler is not None:
+            self.writer.set_step(epoch, 'valid')
+            self._lr_scheduler(mode='valid')
 
     def _loss(self, output, target, logit):
         return self.criterion(output, target, self.classes, self.device)
@@ -338,7 +341,20 @@ class Trainer(BaseTrainer):
             raise ValueError('The loss function in the DA class requires passing values as a dictionary with keys "loss" and "target".')
         self.DA_ftns.reset()
         return result['loss'], result['target']
-        
+    
+    def _lr_scheduler(self, mode='training'):
+        if mode.lower() not in ['training', 'validation', 'train', 'valid']: 
+            raise ValueError('mode must be "training" ("train") or "validation" ("valid").')
+        self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
+        if isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau): 
+            if mode == 'training':
+                self.logger.warning('ReduceLROnPlateau requires a validation metric (e.g., validation loss) to function properly.\n'
+                                    +'Using training loss instead may lead to overfitting. Therefore, the learning rate scheduler does not apply.\n'
+                                    +'Please ensure a validation dataset and metric are provided.')
+                return
+            self.lr_scheduler.step(self.valid_metrics.avg(self.metric_loss_key))
+        else: self.lr_scheduler.step()
+     
     def _plottable_metrics(self, actual_vector, probability_vector, mode='training'):
         if np.array(probability_vector).ndim != 2: raise ValueError('The probability vector should be 2D array.')
         for met in self.plottable_metric_ftns:            

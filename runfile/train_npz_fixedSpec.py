@@ -17,6 +17,7 @@ import data_loader.transforms as module_transforms
 import data_loader.npz_loaders as module_data
 import data_loader.data_augmentation as module_DA
 import model.optim as module_optim
+import model.lr_scheduler as module_lr_scheduler
 import model.loss as module_loss
 import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric
@@ -94,7 +95,7 @@ def main(config):
     optimizer = config.init_obj('optimizer', module_optim, trainable_params)
     lr_scheduler = None
     if 'lr_scheduler' in config.config.keys():
-        lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer) 
+        lr_scheduler = config.init_obj('lr_scheduler', module_lr_scheduler, optimizer)
     if lr_scheduler is None: print('lr_scheduler is not set.\n')
 
     trainer = Trainer(model, criterion, metrics, plottable_metric, optimizer,
