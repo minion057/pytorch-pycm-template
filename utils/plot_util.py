@@ -199,7 +199,7 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool
                 if f'val_{name}'.lower() in log_items: 
                     for subname, subscore in logs[f'val_{name}'].items():
                         ax.plot(logs['epoch'], subscore, label=f'Val {subname}'.replace('_', ' '))
-                ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=len(score) if len(score) < 4 else 3, mode='expand')
+                ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=2, mode='expand')
                 if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
                 if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
     
