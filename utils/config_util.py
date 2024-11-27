@@ -69,7 +69,7 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
         
     # return config information
     if return_type is str:
-        lr_scheduler, da, accum_steps = exper_dict['lr_scheduler'], exper_dict['da'], exper_dict['accum_steps']
+        lr_scheduler, lr_scheduler_settings, da, accum_steps = exper_dict['lr_scheduler'], exper_dict['lr_scheduler_settings'], exper_dict['da'], exper_dict['accum_steps']
         sampler_type, sampler = exper_dict['sampler_type'], exper_dict['sampler']
         exper_name = (
             # Required elements in the 1st folder: Name of config
