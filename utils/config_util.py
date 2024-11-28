@@ -58,7 +58,7 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
     exper_dict['accum_steps'] = '' if 'accumulation_steps' not in config['trainer'].keys() else config['trainer']['accumulation_steps']
     
     # Option 5. Regularization
-    exper_dict['dropout'] = 0.0 if 'dropout' not in config['arch']['args'].keys() else config['arch']['args']['dropout']
+    exper_dict['drop_rate'] = 0.0 if 'drop_rate' not in config['arch']['args'].keys() else config['arch']['args']['drop_rate']
     exper_dict['attn_drop_rate'] = 0.0 if 'attn_drop_rate' not in config['arch']['args'].keys() else config['arch']['args']['attn_drop_rate']
     exper_dict['weight_decay'] = 0.0 if 'weight_decay' not in config['optimizer']['args'].keys() else config['optimizer']['args']['weight_decay']
     
@@ -76,7 +76,7 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
             f"{exper_dict['config_name']}"
             # Required elements in the 2st folder: Name of model and dataloader
             # Optional elements in the 2st folder: Regularization        
-            f"/{exper_dict['model']}-{exper_dict['dataloader']}-WD_{exper_dict['weight_decay']}-DR_{exper_dict['dropout']}-ADR_{exper_dict['attn_drop_rate']}"
+            f"/{exper_dict['model']}-{exper_dict['dataloader']}-WD_{exper_dict['weight_decay']}-DR_{exper_dict['drop_rate']}-ADR_{exper_dict['attn_drop_rate']}"
             # Required elements in the 3st folder: Optimizer and learning rate
             # Optional elements in the 3st folder: Learning rate scheduler that anneals the learning rate         
             f"/{exper_dict['optimizer']}-lr_{exper_dict['lr']}{'' if lr_scheduler == '' else f'-{lr_scheduler}-{lr_scheduler_settings}'}"
