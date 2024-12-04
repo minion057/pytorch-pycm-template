@@ -99,6 +99,7 @@ def tb_projector_resize(data, target_img, features):
 def check_onehot_encoding_1(item, classes):
     item = np.array(item)
     item_class = np.unique(item, return_counts=True)[0]
+    if len(item_class) != 2: return False
     if all([0, 1] == item_class): 
         if len(classes) == len(item): return True
         else: raise ValueError('It\'s a one-hot encoding format, but it\'s not the same size as classes.')
@@ -129,6 +130,17 @@ def onehot_encoding(targets, classes):
         target2onehot = oh.transform(targets).toarray()
     else: target2onehot = np.array(targets)
     return target2onehot
+
+def convertOneHotEncoding(target, classes, device=None, useBinaryConversion=True, useMultiConversion=False):
+    if check_onehot_encoding_1(target[0].cpu(), classes): 
+        target = torch.max(target, 1).indices
+    if not useBinaryConversion and not useMultiConversion: 
+        target = target.clone()
+        target[target==0] = -1
+    elif useMultiConversion: 
+        if device is None: raise ValueError('device is required for multi-class classification.')
+        target = target.to(device, dtype=torch.long)
+    return target
 
 def integer_encoding(targets, classes): #  by index of classes
     targets, classes = np.array(targets), list(classes)
