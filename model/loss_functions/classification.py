@@ -43,7 +43,7 @@ def binary_focal_loss(output, target, classes=None, device=None, **kwargs):
 
 def soft_margin_loss(output, target, classes=None, device=None, **kwargs):
     if output.shape != target.shape and (len(output.shape) != 1 and len(target.shape) == 1):
-        target = convertOneHotEncoding(target, classes, useBinaryConversion=True, useMultiConversion=False)
+        target = convertOneHotEncoding(target, classes, useBinaryConversion=False, useMultiConversion=False)
         if output.shape[-1] == 1: output = output.squeeze()
         elif output.shape[-1] != 2: 
             raise ValueError('SoftMarginLoss is designed for binary classification tasks only. Multi-class classification is not supported.')
@@ -52,7 +52,7 @@ def soft_margin_loss(output, target, classes=None, device=None, **kwargs):
 
 def hinge_embedding_loss(output, target, classes=None, device=None, **kwargs):
     if output.shape != target.shape and (len(output.shape) != 1 and len(target.shape) == 1):
-        target = convertOneHotEncoding(target, classes, useBinaryConversion=True, useMultiConversion=False)
+        target = convertOneHotEncoding(target, classes, useBinaryConversion=False, useMultiConversion=False)
         if output.shape[-1] == 1: output = output.squeeze()
         elif output.shape[-1] != 2: 
             raise ValueError('HingeEmbeddingLoss is designed for binary classification tasks only. Multi-class classification is not supported.')
@@ -66,5 +66,6 @@ def auc_marging_loss(output, target, classes=None, device=None, **kwargs):
     # It is recommended to train first with CE LOSS and then use it for secondary training with BEST model.
     margin = kwargs.get('margin', 1.0)
     version = kwargs.get('version', 'v1')
+    target = convertOneHotEncoding(target, classes, useBinaryConversion=True, useMultiConversion=False)
     loss_fn = losses.AUCMLoss(margin=margin, version=version, device='cpu' if device is None else device)
     return loss_fn(output, target)
