@@ -13,3 +13,5 @@ tqdm
 pycm==4.0
 scikit-learn
 torchcam
+
+libauc
