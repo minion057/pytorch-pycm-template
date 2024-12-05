@@ -32,7 +32,7 @@ def focal_loss(output, target, classes=None, device=None, **kwargs):
         return focal_loss.sum()
     else:
         return focal_loss
-def binary_focal_loss(output, target, classes=None, device=None, **kwargs):
+def binary_focal_loss(output, target, classes=None, device=None, **kwargs): # only for binary classification
     if output.shape != target.shape and (len(output.shape) != 1 and len(target.shape) == 1):
         target = convertOneHotEncoding(target, classes, useBinaryConversion=True, useMultiConversion=False)
         if output.shape[-1] == 1: output = output.squeeze()
