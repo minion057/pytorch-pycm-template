@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torchvision.ops import sigmoid_focal_loss
 from utils import convertOneHotEncoding
-
+from libauc import losses
 
 def ce_loss(output, target, classes=None, device=None, **kwargs):
     return F.cross_entropy(output, target, **kwargs)
@@ -58,3 +58,13 @@ def hinge_embedding_loss(output, target, classes=None, device=None, **kwargs):
             raise ValueError('HingeEmbeddingLoss is designed for binary classification tasks only. Multi-class classification is not supported.')
         else: output = output[:, 1] - output[:, 0]
     return F.hinge_embedding_loss(output.squeeze(), target.to(dtype=torch.float, device=device), **kwargs)
+
+def auc_marging_loss(output, target, classes=None, device=None, **kwargs):
+    # Large-scale Robust Deep AUC Maximization: A New Surrogate Loss and Empirical Studies on Medical Image Classification (2021, ICCV)
+    # AUC-Margin loss with squared-hinge surrogate loss for optimizing AUROC
+    # Must be used with the PESG optimiser.
+    # It is recommended to train first with CE LOSS and then use it for secondary training with BEST model.
+    margin = kwargs.get('margin', 1.0)
+    version = kwargs.get('version', 'v1')
+    loss_fn = losses.AUCMLoss(margin=margin, version=version, device='cpu' if device is None else device)
+    return loss_fn(output, target)
