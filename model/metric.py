@@ -89,7 +89,7 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
     use_ftns = getattr(metrics_module, ftns_name)
     
     target_classes = list(np.unique(confusion_obj.actual_vector))
-    if len(target_classes) == 1: return {c:0. for c in classes} # AUC area not available
+    if len(classes) != len(target_classes): return {c:-1. for c in classes} # AUC area not available
     if not all(class_item in list(target_classes) for class_item in list(classes)):
         print(f"Warning: Classes in current label ({target_classes}) do not match classes in confusion object ({classes})."
               +"Please ensure that the classes are consistent.")
@@ -97,10 +97,12 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
     if confusion_obj.prob_vector is None: raise ValueError('No value for prob vector.')
     if isinstance(confusion_obj.prob_vector, dict):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
-        
     roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
     close_all_plots()
-    score = {f'{classes[pos]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    score = {classes[pos]:auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    for class_item in classes:
+        if class_item not in score.keys(): 
+            score[class_item] = -1.
     if positive_class_indices is not None: 
         positive_classes = np.array(classes)[positive_class_indices]
         for class_item in list(score.keys()):
@@ -117,7 +119,7 @@ def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
     use_ftns = getattr(metrics_module, ftns_name)
     
     target_classes = list(np.unique(confusion_obj.actual_vector))
-    if len(target_classes) == 1: return {c:0. for c in classes} # AUC area not available
+    if len(target_classes) == 1: return {c:-1. for c in classes} # AUC area not available
     if not all(class_item in list(target_classes) for class_item in list(classes)):
         print(f"Warning: Classes in current label ({target_classes}) do not match classes in confusion object ({classes})."
               +"Please ensure that the classes are consistent.")
@@ -129,6 +131,11 @@ def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
     roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
     close_all_plots()
     score = {f'{classes[pos]} vs {classes[neg]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    for pos_class in classes:
+        for neg_class in classes:
+            if pos_class == neg_class: continue
+            socre_key = f'{pos_class} vs {neg_class}'
+            if socre_key not in score.keys(): score[socre_key] = -1.
     if positive_class_indices is not None: 
         positive_classes = np.array(classes)[positive_class_indices]
         for class_item in list(score.keys()):
