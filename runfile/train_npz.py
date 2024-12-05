@@ -7,6 +7,7 @@ import argparse
 import collections
 import torch
 import numpy as np
+from pathlib import Path
 
 from torchinfo import summary
 from torchviz import make_dot
@@ -23,10 +24,11 @@ import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
-from runner import Trainer
-from utils import prepare_device, reset_device
-from utils import cal_model_parameters
+from runner import Trainer, FixedSpecTrainer
+from utils import prepare_device, reset_device, cal_model_parameters
+from utils import read_json, write_json, set_common_experiment_name
 
+from libauc import losses
 
 # fix random seeds for reproducibility
 SEED = 123
@@ -35,10 +37,50 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
+def change_config_for_auclossmode():
+    args = argparse.ArgumentParser(description='PyTorch pycm Template')
+    args.add_argument('-co', '--config_origin', default=None, type=str, help='config file path (default: None)')
+    args, unknown = args.parse_known_args()
+    config_dict = read_json(args.config_origin)
+    
+    resume_path = Path(config_dict['trainer']['save_dir']) / 'models' / set_common_experiment_name(config_dict)
+    best_model_list = sorted(resume_path.glob('**/model_best.pth'))
+    if len(best_model_list) == 0: raise ValueError('There is no best model.')
+    elif len(best_model_list) > 1: raise ValueError(f'There are more than one best model. List: {best_model_list}.')
+    
+    config_dict['loss'] = 'auc_marging_loss'
+    config_dict['optimizer']['type'] = 'PESG'
+    config_dict['optimizer']['args'] = {'lr':config_dict['optimizer']['args']['lr']}
+    
+    append_str = '_AUCLOSS'
+    # if config_dict['trainer']['save_dir'][-1] != '/': config_dict['trainer']['save_dir'] +=  append_str
+    # else: config_dict['trainer']['save_dir'] = config_dict['trainer']['save_dir'].rstrip('/') + append_str
+    config_dict['name'] += append_str
+    config_save_path = str(args.config_origin).replace('.json', f'{append_str}.json')
+    config_dict['AUC LOSS'] = str(best_model_list[-1])
+    write_json(config_dict, config_save_path)
+    return best_model_list[-1], config_save_path
+
+def init_args():
+    args = argparse.ArgumentParser(description='PyTorch pycm Template')
+    args.add_argument('-f', '--fixedspectrainer',  default=False,  type=bool, help='Whether to enable fixedspectrainer mode (default: True)')
+    args.add_argument('-c',  '--config',        default=None,  type=str,  help='config file path (default: None)')
+    args.add_argument('-co', '--config_origin', default=None,  type=str,  help='config file path for auc loss mode (default: None)') 
+    args, unknown = args.parse_known_args()
+    return args.fixedspectrainer, not args.config_origin is None
+    
+def parsing_args(config_new_path:str=None):
+    args = argparse.ArgumentParser(description='PyTorch pycm Template')
+    args.add_argument('-co', '--config_origin', default=None,  type=str,  help='config file path for auc loss mode (default: None)') 
+    args.add_argument('-c',  '--config',        default=config_new_path,  type=str,  help='config file path (default: None)')
+    args.add_argument('-r',  '--resume',        default=None,  type=str,  help='path to latest checkpoint (default: None)')
+    args.add_argument('-d',  '--device',        default=None,  type=str,  help='indices of GPUs to enable (default: all)')
+    args.add_argument('-t',  '--test',          default=False, type=bool, help='Whether to enable test mode (default: False)')
+    return args
 
 def main(config):
     logger = config.get_logger('train')
-
+    
     # setup data_loader instances
     if 'trsfm' in config['data_loader']['args'].keys():
         tf_list = []
@@ -62,6 +104,12 @@ def main(config):
     device, device_ids = prepare_device(config['n_gpu'])
     model = model.to(device)
     if len(device_ids) > 1: model = torch.nn.DataParallel(model, device_ids=device_ids)
+
+    if IS_AUCLOSS: # model load using best model
+        logger.info('\nAUC LOSS MODE. USING MODEL PATH: {}\n'.format(MODEL_BEST_PATH))
+        checkpoint = torch.load(MODEL_BEST_PATH, map_location=device, weights_only=False)
+        if len(device_ids) > 1: model.module.load_state_dict(checkpoint['state_dict'])
+        else: model.load_state_dict(checkpoint['state_dict'])
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
@@ -89,23 +137,31 @@ def main(config):
                         logger.warning('Although the data loader has already been oversampled by the sampler, '\
                                        'it will be further oversampled by the DA, which may cause errors.')
     else: da_ftns = None
-
+        
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = config.init_obj('optimizer', module_optim, trainable_params)
+    if IS_AUCLOSS: optimizer = config.init_obj('optimizer', module_optim, trainable_params, losses.AUCMLoss(device=device))
+    else: optimizer = config.init_obj('optimizer', module_optim, trainable_params)
     lr_scheduler = None
     if 'lr_scheduler' in config.config.keys():
         lr_scheduler = config.init_obj('lr_scheduler', module_lr_scheduler, optimizer)
     if lr_scheduler is None: print('lr_scheduler is not set.\n')
 
-    trainer = Trainer(model, criterion, metrics, plottable_metric, optimizer,
-                      config=config,
-                      classes=classes,
-                      device=device,
-                      data_loader=train_data_loader,
-                      valid_data_loader=valid_data_loader,
-                      lr_scheduler=lr_scheduler,
-                      da_ftns=da_ftns)
+    train_kwargs = {
+        'model': model,
+        'criterion': criterion,
+        'metric_ftns': metrics,
+        'plottable_metric_ftns': plottable_metric,
+        'optimizer': optimizer,
+        'lr_scheduler': lr_scheduler,
+        'config': config,
+        'classes': classes,
+        'device': device,
+        'data_loader': train_data_loader,
+        'valid_data_loader': valid_data_loader,
+        'da_ftns': da_ftns
+    }
+    trainer = Trainer(**train_kwargs) if not IS_FIXED else FixedSpecTrainer(**train_kwargs)
 
     trainer.train()
 
@@ -126,12 +182,13 @@ def main(config):
 
 
 """ Run """
-args = argparse.ArgumentParser(description='PyTorch pycm Template')
-args.add_argument('-c', '--config', default=None,  type=str,  help='config file path (default: None)')
-args.add_argument('-r', '--resume', default=None,  type=str,  help='path to latest checkpoint (default: None)')
-args.add_argument('-d', '--device', default=None,  type=str,  help='indices of GPUs to enable (default: all)')
-args.add_argument('-t', '--test',   default=False, type=bool, help='Whether to enable test mode (default: False)')
-
+IS_FIXED, IS_AUCLOSS = init_args()
+if IS_AUCLOSS:
+    print('auc mode')
+    MODEL_BEST_PATH, NEW_AUC_CONFIG_PATH = change_config_for_auclossmode()
+    print('auc mode', MODEL_BEST_PATH)
+    args = parsing_args(NEW_AUC_CONFIG_PATH)
+else: args = parsing_args()
 # custom cli options to modify configuration from default values given in json file.
 CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
 options = [
