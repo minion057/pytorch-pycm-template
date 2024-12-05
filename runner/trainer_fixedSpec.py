@@ -31,6 +31,7 @@ class FixedSpecTrainer(Trainer):
         
         super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device,
                          data_loader, valid_data_loader, lr_scheduler, len_epoch, da_ftns)
+        self.logger.info('FixedSpecTrainer is running...')
         self.config = config
         self.device = device
         
