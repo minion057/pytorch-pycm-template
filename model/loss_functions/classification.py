@@ -15,7 +15,7 @@ def bce_loss(output, target, classes=None, device=None, **kwargs):
 
 def focal_loss(output, target, classes=None, device=None, **kwargs):
     reduction = kwargs.get('reduction', 'mean')
-    alpha = kwargs.get('alpha', None)
+    alpha = kwargs.get('alpha', 0.25)
     gamma = kwargs.get('gamma', .2)
     if reduction not in ['mean', 'sum']: raise ValueError(f"Invalid reduction mode: {reduction}")
     if gamma is None: raise ValueError("Focal Loss requires 'gamma' to be set.")
