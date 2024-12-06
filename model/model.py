@@ -10,6 +10,8 @@ from .models.InceptionNeXt import inceptionnext_tiny, inceptionnext_small, incep
 from .models.VanillaNet import vanillanet_5, vanillanet_6, vanillanet_7, vanillanet_8, vanillanet_9, vanillanet_10, vanillanet_11, vanillanet_12
 from .models.VanillaNet import vanillanet_13, vanillanet_13_x1_5, vanillanet_13_x1_5_ada_pool
 
+from .models.ResNet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152
+
 """ 2. Input: n X n -> need to pad for model """
 from .models.DeiT3 import deit_tiny_patch16_LS, deit_small_patch16_LS, deit_base_patch16_LS
 from .models.DeiT3 import deit_large_patch16_LS, deit_huge_patch14_LS
