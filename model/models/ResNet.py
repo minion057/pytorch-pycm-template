@@ -1,10 +1,3 @@
-""" ConvNeXt V2: Co-designing and Scaling ConvNets with Masked Autoencoders
-- Papaer: https://arxiv.org/pdf/1608.06993.pdf
-- Official Code: https://github.com/liuzhuang13/ResNet
-
-- The models used in the paper are all.
-"""
-
 import timm
 
 def ResNet18(num_classes:int=1000, in_chans=3, pretrained:bool=False, **kwargs):    
