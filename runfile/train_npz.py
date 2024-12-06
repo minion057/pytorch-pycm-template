@@ -29,49 +29,32 @@ from utils import prepare_device, reset_device, cal_model_parameters
 from utils import read_json, write_json, set_common_experiment_name
 
 from libauc import losses
+import libauc.optimizers as libauc_optim
 
 # fix random seeds for reproducibility
-SEED = 123
+SEED, AUCLOSS = 123, 'AUCLOSS'
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
-def change_config_for_auclossmode():
-    args = argparse.ArgumentParser(description='PyTorch pycm Template')
-    args.add_argument('-co', '--config_origin', default=None, type=str, help='config file path (default: None)')
-    args, unknown = args.parse_known_args()
+def find_best_model_for_aucloss(args):
     config_dict = read_json(args.config_origin)
-    
-    resume_path = Path(config_dict['trainer']['save_dir']) / 'models' / set_common_experiment_name(config_dict)
-    best_model_list = sorted(resume_path.glob('**/model_best.pth'))
+    pretrained_path = Path(str(config_dict['trainer']['save_dir']).replace(f'_{AUCLOSS}', '').replace(AUCLOSS, '')) / 'models' / set_common_experiment_name(config_dict)
+    best_model_list = sorted(pretrained_path.glob('**/model_best.pth'))
     if len(best_model_list) == 0: raise ValueError('There is no best model.')
     elif len(best_model_list) > 1: raise ValueError(f'There are more than one best model. List: {best_model_list}.')
-    
-    config_dict['loss'] = 'auc_marging_loss'
-    config_dict['optimizer']['type'] = 'PESG'
-    config_dict['optimizer']['args'] = {'lr':config_dict['optimizer']['args']['lr']}
-    
-    append_str = '_AUCLOSS'
-    # if config_dict['trainer']['save_dir'][-1] != '/': config_dict['trainer']['save_dir'] +=  append_str
-    # else: config_dict['trainer']['save_dir'] = config_dict['trainer']['save_dir'].rstrip('/') + append_str
-    config_dict['name'] += append_str
-    config_save_path = str(args.config_origin).replace('.json', f'{append_str}.json')
-    config_dict['AUC LOSS'] = str(best_model_list[-1])
-    write_json(config_dict, config_save_path)
-    return best_model_list[-1], config_save_path
+    return best_model_list[-1]
 
 def init_args():
     args = argparse.ArgumentParser(description='PyTorch pycm Template')
     args.add_argument('-f', '--fixedspectrainer',  default=False,  type=bool, help='Whether to enable fixedspectrainer mode (default: True)')
-    args.add_argument('-c',  '--config',        default=None,  type=str,  help='config file path (default: None)')
-    args.add_argument('-co', '--config_origin', default=None,  type=str,  help='config file path for auc loss mode (default: None)') 
+    args.add_argument('-c',  '--config',           default=None,  type=str,  help='config file path (default: None)')
     args, unknown = args.parse_known_args()
-    return args.fixedspectrainer, not args.config_origin is None
+    return args.fixedspectrainer, AUCLOSS in str(args.config).lower()
     
 def parsing_args(config_new_path:str=None):
     args = argparse.ArgumentParser(description='PyTorch pycm Template')
-    args.add_argument('-co', '--config_origin', default=None,  type=str,  help='config file path for auc loss mode (default: None)') 
     args.add_argument('-c',  '--config',        default=config_new_path,  type=str,  help='config file path (default: None)')
     args.add_argument('-r',  '--resume',        default=None,  type=str,  help='path to latest checkpoint (default: None)')
     args.add_argument('-d',  '--device',        default=None,  type=str,  help='indices of GPUs to enable (default: all)')
@@ -140,8 +123,16 @@ def main(config):
         
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-    if IS_AUCLOSS: optimizer = config.init_obj('optimizer', module_optim, trainable_params, losses.AUCMLoss(device=device))
-    else: optimizer = config.init_obj('optimizer', module_optim, trainable_params)
+    loss_fn = None
+    if IS_AUCLOSS:
+        if config['loss'] == 'binary_auc_marging_loss' and len(classes) != 2:
+            raise ValueError(f'The number of classes should be 2 when using binary_auc_marging_loss. Now it is {len(classes)}.')
+        if 'auc_marging_loss' not in config['loss']:
+            raise ValueError('Not supported loss function. Only auc_marging_loss is supported.')
+        loss_fn =  losses.MultiLabelAUCMLoss(device=device, num_labels=len(classes)) if len(classes) != 2 else losses.AUCMLoss(device=device)
+    if not hasattr(libauc_optim, config['optimizer']): optimizer = config.init_obj('optimizer', module_optim, trainable_params)
+    else: optimizer = config.init_obj('optimizer', module_optim, trainable_params, criterion if loss_fn is None else loss_fn)
+    
     lr_scheduler = None
     if 'lr_scheduler' in config.config.keys():
         lr_scheduler = config.init_obj('lr_scheduler', module_lr_scheduler, optimizer)
@@ -185,10 +176,9 @@ def main(config):
 IS_FIXED, IS_AUCLOSS = init_args()
 if IS_AUCLOSS:
     print('auc mode')
-    MODEL_BEST_PATH, NEW_AUC_CONFIG_PATH = change_config_for_auclossmode()
+    MODEL_BEST_PATH = find_best_model_for_aucloss()
     print('auc mode', MODEL_BEST_PATH)
-    args = parsing_args(NEW_AUC_CONFIG_PATH)
-else: args = parsing_args()
+args = parsing_args()
 # custom cli options to modify configuration from default values given in json file.
 CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
 options = [
