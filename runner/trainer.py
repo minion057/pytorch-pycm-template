@@ -211,7 +211,7 @@ class Trainer(BaseTrainer):
         # 6. Upate the lr scheduler
         if self.lr_scheduler is not None and not self.do_validation:
             self.writer.set_step(epoch)
-            self._lr_scheduler.step(mode='train')
+            self._lr_scheduler.step(epoch=epoch, mode='train')
 
         # 7. setting result     
         return self._get_a_log(epoch)
@@ -329,7 +329,7 @@ class Trainer(BaseTrainer):
         # 7. Upate the lr scheduler
         if self.lr_scheduler is not None:
             self.writer.set_step(epoch, 'valid')
-            self._lr_scheduler(mode='valid')
+            self._lr_scheduler(epoch=epoch, mode='valid')
 
     def _loss(self, output, target, logit):
         return self.criterion(output, target, self.classes, self.device)
@@ -343,7 +343,7 @@ class Trainer(BaseTrainer):
         self.DA_ftns.reset()
         return result['loss'], result['target']
     
-    def _lr_scheduler(self, mode='training'):
+    def _lr_scheduler(self, epoch, mode='training'):
         if mode.lower() not in ['training', 'validation', 'train', 'valid']: 
             raise ValueError('mode must be "training" ("train") or "validation" ("valid").')
         self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
@@ -354,7 +354,9 @@ class Trainer(BaseTrainer):
                                     +'Please ensure a validation dataset and metric are provided.')
                 return
             self.lr_scheduler.step(self.valid_metrics.avg(self.metric_loss_key))
-        else: self.lr_scheduler.step()
+        else: 
+            try: self.lr_scheduler.step()
+            except: self.lr_scheduler.step(epoch) # for timm optim
      
     def _plottable_metrics(self, actual_vector, probability_vector, mode='training'):
         if np.array(probability_vector).ndim != 2: raise ValueError('The probability vector should be 2D array.')
