@@ -16,7 +16,7 @@ def bce_loss(output, target, classes=None, device=None, **kwargs):
 def focal_loss(output, target, classes=None, device=None, **kwargs):
     reduction = kwargs.get('reduction', 'mean')
     alpha = kwargs.get('alpha', None)
-    gamma = kwargs.get('gamma', .0)
+    gamma = kwargs.get('gamma', .2)
     if reduction not in ['mean', 'sum']: raise ValueError(f"Invalid reduction mode: {reduction}")
     if gamma is None: raise ValueError("Focal Loss requires 'gamma' to be set.")
     
@@ -59,7 +59,7 @@ def hinge_embedding_loss(output, target, classes=None, device=None, **kwargs):
         else: output = output[:, 1] - output[:, 0]
     return F.hinge_embedding_loss(output.squeeze(), target.to(dtype=torch.float, device=device), **kwargs)
 
-def auc_marging_loss(output, target, classes=None, device=None, **kwargs):
+def binary_auc_marging_loss(output, target, classes=None, device=None, **kwargs):
     # Large-scale Robust Deep AUC Maximization: A New Surrogate Loss and Empirical Studies on Medical Image Classification (2021, ICCV)
     # AUC-Margin loss with squared-hinge surrogate loss for optimizing AUROC
     # Must be used with the PESG optimiser.
@@ -68,4 +68,12 @@ def auc_marging_loss(output, target, classes=None, device=None, **kwargs):
     version = kwargs.get('version', 'v1')
     target = convertOneHotEncoding(target, classes, useBinaryConversion=True, useMultiConversion=False)
     loss_fn = losses.AUCMLoss(margin=margin, version=version, device='cpu' if device is None else device)
+    return loss_fn(output, target)
+def auc_marging_loss(output, target, classes=None, device=None, **kwargs):
+    # Large-scale Robust Deep AUC Maximization: A New Surrogate Loss and Empirical Studies on Medical Image Classification (2021, ICCV)
+    # AUC-Margin loss with squared-hinge surrogate loss for optimizing AUROC
+    # Must be used with the PESG optimiser.
+    # It is recommended to train first with CE LOSS and then use it for secondary training with BEST model.
+    margin = kwargs.get('margin', 1.0)
+    loss_fn = losses.MultiLabelAUCMLoss(margin=margin, num_labels=len(classes), device='cpu' if device is None else device)
     return loss_fn(output, target)
