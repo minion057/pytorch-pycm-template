@@ -122,10 +122,10 @@ def main(config):
         if 'auc_marging_loss' not in config['loss']:
             raise ValueError('Not supported loss function. Only auc_marging_loss is supported.')
         loss_fn =  losses.MultiLabelAUCMLoss(device=device, num_labels=len(classes)) if len(classes) != 2 else losses.AUCMLoss(device=device)
-    if not hasattr(libauc_optim, config['optimizer']['type']): 
-        optimizer = config.init_obj('optimizer', module_optim, trainable_params)
-    else:
-        optimizer = config.init_obj('optimizer', module_optim, trainable_params, criterion if loss_fn is None else loss_fn)
+    # if not hasattr(libauc_optim, config['optimizer']['type']): 
+    try:    optimizer = config.init_obj('optimizer', module_optim, trainable_params)
+    # else:
+    except:    optimizer = config.init_obj('optimizer', module_optim, trainable_params, criterion if loss_fn is None else loss_fn)
     
     lr_scheduler = None
     if 'lr_scheduler' in config.config.keys():
