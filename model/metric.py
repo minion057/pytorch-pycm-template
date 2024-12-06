@@ -33,6 +33,10 @@ def TPR_class(confusion_obj:pycmCM, classes=None, positive_class_indices=None):
     # Instantiate objects and verify class correctness
     ftns = BaseMetricFtns(confusion_obj=confusion_obj, classes=classes)
     return ftns.multi_class_metric('TPR', positive_class_indices)
+def BACC(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
+    # Instantiate objects and verify class correctness
+    ftns = BaseMetricFtns(confusion_obj=confusion_obj, classes=classes)
+    return ftns.single_class_metric('TPR', positive_class_idx, 'Macro')
 
 """ Specificity or true negative rate """
 def TNR(confusion_obj:pycmCM, classes=None, positive_class_idx=None):
