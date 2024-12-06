@@ -1,3 +1,3 @@
 from torch.optim.lr_scheduler import *
-
-from .lr_schedulers.customCosineAnnealingWarmRestarts import CustomCosineAnnealingWarmUpRestarts
+from timm.scheduler import *
+# from .lr_schedulers.customCosineAnnealingWarmRestarts import CustomCosineAnnealingWarmUpRestarts
