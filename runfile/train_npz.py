@@ -38,20 +38,12 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
-def find_best_model_for_aucloss(args):
-    config_dict = read_json(args.config_origin)
-    pretrained_path = Path(str(config_dict['trainer']['save_dir']).replace(f'_{AUCLOSS}', '').replace(AUCLOSS, '')) / 'models' / set_common_experiment_name(config_dict)
-    best_model_list = sorted(pretrained_path.glob('**/model_best.pth'))
-    if len(best_model_list) == 0: raise ValueError('There is no best model.')
-    elif len(best_model_list) > 1: raise ValueError(f'There are more than one best model. List: {best_model_list}.')
-    return best_model_list[-1]
-
 def init_args():
     args = argparse.ArgumentParser(description='PyTorch pycm Template')
     args.add_argument('-f', '--fixedspectrainer',  default=False,  type=bool, help='Whether to enable fixedspectrainer mode (default: True)')
     args.add_argument('-c',  '--config',           default=None,  type=str,  help='config file path (default: None)')
     args, unknown = args.parse_known_args()
-    return args.fixedspectrainer, AUCLOSS in str(args.config).lower()
+    return args.fixedspectrainer, AUCLOSS in str(args.config)
     
 def parsing_args(config_new_path:str=None):
     args = argparse.ArgumentParser(description='PyTorch pycm Template')
@@ -89,8 +81,8 @@ def main(config):
     if len(device_ids) > 1: model = torch.nn.DataParallel(model, device_ids=device_ids)
 
     if IS_AUCLOSS: # model load using best model
-        logger.info('\nAUC LOSS MODE. USING MODEL PATH: {}\n'.format(MODEL_BEST_PATH))
-        checkpoint = torch.load(MODEL_BEST_PATH, map_location=device, weights_only=False)
+        logger.info('\nAUC LOSS MODE. USING MODEL PATH: {}\n'.format(config['pretrained_model']))
+        checkpoint = torch.load(config['pretrained_model'], map_location=device, weights_only=False)
         if len(device_ids) > 1: model.module.load_state_dict(checkpoint['state_dict'])
         else: model.load_state_dict(checkpoint['state_dict'])
 
@@ -130,8 +122,10 @@ def main(config):
         if 'auc_marging_loss' not in config['loss']:
             raise ValueError('Not supported loss function. Only auc_marging_loss is supported.')
         loss_fn =  losses.MultiLabelAUCMLoss(device=device, num_labels=len(classes)) if len(classes) != 2 else losses.AUCMLoss(device=device)
-    if not hasattr(libauc_optim, config['optimizer']): optimizer = config.init_obj('optimizer', module_optim, trainable_params)
-    else: optimizer = config.init_obj('optimizer', module_optim, trainable_params, criterion if loss_fn is None else loss_fn)
+    if not hasattr(libauc_optim, config['optimizer']['type']): 
+        optimizer = config.init_obj('optimizer', module_optim, trainable_params)
+    else:
+        optimizer = config.init_obj('optimizer', module_optim, trainable_params, criterion if loss_fn is None else loss_fn)
     
     lr_scheduler = None
     if 'lr_scheduler' in config.config.keys():
@@ -174,10 +168,6 @@ def main(config):
 
 """ Run """
 IS_FIXED, IS_AUCLOSS = init_args()
-if IS_AUCLOSS:
-    print('auc mode')
-    MODEL_BEST_PATH = find_best_model_for_aucloss()
-    print('auc mode', MODEL_BEST_PATH)
 args = parsing_args()
 # custom cli options to modify configuration from default values given in json file.
 CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
