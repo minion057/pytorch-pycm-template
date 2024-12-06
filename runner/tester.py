@@ -105,8 +105,8 @@ class Tester(BaseTester):
                 if self.projector:                    
                     label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
                     class_labels.extend([str(self.classes[lab]) for lab in use_target])
-                
-                if batch_idx == len(self.data_loader)-2 and self.tensorboard_pred_plot:
+
+                if (batch_idx == len(self.data_loader)-2 or len(self.data_loader) == 1) and self.tensorboard_pred_plot:
                     # last batch -1 > To minimize batches with a length of 1 as much as possible.
                     # If you want to modify the last batch, pretend that len(self.data_loader)-2 is self.len_epoch-1.
                     self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
