@@ -101,12 +101,15 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
     if confusion_obj.prob_vector is None: raise ValueError('No value for prob vector.')
     if isinstance(confusion_obj.prob_vector, dict):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
-    roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
+    roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, 
+                           classes=classes, positive_class_indices=list(range(len(classes))), return_result=True)
     close_all_plots()
-    score = {classes[pos]:auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    real_score = {classes[pos]:auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    score = {}
     for class_item in classes:
-        if class_item not in score.keys(): 
+        if class_item not in real_score.keys(): 
             score[class_item] = -1.
+        else: score[class_item] = real_score[class_item]
     if positive_class_indices is not None: 
         positive_classes = np.array(classes)[positive_class_indices]
         for class_item in list(score.keys()):
@@ -132,14 +135,17 @@ def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
     if isinstance(confusion_obj.prob_vector, dict):
         confusion_obj.prob_vector = confusion_obj.prob_vector['all_probs']
         
-    roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True)
+    roc_dict, _ = use_ftns(labels=confusion_obj.actual_vector, probs=confusion_obj.prob_vector, classes=classes, return_result=True, 
+                           positive_class_indices=list(range(len(classes))), negative_class_indices=list(range(len(classes))))
     close_all_plots()
-    score = {f'{classes[pos]} vs {classes[neg]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    real_score = {f'{classes[pos]} vs {classes[neg]}':auc for (pos, neg), auc in zip(roc_dict['pos_neg_idx'], roc_dict['auc'])}
+    score = {}
     for pos_class in classes:
         for neg_class in classes:
             if pos_class == neg_class: continue
             socre_key = f'{pos_class} vs {neg_class}'
-            if socre_key not in score.keys(): score[socre_key] = -1.
+            if socre_key not in real_score.keys(): score[socre_key] = -1.
+            else: score[socre_key] = real_score[socre_key]
     if positive_class_indices is not None: 
         positive_classes = np.array(classes)[positive_class_indices]
         for class_item in list(score.keys()):
