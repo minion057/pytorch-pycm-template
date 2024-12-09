@@ -48,77 +48,79 @@ class Tester(BaseTester):
         self.confusion.reset()
         label_img, features, class_labels = None, None, []
         data_channel = None
+        self.writer.set_step(self.test_epoch, self.wirter_mode)
         with torch.no_grad():
+            output, use_data, use_target, use_path = [], [], [], []
             for batch_idx, load_data in enumerate(tqdm(self.data_loader)):
                 if len(load_data) == 3: data, target, path = load_data
                 elif len(load_data) == 2: data, target, path = load_data, None
                 else: raise Exception('The length of load_data should be 2 or 3.')
-                
-                batch_num = batch_idx + 1
                 
                 # 1. To move Torch to the GPU or CPU
                 data, target = data.to(self.device), target.to(self.device)
 
                 # Compute prediction error
                 # 2. Forward pass: compute predicted outputs by passing inputs to the model
-                output = self.model(data)
-                logit, predict = torch.max(output, 1)
-                loss = self._loss(output, target, logit)
-                if check_onehot_encoding_1(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
+                output.append(self.model(data).detach())
+                use_data.append(data.detach())
+                use_target.append(target.detach())
+                use_path.extend(list(path))
                 
-                use_data, use_target = data.detach().cpu(), target.detach().cpu().tolist()
-                use_output, use_predict =output.detach().cpu(), predict.detach().cpu()
-                
-                # 3. Update the loss
-                self.writer.set_step(batch_num, f'batch_{self.wirter_mode}')
-                self.metrics.update('loss', loss.item())
-                # 4. Update the confusion matrix and input data
-                confusion_content = {'actual':use_target, 'predict':use_predict.clone().tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
-                self.confusion.update(self.confusion_key, confusion_content, img_update=False)
-
-                confusion_obj = self.confusion.get_confusion_obj(self.confusion_key)
-                for met in self.metric_ftns:
-                    met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
-                    use_confusion_obj = deepcopy(confusion_obj)                             
-                    if met_kwargs is None: self.metrics.update(tag, met(use_confusion_obj, self.classes))
-                    else: self.metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
-                    
-                if batch_idx % self.log_step == 0:
-                    self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
-                
-                # 4-0. Additional tracking
-                for col in self.additionalTracking_columns:
-                    if 'path' in col.lower() and path is not None: 
-                        for p in path: self.additionalTracking.update(self.additionalTracking_key, col, str(p))
-                    elif 'target' in col.lower():
-                        for p in confusion_content['actual']: self.additionalTracking.update(self.additionalTracking_key, col, p)
-                    elif 'pred' in col.lower():
-                        for p in confusion_content['predict']: self.additionalTracking.update(self.additionalTracking_key, col, self.classes[p])
-                    elif 'prob' in col.lower():
-                        class_idx = [i for i, c in enumerate(self.classes) if c in col]
-                        if len(class_idx) != 1: 
-                            raise ValueError(f'All class names could not be found in the name of the column ({col}) where the probability value is to be stored.')
-                        for p in confusion_content['probability']: 
-                            self.additionalTracking.update(self.additionalTracking_key, col, p[class_idx[0]])
+            output = torch.cat(output, 0)
+            use_data = torch.cat(use_data, 0)
+            use_target = torch.cat(use_target, 0)
+            logit, predict = torch.max(output, 1)
+            loss = self._loss(output, use_target, logit)
+            if check_onehot_encoding_1(use_target[0].cpu(), self.classes): use_target = torch.max(use_target, 1)[-1] # indices
             
-                # 4-1. Update the Projector
-                if self.projector:                    
-                    label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
-                    class_labels.extend([str(self.classes[lab]) for lab in use_target])
+            use_data, use_target = use_data.cpu(), use_target.cpu().tolist()
+            use_output, use_predict = output.cpu(), predict.detach().cpu()
+            
+            # 3. Update the loss
+            self.metrics.update('loss', loss.item())
+            # 4. Update the confusion matrix and input data
+            confusion_content = {'actual':use_target, 'predict':use_predict.clone().tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
+            self.confusion.update(self.confusion_key, confusion_content, img_update=False)
 
-                if (batch_idx == len(self.data_loader)-2 or len(self.data_loader) == 1) and self.tensorboard_pred_plot:
-                    # last batch -1 > To minimize batches with a length of 1 as much as possible.
-                    # If you want to modify the last batch, pretend that len(self.data_loader)-2 is self.len_epoch-1.
-                    self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
-                    data_channel = self.prediction_images.shape[1]
-                    preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())                    
-                    preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1                 
-                    use_prob = self.confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                    self.prediction_preds = [self.classes[lab] for lab in preds]
-                    self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
+            confusion_obj = self.confusion.get_confusion_obj(self.confusion_key)
+            for met in self.metric_ftns:
+                met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
+                use_confusion_obj = deepcopy(confusion_obj)                             
+                if met_kwargs is None: self.metrics.update(tag, met(use_confusion_obj, self.classes))
+                else: self.metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))
+                
+            self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
+            
+            # 4-0. Additional tracking
+            for col in self.additionalTracking_columns:
+                if 'path' in col.lower() and use_path is not None: 
+                    for p in use_path: self.additionalTracking.update(self.additionalTracking_key, col, str(p))
+                elif 'target' in col.lower():
+                    for p in confusion_content['actual']: self.additionalTracking.update(self.additionalTracking_key, col, p)
+                elif 'pred' in col.lower():
+                    for p in confusion_content['predict']: self.additionalTracking.update(self.additionalTracking_key, col, self.classes[p])
+                elif 'prob' in col.lower():
+                    class_idx = [i for i, c in enumerate(self.classes) if c in col]
+                    if len(class_idx) != 1: 
+                        raise ValueError(f'All class names could not be found in the name of the column ({col}) where the probability value is to be stored.')
+                    for p in confusion_content['probability']: 
+                        self.additionalTracking.update(self.additionalTracking_key, col, p[class_idx[0]])
+        
+            # 4-1. Update the Projector
+            if self.projector:                    
+                label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
+                class_labels.extend([str(self.classes[lab]) for lab in use_target])
+
+            if self.tensorboard_pred_plot:
+                self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
+                data_channel = self.prediction_images.shape[1]
+                preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())                    
+                preds = preds if len(use_target)!=1 else np.array([preds]) # For batches with length of 1    
+                use_prob = self.confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
+                self.prediction_preds = [self.classes[lab] for lab in preds]
+                self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
         
         # 4-2. Update the curve plot and projector
-        self.writer.set_step(self.test_epoch, self.wirter_mode)
         if self.plottable_metric_ftns is not None: self._plottable_metrics()
         if self.projector: self.writer.add_embedding('DataEmbedding', features, metadata=class_labels, label_img=label_img)
         # 4-3. Upate the example of predtion
