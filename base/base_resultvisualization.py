@@ -19,6 +19,7 @@ class ResultVisualization:
         self.test_filename = test_filename
         self.test_file_addtional_name = test_file_addtional_name
         self.sheet_list = ['training', 'validation', 'test']
+        self.test_epoch_key = 'Best Epoch'
         
         self.utils = self._import_custom_module()
         
@@ -158,10 +159,10 @@ class ResultVisualization:
         def remove_val(key): return key.replace('val_', '').replace('_val', '').replace('val', '')
         if mode not in ['train', 'test']: TypeError('The model can only accept "train" and "test" as inputs.')
         json_content = self.utils.read_json(json_path)
-        test_epoch_key = 'Best Epoch'
-        train, valid, test = {test_epoch_key:test_epoch}, {test_epoch_key:test_epoch}, {test_epoch_key:test_epoch}
+        
+        train, valid, test = {self.test_epoch_key:test_epoch}, {self.test_epoch_key:test_epoch}, {self.test_epoch_key:test_epoch}
         if mode == 'train': 
-            train = {test_epoch_key:test_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
+            train = {self.test_epoch_key:test_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
         for metrics_name, metrics_values in json_content.items():
             if any(s in metrics_name for s in ['epoch', 'time', 'confusion']): continue
             use_metrics_name = remove_val(metrics_name)
@@ -183,7 +184,8 @@ class ResultVisualization:
         return self._sort_df_result(train), self._sort_df_result(valid), self._sort_df_result(test)
     
     def _sort_df_result(self, df_dict):
-        sorted_df_dict = {}
+        sorted_df_dict = {self.test_epoch_key:df_dict[self.test_epoch_key]}
+        del df_dict[self.test_epoch_key]
         if 'loss' in df_dict.keys():
             sorted_df_dict['loss'] = df_dict['loss']
             del df_dict['loss']
