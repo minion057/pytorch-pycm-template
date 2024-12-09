@@ -2,6 +2,7 @@ import numpy as np
 from pycm import ConfusionMatrix as pycmCM
 from base import BaseMetricFtns
 from utils import check_and_import_library, close_all_plots
+from copy import deepcopy
 
 """ 
 All metrics use the one-vs-rest strategy. 
@@ -111,15 +112,17 @@ def AUC_OvR_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
             score[class_item] = -1.
         else: score[class_item] = real_score[class_item]
     if positive_class_indices is not None: 
+        copy_score = deepcopy(score)
         positive_classes = np.array(classes)[positive_class_indices]
         for class_item in list(score.keys()):
-            if class_item not in positive_classes: del score[class_item]
+            if class_item not in positive_classes: del copy_score[class_item]
+        score = copy_score
     return score
 
 def AUC_OvO(confusion_obj:pycmCM, classes, positive_class_idx=None):
     if positive_class_idx is None: raise ValueError('AUC requires positive_class_idx.')
     return list(AUC_OvO_class(confusion_obj, classes, [positive_class_idx]).values())[0]
-def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):    
+def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None, negative_class_indices=None):    
     if classes is None: raise ValueError('CLASSES is required to be entered in order to calculate with the ROC version.')
     ftns_name, metrics_module = 'ROC_OvO', check_and_import_library('model.plottable_metrics')
     if ftns_name not in dir(metrics_module): raise ValueError(f'Warring: {ftns_name} is not in the model.metric library.')
@@ -147,8 +150,12 @@ def AUC_OvO_class(confusion_obj:pycmCM, classes, positive_class_indices=None):
             if socre_key not in real_score.keys(): score[socre_key] = -1.
             else: score[socre_key] = real_score[socre_key]
     if positive_class_indices is not None: 
+        copy_score = deepcopy(score)
         positive_classes = np.array(classes)[positive_class_indices]
+        negative_classes = np.array(classes)[negative_class_indices]
         for class_item in list(score.keys()):
-            pos_class = class_item.split(' vs ')[0]
-            if pos_class not in positive_classes: del score[class_item]
+            pos_class, neg_class = class_item.split(' vs ')
+            if pos_class not in positive_classes: del copy_score[class_item]
+            elif neg_class not in negative_classes: del copy_score[class_item]
+        score = copy_score
     return score
