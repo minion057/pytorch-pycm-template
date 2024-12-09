@@ -119,58 +119,58 @@ class ResultVisualization:
         '''
         basic_column_list = ['Run ID', 
                              'Model', 'DataLoader',
-                             'Optimizer', 'Learning rate (LR)', 'LR scheduler',
-                             'Loss', 'DA', 'Sampler type', 'Sampler',
-                             'Batch size', 'Accumulation steps', 'Max Epoch']
+                             'Optimizer', 'Loss', 
+                             'Learning rate (LR)', 'LR scheduler',
+                             'DA', 'Sampler type', 'Sampler',
+                             'Batch size', 'Accumulation steps', 
+                             'Max Epoch', 'Last Training Epoch']
         data_dict = {s:{'data':[], 'col':[]} for s in self.sheet_list}
         
-        for exper_name, run_dict in self.result_info.items():
-            for run_id, run_json in run_dict.items():
+        for exper_name, exper_dict in self.result_info.items():
+            for run_id, run_json in exper_dict.items():
                 # 0. get a config
                 exper_dict = self.utils.set_common_experiment_name(self.utils.read_json(run_json['config']), return_type=dict)
                 basic_data = [run_id, 
                               exper_dict['model'], exper_dict['dataloader'],
-                              exper_dict['optimizer'], exper_dict['lr'], exper_dict['lr_scheduler'],
-                              exper_dict['loss'], exper_dict['da'], exper_dict['sampler_type'], exper_dict['sampler'],
-                              exper_dict['batch_size'], exper_dict['accum_steps'], exper_dict['max_epoch']]
-                # 1. get a train
-                tr, val, _ = self._read_df_result(run_json['train'])
+                              exper_dict['optimizer'], exper_dict['loss'],
+                              exper_dict['lr'], exper_dict['lr_scheduler'],
+                              exper_dict['da'], exper_dict['sampler_type'], exper_dict['sampler'],
+                              exper_dict['batch_size'], exper_dict['accum_steps'], 
+                              exper_dict['max_epoch'], run_json['latest']]
+                # 1. get a test information
+                test_data, test_col, test_epoch = self._get_test_result(run_json['test'], basic_data, basic_column_list)
+                data_dict['test']['data'].append(test_data)
+                data_dict['test']['col'].append(test_col)
+                # 2. get a train information
+                tr, val, _ = self._read_df_result(run_json['train'], test_epoch, mode='train')
                 data_dict['training']['data'].append(self._list_concat(basic_data, list(tr.values())))
                 data_dict['training']['col'].append(self._list_concat(basic_column_list, list(tr.keys())))
                 if len(list(val.keys())) != 1:
                     data_dict['validation']['data'].append(self._list_concat(basic_data, list(val.values())))
                     data_dict['validation']['col'].append(self._list_concat(basic_column_list, list(val.keys())))
-                # 2. get a test 
-                test_data, test_col = self._get_test_result(run_json, basic_data, basic_column_list)
-                data_dict['test']['data'].append(test_data)
-                data_dict['test']['col'].append(test_col)
         return data_dict
     
     def _get_test_result(self, run_json, basic_data, basic_column_list):
-        # return data, col
+        # return data, col, test_epoch
         raise NotImplementedError
         
-    def _read_df_result(self, json_path, mode='train'):
+    def _read_df_result(self, json_path, test_epoch, mode='train'):
         if mode not in ['train', 'test']: TypeError('The model can only accept "train" and "test" as inputs.')
         json_content = self.utils.read_json(json_path)
-        train_epoch = len(json_content['epoch']) if mode == 'train' else 0
-        # test_epoch = json_content['epoch'][0] if mode == 'test' else 0 #-> 나중에 이걸로 수정
-        test_epoch = 0
-        if mode == 'test': 
-            test_epoch = json_content['epoch'][0] if type(json_content['epoch']) == list else json_content['epoch']
-        train, valid, test = {'Epoch':train_epoch}, {'Epoch':train_epoch}, {'Epoch':test_epoch}
+        test_epoch_key = 'Best Epoch'
+        train, valid, test = {test_epoch_key:test_epoch}, {test_epoch_key:test_epoch}, {test_epoch_key:test_epoch}
         if mode == 'train': 
-            train = {'Epoch':train_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
+            train = {test_epoch_key:test_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
         for k, v in json_content.items():
-            if k in ['epoch', 'runtime', 'totaltime', 'loss', 'confusion', 'val_loss', 'val_confusion']: continue
+            if any(s in k for s in ['epoch', 'time', 'confusion']): continue
             if mode == 'train':
                 if isinstance(v, dict):
                     for kk, vv in v.items():
-                        if 'val' in kk: valid[f'{k}_{kk.split("val_")[-1]}'] = vv[-1]
-                        else: train[f'{k}_{kk}'] = vv[-1]
+                        if 'val' in kk: valid[f'{k}_{kk.split("val_")[-1]}'] = vv[test_epoch-1] # epoch strat from 1 but index start from 0
+                        else: train[f'{k}_{kk}'] = vv[test_epoch-1]
                 else:
-                    if 'val' in k: valid[k.split('val_')[-1]] = v[-1]
-                    else: train[k] = v[-1]
+                    if 'val' in k: valid[k.split('val_')[-1]] = v[test_epoch-1]
+                    else: train[k] = v[test_epoch-1]
             else: 
                 if isinstance(v, dict):
                     for kk, vv in v.items(): test[f'{k}_{kk}'] = vv
