@@ -20,4 +20,4 @@ from .models.HiFuse import HiFuse_Tiny, HiFuse_Small, HiFuse_Base
 
 from .models.ResT_v2 import restv2_tiny, restv2_small, restv2_base, restv2_large
 
-from .models.ETCmodel import res2net50d, res2next50, xception, inception_v3, inception_resnet_v2
+from .models.ETCmodel import *

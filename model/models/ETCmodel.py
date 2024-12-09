@@ -17,3 +17,7 @@ def xception(num_classes:int=1000, in_chans=3, pretrained:bool=False, **kwargs):
 def inception_resnet_v2(num_classes:int=1000, in_chans=3, pretrained:bool=False, **kwargs):    
     model = timm.create_model('inception_resnet_v2', pretrained=pretrained, num_classes=num_classes, **kwargs)
     return model
+
+def dense121(num_classes:int=1000, in_chans=3, pretrained:bool=False, **kwargs):    
+    model = timm.create_model('densenet121.ra_in1k', pretrained=pretrained, num_classes=num_classes, **kwargs)
+    return model
