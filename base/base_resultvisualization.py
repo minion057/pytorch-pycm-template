@@ -180,7 +180,15 @@ class ResultVisualization:
                     for sub_metrics_name, sub_metrics_value in metrics_values.items(): 
                         test[f'{use_metrics_name}_{sub_metrics_name}'] = sub_metrics_value
                 else: test[use_metrics_name] = metrics_values
-        return train, valid, test
+        return self._sort_df_result(train), self._sort_df_result(valid), self._sort_df_result(test)
+    
+    def _sort_df_result(self, df_dict):
+        sorted_df_dict = {}
+        if 'loss' in df_dict.keys():
+            sorted_df_dict['loss'] = df_dict['loss']
+            del df_dict['loss']
+        for key, value in sorted(df_dict.items()): sorted_df_dict[key] = value
+        return sorted_df_dict
 
     def _list_concat(self, one, two):
         data = deepcopy(one)
