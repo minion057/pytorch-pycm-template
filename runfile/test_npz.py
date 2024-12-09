@@ -34,6 +34,7 @@ def main(config):
             if v is None: tf_list.append(getattr(module_transforms, k)())
             else: tf_list.append(getattr(module_transforms, k)(**v))
         config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)  
+    config.config['data_loader']['args']['batch_size'] = 1
     try:
         is_test = True
         config.config['data_loader']['args']['mode'] = ['test']
