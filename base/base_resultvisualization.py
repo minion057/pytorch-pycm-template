@@ -155,26 +155,31 @@ class ResultVisualization:
         raise NotImplementedError
         
     def _read_df_result(self, json_path, test_epoch, mode='train'):
+        def remove_val(key): return key.replace('val_', '').replace('_val', '').replace('val', '')
         if mode not in ['train', 'test']: TypeError('The model can only accept "train" and "test" as inputs.')
         json_content = self.utils.read_json(json_path)
         test_epoch_key = 'Best Epoch'
         train, valid, test = {test_epoch_key:test_epoch}, {test_epoch_key:test_epoch}, {test_epoch_key:test_epoch}
         if mode == 'train': 
             train = {test_epoch_key:test_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
-        for k, v in json_content.items():
-            if any(s in k for s in ['epoch', 'time', 'confusion']): continue
+        for metrics_name, metrics_values in json_content.items():
+            if any(s in metrics_name for s in ['epoch', 'time', 'confusion']): continue
+            use_metrics_name = remove_val(metrics_name)
             if mode == 'train':
-                if isinstance(v, dict):
-                    for kk, vv in v.items():
-                        if 'val' in kk: valid[f'{k}_{kk.split("val_")[-1]}'] = vv[test_epoch-1] # epoch strat from 1 but index start from 0
-                        else: train[f'{k}_{kk}'] = vv[test_epoch-1]
+                is_val = metrics_name != use_metrics_name
+                if isinstance(metrics_values, dict):
+                    for sub_metrics_name, sub_metrics_values in metrics_values.items():
+                        use_save_metrics_name = f'{use_metrics_name}_{sub_metrics_name}'
+                        if is_val: valid[use_save_metrics_name] = sub_metrics_values[test_epoch-1] # epoch strat from 1 but index start from 0
+                        else: train[use_save_metrics_name] = sub_metrics_values[test_epoch-1]
                 else:
-                    if 'val' in k: valid[k.split('val_')[-1]] = v[test_epoch-1]
-                    else: train[k] = v[test_epoch-1]
+                    if is_val: valid[use_metrics_name] = metrics_values[test_epoch-1]
+                    else: train[use_metrics_name] = metrics_values[test_epoch-1]
             else: 
-                if isinstance(v, dict):
-                    for kk, vv in v.items(): test[f'{k}_{kk}'] = vv
-                else: test[k] = v
+                if isinstance(metrics_values, dict):
+                    for sub_metrics_name, sub_metrics_value in metrics_values.items(): 
+                        test[f'{use_metrics_name}_{sub_metrics_name}'] = sub_metrics_value
+                else: test[use_metrics_name] = metrics_values
         return train, valid, test
 
     def _list_concat(self, one, two):
