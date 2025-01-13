@@ -1,8 +1,7 @@
 import torch
 import numpy as np
 from torchvision import transforms
-from copy import deepcopy
-from base import BaseSplitDataset, DATASET_MODE, BaseSplitDatasetLoader
+from base import BaseSplitDataset, BaseSplitDatasetLoader
 import data_loader.data_sampling as module_sampling
 
 class NPZDataset(BaseSplitDataset):
@@ -13,7 +12,7 @@ class NPZDataset(BaseSplitDataset):
         if trsfm is None:
             trsfm = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), #RGB
+                # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), #RGB
                 # transforms.Normalize((0.5, ), (0.5, )) # Grayscale
             ])
         super().__init__(dataset_path, mode, trsfm)
@@ -54,36 +53,8 @@ class NPZDataset(BaseSplitDataset):
         targets = torch.from_numpy(targets)
         return data, targets, classes, paths, paths_per_class
 
-class NPZDataLoader():
-    def __init__(self, dataset_path:str, batch_size:int=32, mode:list=DATASET_MODE, trsfm=None, num_workers=0, collate_fn=None, **kwargs):
-        self.loaderdict = dict()
-        self.size, self.classes = None, None
-        
-        for m in mode:
-            dataset, use_kwargs = NPZDataset(dataset_path, m, trsfm), deepcopy(kwargs)
-            if 'shuffle' not in kwargs.keys(): use_kwargs['shuffle'] = True if m==DATASET_MODE[0] else False
-            if 'sampler' in kwargs.keys(): 
-                if m == DATASET_MODE[0]:
-                    if 'shuffle' in use_kwargs.keys(): use_kwargs['shuffle'] = False
-                    sampling_kwargs = kwargs['sampler']['args']
-                    sampling_kwargs['data_source'] = dataset
-                    sampling_kwargs['classes'] = dataset.classes
-                    use_kwargs['sampler'] = getattr(module_sampling, kwargs['sampler']['type'])(**sampling_kwargs)
-                else: del use_kwargs['sampler']
-            self.loaderdict[m] = BaseSplitDatasetLoader(dataset=dataset, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_fn, **use_kwargs)
-            print(f'Make a {m} dataloader.')
-            size, classes = self._check_dataloader_shape(self.loaderdict[m])
-            if self.size is None: self.size = size
-            elif self.size != size: raise ValueError('The height and width sizes do not match the data loader in different modes.')
-            if self.classes is None: self.classes = classes
-            elif all(self.classes != classes): raise ValueError('The classes in the data loader do not match in different modes.')
-        
-    def _check_dataloader_shape(self, dataloader):
-        # X, y, path = next(iter(dataloader.dataloader))
-        _ = next(iter(dataloader.dataloader))
-        if len(_) == 2: (X, y), path = _, ''
-        elif len(_) == 3: X, y, path = _
-        else: raise Exception('Unsupported dataloader shape.')
-        if X.shape[1] != 3: raise Exception(f'Shape of batch is [N, C, H, W]. Please recheck.')
-        _, C, H, W = X.shape
-        return (C, H, W), dataloader.dataloader.dataset.classes
+class NPZDataLoader(BaseSplitDatasetLoader):
+    def __init__(self, dataset_path:str, mode:str, trsfm=None,
+                 batch_size:int=32, shuffle:bool=False, num_workers=0, collate_fn=None, **kwargs):       
+        super().__init__(dataset=NPZDataset(dataset_path, mode, trsfm), mode=mode, 
+                         batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, **kwargs)
