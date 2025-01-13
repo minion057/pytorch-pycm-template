@@ -95,6 +95,6 @@ class ExcelImgDataLoader(BaseSplitDatasetLoader):
     def __init__(self, excel_path:str, dataset_path:str, mode:str,
                  trsfm=None, suffix:str='.png', use_onehot:bool=False, 
                  batch_size:int=32, shuffle:bool=False, num_workers=0, collate_fn=None, **kwargs):  
-        super().__init__(dataset=ExcelDataset(excel_path, dataset_path, mode, trsfm, suffix, use_onehot), mode=mode, 
+        super().__init__(dataset=ExcelImgDataset(excel_path, dataset_path, mode, trsfm, suffix, use_onehot), mode=mode, 
                          batch_size=batch_size, shuffle=shuffle,  num_workers=num_workers, collate_fn=collate_fn, **kwargs)
         
