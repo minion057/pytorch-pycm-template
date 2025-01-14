@@ -51,8 +51,7 @@ def main(config):
     config.config['trainer']['tensorboard_pred_plot'] = False
     config.config['trainer']['save_performance_plot'] = False
     
-    data_loader = config.init_obj('data_loader', module_data)
-    test_data_loader = data_loader.loaderdict['test'].dataloader
+    test_data_loader = config.init_obj('data_loader', module_data, **{'mode':'test'}).dataloader
 
     # build model architecture, then print to console
     classes = test_data_loader.dataset.classes

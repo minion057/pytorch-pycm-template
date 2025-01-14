@@ -63,9 +63,8 @@ def main(config):
             if v is None: tf_list.append(getattr(module_transforms, k)())
             else: tf_list.append(getattr(module_transforms, k)(**v))
         config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)
-    data_loader = config.init_obj('data_loader', module_data)
-    train_data_loader = data_loader.loaderdict['train'].dataloader
-    valid_data_loader = data_loader.loaderdict['valid'].dataloader
+    train_data_loader = config.init_obj('data_loader', module_data, **{'mode':'train'}).dataloader
+    valid_data_loader = config.init_obj('data_loader', module_data, **{'mode':'valid'}).dataloader
 
     # build model architecture, then print to console
     classes = train_data_loader.dataset.classes
@@ -168,6 +167,7 @@ def main(config):
 
 """ Run """
 IS_FIXED, IS_AUCLOSS = init_args()
+print(f'IS_FIXED? {IS_FIXED}, IS_AUCLOSS? {IS_AUCLOSS}')
 args = parsing_args()
 # custom cli options to modify configuration from default values given in json file.
 CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
