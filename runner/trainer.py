@@ -278,7 +278,7 @@ class Trainer(BaseTrainer):
             # 4-0. Additional tracking
             for col in self.additionalTracking_columns:
                 if 'path' in col.lower() and path is not None: 
-                    for p in path: self.valid_additionalTracking.update(self.additionalTracking_key, col, str(p))
+                    for p in use_path: self.valid_additionalTracking.update(self.additionalTracking_key, col, str(p))
                 elif 'target' in col.lower():
                     for p in confusion_content['actual']: self.valid_additionalTracking.update(self.additionalTracking_key, col, p)
                 elif 'pred' in col.lower():
