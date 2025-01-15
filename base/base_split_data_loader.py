@@ -38,15 +38,14 @@ class BaseSplitDatasetLoader():
         use_kwargs = self._setKwargsForMode(kwargs)
         self.shuffle = use_kwargs['shuffle']
         self.dataloader = DataLoader(self.dataset, **use_kwargs)
-        print(f'Make a {self.mode} dataloader.')
+        print(f'Make a {self.mode} dataloader. (Shuffle is set to {self.shuffle}. The value entered for the parameter is {shuffle}.)')
         
     def __len__(self):
         return len(self.dataset)
 
     def _setKwargsForMode(self, original_kwargs):
         use_kwargs = deepcopy(original_kwargs)
-        if 'shuffle' not in original_kwargs.keys(): 
-            original_kwargs['shuffle'] = True if self.mode_checker.isTrainingMode(self.mode) else False
+        use_kwargs['shuffle'] = True if self.mode_checker.isTrainingMode(self.mode) else False
         if 'sampler' in original_kwargs.keys(): 
             if self.mode_checker.isTrainingMode(self.mode):
                 if 'shuffle' in original_kwargs.keys(): use_kwargs['shuffle'] = False
