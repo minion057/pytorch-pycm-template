@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -23,10 +24,24 @@ def get_color_cycle():
     return cycle(colors)
     
 def plot_imshow(img, one_channel=False):
-    if one_channel:
-        img = img.mean(dim=0)
-    img = img / 2 + 0.5     # unnormalize
+    print(f'plot_imshow {img.min()} ~ {img.max()}')
+    min_val, max_val = img.min(), img.max()
+    
+    # the data change to RGB_range
+    is_RGB_range = False
+    if min_val >= 0:
+        if max_val <= 1: 
+            is_RGB_range = True
+        elif max_val <= 255: 
+            img /= 255.0
+            is_RGB_range = True
+    elif min_val >= -1 and max_val <= 1: 
+        img = img / 2 + 0.5
+        is_RGB_range = True
+    
+    if one_channel: img = img.mean(dim=0)
     npimg = img.numpy()
+    if not is_RGB_range: npimg = npimg.astype('uint8')
     if one_channel:
         plt.imshow(npimg, cmap="Greys")
     else:
