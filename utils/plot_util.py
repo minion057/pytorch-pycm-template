@@ -24,7 +24,6 @@ def get_color_cycle():
     return cycle(colors)
     
 def plot_imshow(img, one_channel=False):
-    print(f'plot_imshow {img.min()} ~ {img.max()}')
     min_val, max_val = img.min(), img.max()
     
     # the data change to RGB_range
