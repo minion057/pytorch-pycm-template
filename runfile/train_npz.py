@@ -25,7 +25,7 @@ import model.metric as module_metric
 
 from parse_config import ConfigParser
 from runner import Trainer, FixedSpecTrainer
-from utils import prepare_device, reset_device, cal_model_parameters
+from utils import prepare_device, reset_device, cal_model_parameters, fix_random_seed
 from utils import read_json, write_json, set_common_experiment_name
 
 from libauc import losses
@@ -33,10 +33,11 @@ import libauc.optimizers as libauc_optim
 
 # fix random seeds for reproducibility
 SEED, AUCLOSS = 123, 'AUCLOSS'
-torch.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(SEED)
+# torch.manual_seed(SEED)
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
+# np.random.seed(SEED)
+fix_random_seed()
 
 def init_args():
     args = argparse.ArgumentParser(description='PyTorch pycm Template')

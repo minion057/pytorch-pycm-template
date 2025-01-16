@@ -23,16 +23,17 @@ import model.metric as module_metric
 
 from parse_config import ConfigParser
 from runner import Trainer
-from utils import prepare_device, reset_device
+from utils import prepare_device, reset_device, fix_random_seed
 from utils import cal_model_parameters
 
 
 # fix random seeds for reproducibility
 SEED = 123
-torch.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(SEED)
+# torch.manual_seed(SEED)
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
+# np.random.seed(SEED)
+fix_random_seed()
 
 
 def main(config):
