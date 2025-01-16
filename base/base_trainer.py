@@ -205,7 +205,7 @@ class BaseTrainer:
         if not self.raytune: 
             self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
 
-    def _save_checkpoint(self, epoch, save_best=False, filename='latest', message='Saving checkpoint', not_improved_count=None):
+    def _save_checkpoint(self, epoch, save_best=False, filename='latest', message='Saving checkpoint', not_improved_count=None, return_state_dict=False):
         """
         Saving checkpoints
 
@@ -231,6 +231,7 @@ class BaseTrainer:
             'config': self.config,
             'not_improved_count':not_improved_count
         }
+        if return_state_dict: return state
         if filename == 'latest':
             with open(str(self.checkpoint_dir / f'{filename}.txt'), "a") as f:
                 f.write(f'{filename}.pth -> epoch{epoch}\n')

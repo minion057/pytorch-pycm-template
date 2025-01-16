@@ -14,8 +14,8 @@ class Trainer(BaseTrainer):
     Trainer class
     """
     def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, data_loader, 
-                 valid_data_loader=None, lr_scheduler=None, len_epoch=None, da_ftns=None):
-        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device)
+                 valid_data_loader=None, lr_scheduler=None, len_epoch=None, da_ftns=None, raytune:bool=False):
+        super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, raytune)
         self.logger.info('Trainer is running...')
         self.config = config
         self.device = device
