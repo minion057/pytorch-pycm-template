@@ -12,11 +12,18 @@ from pathlib import Path
 from utils import ensure_dir, read_json, write_dict2json, convert_confusion_matrix_to_list, convert_days_to_hours
 from utils import plot_confusion_matrix_1, plot_performance_N, close_all_plots
 
+###### raytune
+import tempfile
+from ray import train as raytrain
+from ray.train import Checkpoint
+import ray.cloudpickle as pickle
+###### raytune
+
 class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device):
+    def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, raytune:bool=False):
         self.config = config
         self.logger = config.get_logger('trainer', config['trainer']['verbosity'])
         
@@ -90,6 +97,18 @@ class BaseTrainer:
             self.not_improved_cnt = 0
             self._resume_checkpoint(config.resume)
             
+        ###### raytune
+        self.raytune = raytune
+        if self.raytune: 
+            self.plottable_metric_ftns = None
+            _metric_ftns = deepcopy(self.metric_ftns)
+            for met in self.metric_ftns:
+                if any(auc_name.lower() in met.__name__.lower() for auc_name in ['auc_ovr', 'auc_ovo']):
+                    _metric_ftns.remove(met)
+                    del self.config['metrics'][met.__name__]
+            self.metric_ftns = _metric_ftns
+        ###### raytune
+        
     @abstractmethod
     def _train_epoch(self, epoch):
         """
@@ -115,10 +134,13 @@ class BaseTrainer:
             log = {'epoch': epoch}
             log.update(result)
             log['runtime'] = runtime_per_epoch
-            # Save result without tensorboard
-            self._save_output(log)
-            # Save result with tensorboard
-            self._save_tensorboard(log)
+            
+            ###### raytune
+            if not self.raytune: 
+                # Save result without tensorboard
+                self._save_output(log)
+                # Save result with tensorboard
+                self._save_tensorboard(log)
 
             # print logged informations to the screen
             self.logger.info('')
@@ -165,9 +187,23 @@ class BaseTrainer:
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=best, not_improved_count=not_improved_count)
                 self._save_other_output(epoch, log, save_best=best)
+                
+            ###### raytune
+            if self.raytune: 
+                basic_log = {k:v for k,v in log.items() if not isinstance(v, dict)}
+                if 'maxprob' in log.keys(): basic_log.update(log['maxprob'])
+                val_basic_log = {k:v for k,v in basic_log.items() if 'val' in k}
+                if val_basic_log != {}: 
+                    basic_log = {k.replace('_val', '').replace('val_', '').replace('val', ''):v for k, v in val_basic_log.items()}
+                checkpoint_data = self._save_checkpoint(epoch, not_improved_count=not_improved_count, return_state_dict=True)
+                with open(self.checkpoint_dir / "data.pkl", "wb") as fp:
+                    pickle.dump(checkpoint_data, fp)
+                raytrain.report(metrics=basic_log, checkpoint=Checkpoint.from_directory(self.checkpoint_dir))
+            ###### raytune
             
         end = time.time()
-        self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
+        if not self.raytune: 
+            self._save_runtime(self._setting_time(start, end)) # e.g., "1:42:44.046400"
 
     def _save_checkpoint(self, epoch, save_best=False, filename='latest', message='Saving checkpoint', not_improved_count=None):
         """
@@ -177,6 +213,10 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
+        ###### raytune
+        if self.raytune and not return_state_dict: 
+            self.logger.info('raytune does not support _save_checkpoint because the model is saved in a pickle (tempfile).')
+            return
         arch = type(self.model).__name__
         
         # Save it so that it can be loaded from a single gpu later on
