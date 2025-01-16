@@ -7,6 +7,7 @@ import argparse
 import collections
 import torch
 import numpy as np
+from pathlib import Path
 
 from torchinfo import summary
 from torchviz import make_dot
@@ -17,27 +18,45 @@ import data_loader.transforms as module_transforms
 import data_loader.npz_loaders as module_data
 import data_loader.data_augmentation as module_DA
 import model.optim as module_optim
+import model.lr_scheduler as module_lr_scheduler
 import model.loss as module_loss
 import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
-from runner import Trainer
-from utils import prepare_device, reset_device
-from utils import cal_model_parameters
+from runner import Trainer, FixedSpecTrainer
+from utils import prepare_device, reset_device, cal_model_parameters, fix_random_seed
+from utils import read_json, write_json, set_common_experiment_name
 
+from libauc import losses
+import libauc.optimizers as libauc_optim
 
 # fix random seeds for reproducibility
-SEED = 123
-torch.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(SEED)
+SEED, AUCLOSS = 123, 'AUCLOSS'
+# torch.manual_seed(SEED)
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
+# np.random.seed(SEED)
+fix_random_seed()
 
+def init_args():
+    args = argparse.ArgumentParser(description='PyTorch pycm Template')
+    args.add_argument('-f', '--fixedspectrainer',  default=False,  type=bool, help='Whether to enable fixedspectrainer mode (default: True)')
+    args.add_argument('-c',  '--config',           default=None,  type=str,  help='config file path (default: None)')
+    args, unknown = args.parse_known_args()
+    return args.fixedspectrainer, AUCLOSS in str(args.config)
+    
+def parsing_args(config_new_path:str=None):
+    args = argparse.ArgumentParser(description='PyTorch pycm Template')
+    args.add_argument('-c',  '--config',        default=config_new_path,  type=str,  help='config file path (default: None)')
+    args.add_argument('-r',  '--resume',        default=None,  type=str,  help='path to latest checkpoint (default: None)')
+    args.add_argument('-d',  '--device',        default=None,  type=str,  help='indices of GPUs to enable (default: all)')
+    args.add_argument('-t',  '--test',          default=False, type=bool, help='Whether to enable test mode (default: False)')
+    return args
 
 def main(config):
     logger = config.get_logger('train')
-
+    
     # setup data_loader instances
     if 'trsfm' in config['data_loader']['args'].keys():
         tf_list = []
@@ -45,9 +64,8 @@ def main(config):
             if v is None: tf_list.append(getattr(module_transforms, k)())
             else: tf_list.append(getattr(module_transforms, k)(**v))
         config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)
-    data_loader = config.init_obj('data_loader', module_data)
-    train_data_loader = data_loader.loaderdict['train'].dataloader
-    valid_data_loader = data_loader.loaderdict['valid'].dataloader
+    train_data_loader = config.init_obj('data_loader', module_data, **{'mode':'train'}).dataloader
+    valid_data_loader = config.init_obj('data_loader', module_data, **{'mode':'valid'}).dataloader
 
     # build model architecture, then print to console
     classes = train_data_loader.dataset.classes
@@ -61,6 +79,12 @@ def main(config):
     device, device_ids = prepare_device(config['n_gpu'])
     model = model.to(device)
     if len(device_ids) > 1: model = torch.nn.DataParallel(model, device_ids=device_ids)
+
+    if IS_AUCLOSS: # model load using best model
+        logger.info('\nAUC LOSS MODE. USING MODEL PATH: {}\n'.format(config['pretrained_model']))
+        checkpoint = torch.load(config['pretrained_model'], map_location=device, weights_only=False)
+        if len(device_ids) > 1: model.module.load_state_dict(checkpoint['state_dict'])
+        else: model.load_state_dict(checkpoint['state_dict'])
 
     # get function handles of loss and metrics
     criterion = getattr(module_loss, config['loss'])
@@ -88,23 +112,41 @@ def main(config):
                         logger.warning('Although the data loader has already been oversampled by the sampler, '\
                                        'it will be further oversampled by the DA, which may cause errors.')
     else: da_ftns = None
-
+        
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = config.init_obj('optimizer', module_optim, trainable_params)
+    loss_fn = None
+    if IS_AUCLOSS:
+        if config['loss'] == 'binary_auc_marging_loss' and len(classes) != 2:
+            raise ValueError(f'The number of classes should be 2 when using binary_auc_marging_loss. Now it is {len(classes)}.')
+        if 'auc_marging_loss' not in config['loss']:
+            raise ValueError('Not supported loss function. Only auc_marging_loss is supported.')
+        loss_fn =  losses.MultiLabelAUCMLoss(device=device, num_labels=len(classes)) if len(classes) != 2 else losses.AUCMLoss(device=device)
+    # if not hasattr(libauc_optim, config['optimizer']['type']): 
+    try:    optimizer = config.init_obj('optimizer', module_optim, trainable_params)
+    # else:
+    except:    optimizer = config.init_obj('optimizer', module_optim, trainable_params, criterion if loss_fn is None else loss_fn)
+    
     lr_scheduler = None
     if 'lr_scheduler' in config.config.keys():
-        lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer) 
+        lr_scheduler = config.init_obj('lr_scheduler', module_lr_scheduler, optimizer)
     if lr_scheduler is None: print('lr_scheduler is not set.\n')
 
-    trainer = Trainer(model, criterion, metrics, plottable_metric, optimizer,
-                      config=config,
-                      classes=classes,
-                      device=device,
-                      data_loader=train_data_loader,
-                      valid_data_loader=valid_data_loader,
-                      lr_scheduler=lr_scheduler,
-                      da_ftns=da_ftns)
+    train_kwargs = {
+        'model': model,
+        'criterion': criterion,
+        'metric_ftns': metrics,
+        'plottable_metric_ftns': plottable_metric,
+        'optimizer': optimizer,
+        'lr_scheduler': lr_scheduler,
+        'config': config,
+        'classes': classes,
+        'device': device,
+        'data_loader': train_data_loader,
+        'valid_data_loader': valid_data_loader,
+        'da_ftns': da_ftns
+    }
+    trainer = Trainer(**train_kwargs) if not IS_FIXED else FixedSpecTrainer(**train_kwargs)
 
     trainer.train()
 
@@ -125,12 +167,9 @@ def main(config):
 
 
 """ Run """
-args = argparse.ArgumentParser(description='PyTorch pycm Template')
-args.add_argument('-c', '--config', default=None,  type=str,  help='config file path (default: None)')
-args.add_argument('-r', '--resume', default=None,  type=str,  help='path to latest checkpoint (default: None)')
-args.add_argument('-d', '--device', default=None,  type=str,  help='indices of GPUs to enable (default: all)')
-args.add_argument('-t', '--test',   default=False, type=bool, help='Whether to enable test mode (default: False)')
-
+IS_FIXED, IS_AUCLOSS = init_args()
+print(f'IS_FIXED? {IS_FIXED}, IS_AUCLOSS? {IS_AUCLOSS}')
+args = parsing_args()
 # custom cli options to modify configuration from default values given in json file.
 CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
 options = [

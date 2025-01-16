@@ -16,22 +16,24 @@ import data_loader.mnist_data_loaders as module_data
 from torchvision import transforms
 import data_loader.transforms as module_transforms
 import model.optim as module_optim
+import model.lr_scheduler as module_lr_scheduler
 import model.loss as module_loss
 import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
 from runner import Trainer
-from utils import prepare_device, reset_device
+from utils import prepare_device, reset_device, fix_random_seed
 from utils import cal_model_parameters
 
 
 # fix random seeds for reproducibility
 SEED = 123
-torch.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(SEED)
+# torch.manual_seed(SEED)
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
+# np.random.seed(SEED)
+fix_random_seed()
 
 
 def main(config):
@@ -71,7 +73,7 @@ def main(config):
     optimizer = config.init_obj('optimizer', module_optim, trainable_params)
     lr_scheduler = None
     if 'lr_scheduler' in config.config.keys():
-        lr_scheduler = config.init_obj('lr_scheduler', torch.optim.lr_scheduler, optimizer) 
+        lr_scheduler = config.init_obj('lr_scheduler', module_lr_scheduler, optimizer)
     if lr_scheduler is None: print('lr_scheduler is not set.\n')
 
     trainer = Trainer(model, criterion, metrics, plottable_metric, optimizer,

@@ -19,6 +19,7 @@ class ResultVisualization:
         self.test_filename = test_filename
         self.test_file_addtional_name = test_file_addtional_name
         self.sheet_list = ['training', 'validation', 'test']
+        self.test_epoch_key = 'Best Epoch'
         
         self.utils = self._import_custom_module()
         
@@ -119,63 +120,77 @@ class ResultVisualization:
         '''
         basic_column_list = ['Run ID', 
                              'Model', 'DataLoader',
-                             'Optimizer', 'Learning rate (LR)', 'LR scheduler',
-                             'Loss', 'DA', 'Sampler type', 'Sampler',
-                             'Batch size', 'Accumulation steps', 'Max Epoch']
+                             'Optimizer', 'Loss', 
+                             'Learning rate (LR)', 'LR scheduler',
+                             'DA', 'Sampler type', 'Sampler',
+                             'Batch size', 'Accumulation steps', 
+                             'Max Epoch', 'Last Training Epoch']
         data_dict = {s:{'data':[], 'col':[]} for s in self.sheet_list}
         
-        for exper_name, run_dict in self.result_info.items():
-            for run_id, run_json in run_dict.items():
+        for exper_name, exper_dict in self.result_info.items():
+            for run_id, run_json in exper_dict.items():
                 # 0. get a config
                 exper_dict = self.utils.set_common_experiment_name(self.utils.read_json(run_json['config']), return_type=dict)
                 basic_data = [run_id, 
                               exper_dict['model'], exper_dict['dataloader'],
-                              exper_dict['optimizer'], exper_dict['lr'], exper_dict['lr_scheduler'],
-                              exper_dict['loss'], exper_dict['da'], exper_dict['sampler_type'], exper_dict['sampler'],
-                              exper_dict['batch_size'], exper_dict['accum_steps'], exper_dict['max_epoch']]
-                # 1. get a train
-                tr, val, _ = self._read_df_result(run_json['train'])
+                              exper_dict['optimizer'], exper_dict['loss'],
+                              exper_dict['lr'], exper_dict['lr_scheduler'],
+                              exper_dict['da'], exper_dict['sampler_type'], exper_dict['sampler'],
+                              exper_dict['batch_size'], exper_dict['accum_steps'], 
+                              exper_dict['max_epoch'], run_json['latest']]
+                # 1. get a test information
+                test_data, test_col, test_epoch = self._get_test_result(run_json['test'], basic_data, basic_column_list)
+                data_dict['test']['data'].append(test_data)
+                data_dict['test']['col'].append(test_col)
+                # 2. get a train information
+                tr, val, _ = self._read_df_result(run_json['train'], test_epoch, mode='train')
                 data_dict['training']['data'].append(self._list_concat(basic_data, list(tr.values())))
                 data_dict['training']['col'].append(self._list_concat(basic_column_list, list(tr.keys())))
                 if len(list(val.keys())) != 1:
                     data_dict['validation']['data'].append(self._list_concat(basic_data, list(val.values())))
                     data_dict['validation']['col'].append(self._list_concat(basic_column_list, list(val.keys())))
-                # 2. get a test 
-                test_data, test_col = self._get_test_result(run_json, basic_data, basic_column_list)
-                data_dict['test']['data'].append(test_data)
-                data_dict['test']['col'].append(test_col)
         return data_dict
     
     def _get_test_result(self, run_json, basic_data, basic_column_list):
-        # return data, col
+        # return data, col, test_epoch
         raise NotImplementedError
         
-    def _read_df_result(self, json_path, mode='train'):
+    def _read_df_result(self, json_path, test_epoch, mode='train'):
+        def remove_val(key): return key.replace('val_', '').replace('_val', '').replace('val', '')
         if mode not in ['train', 'test']: TypeError('The model can only accept "train" and "test" as inputs.')
         json_content = self.utils.read_json(json_path)
-        train_epoch = len(json_content['epoch']) if mode == 'train' else 0
-        # test_epoch = json_content['epoch'][0] if mode == 'test' else 0 #-> 나중에 이걸로 수정
-        test_epoch = 0
-        if mode == 'test': 
-            test_epoch = json_content['epoch'][0] if type(json_content['epoch']) == list else json_content['epoch']
-        train, valid, test = {'Epoch':train_epoch}, {'Epoch':train_epoch}, {'Epoch':test_epoch}
+        
+        train, valid, test = {self.test_epoch_key:test_epoch}, {self.test_epoch_key:test_epoch}, {self.test_epoch_key:test_epoch}
         if mode == 'train': 
-            train = {'Epoch':train_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
-        for k, v in json_content.items():
-            if k in ['epoch', 'runtime', 'totaltime', 'loss', 'confusion', 'val_loss', 'val_confusion']: continue
+            train = {self.test_epoch_key:test_epoch, 'Runtime':json_content['totaltime'] if 'totaltime' in json_content.keys() else '00:00:00'}
+        for metrics_name, metrics_values in json_content.items():
+            if any(s in metrics_name for s in ['epoch', 'time', 'confusion']): continue
+            use_metrics_name = remove_val(metrics_name)
             if mode == 'train':
-                if isinstance(v, dict):
-                    for kk, vv in v.items():
-                        if 'val' in kk: valid[f'{k}_{kk.split("val_")[-1]}'] = vv[-1]
-                        else: train[f'{k}_{kk}'] = vv[-1]
+                is_val = metrics_name != use_metrics_name
+                if isinstance(metrics_values, dict):
+                    for sub_metrics_name, sub_metrics_values in metrics_values.items():
+                        use_save_metrics_name = f'{use_metrics_name}_{sub_metrics_name}'
+                        if is_val: valid[use_save_metrics_name] = sub_metrics_values[test_epoch-1] # epoch strat from 1 but index start from 0
+                        else: train[use_save_metrics_name] = sub_metrics_values[test_epoch-1]
                 else:
-                    if 'val' in k: valid[k.split('val_')[-1]] = v[-1]
-                    else: train[k] = v[-1]
+                    if is_val: valid[use_metrics_name] = metrics_values[test_epoch-1]
+                    else: train[use_metrics_name] = metrics_values[test_epoch-1]
             else: 
-                if isinstance(v, dict):
-                    for kk, vv in v.items(): test[f'{k}_{kk}'] = vv
-                else: test[k] = v
-        return train, valid, test
+                if isinstance(metrics_values, dict):
+                    for sub_metrics_name, sub_metrics_value in metrics_values.items(): 
+                        test[f'{use_metrics_name}_{sub_metrics_name}'] = sub_metrics_value
+                else: test[use_metrics_name] = metrics_values
+        return self._sort_df_result(train), self._sort_df_result(valid), self._sort_df_result(test)
+    
+    def _sort_df_result(self, df_dict):
+        sorted_df_dict = {self.test_epoch_key:df_dict[self.test_epoch_key]}
+        del df_dict[self.test_epoch_key]
+        if 'loss' in df_dict.keys():
+            sorted_df_dict['loss'] = df_dict['loss']
+            del df_dict['loss']
+        for key, value in sorted(df_dict.items()): sorted_df_dict[key] = value
+        return sorted_df_dict
 
     def _list_concat(self, one, two):
         data = deepcopy(one)

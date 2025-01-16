@@ -16,6 +16,7 @@ class Trainer(BaseTrainer):
     def __init__(self, model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device, data_loader, 
                  valid_data_loader=None, lr_scheduler=None, len_epoch=None, da_ftns=None):
         super().__init__(model, criterion, metric_ftns, plottable_metric_ftns, optimizer, config, classes, device)
+        self.logger.info('Trainer is running...')
         self.config = config
         self.device = device
         
@@ -29,10 +30,10 @@ class Trainer(BaseTrainer):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.lr_scheduler_name = config['lr_scheduler']['type'] if 'lr_scheduler' in config.config.keys() else None
         self.log_step = int(np.sqrt(data_loader.batch_size))
 
-        self.basic_metrics = ['loss']
+        self.metric_loss_key = 'loss'
+        self.basic_metrics = [self.metric_loss_key]
         metrics_tag = []
         for met in self.metric_ftns:
             met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
@@ -208,11 +209,9 @@ class Trainer(BaseTrainer):
         self.prediction_preds, self.prediction_probs = None, None   
         
         # 6. Upate the lr scheduler
-        if self.lr_scheduler is not None:
+        if self.lr_scheduler is not None and not self.do_validation:
             self.writer.set_step(epoch)
-            self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
-            if self.lr_scheduler_name == 'ReduceLROnPlateau': self.lr_scheduler.step(val_log['loss'])
-            else: self.lr_scheduler.step()
+            self._lr_scheduler.step(epoch=epoch, mode='train')
 
         # 7. setting result     
         return self._get_a_log(epoch)
@@ -231,14 +230,14 @@ class Trainer(BaseTrainer):
         label_img, features, class_labels = None, None, []
         data_channel = None
         # print('\n\n\nValid!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        self.writer.set_step(epoch, 'valid')
         with torch.no_grad():
+            output, use_data, use_target, use_path = [], [], [], []
             for batch_idx, load_data in enumerate(self.valid_data_loader):
                 if len(load_data) == 3: data, target, path = load_data
                 elif len(load_data) == 2: data, target, path = load_data, None
                 else: raise Exception('The length of load_data should be 2 or 3.')
                 
-                batch_num = (epoch - 1) * len(self.valid_data_loader) + batch_idx + 1
-                self.writer.set_step(batch_num, 'batch_valid')
                 
                 # 1. To move Torch to the GPU or CPU
                 # target_classes, target_cnt = np.unique(target, axis=0, return_counts=True)
@@ -247,61 +246,65 @@ class Trainer(BaseTrainer):
 
                 # Compute prediction error
                 # 2. Forward pass: compute predicted outputs by passing inputs to the model
-                output = self.model(data)
-                logit, predict = torch.max(output, 1) 
-                loss = self._loss(output, target, logit)
-                if check_onehot_encoding_1(target[0].cpu(), self.classes): target = torch.max(target, 1)[-1] # indices
-                
-                use_data, use_target = data.detach().cpu(), target.detach().cpu().tolist()
-                use_output, use_predict =output.detach().cpu(), predict.detach().cpu()
-                
-                # 3. Update the loss
-                self.valid_metrics.update('loss', loss.item())
-                # 4. Update the confusion matrix and input data
-                confusion_content = {'actual':use_target, 'predict':use_predict.tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
-                self.valid_confusion.update(self.confusion_key, confusion_content, img_update=False)
-                    
-                confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
-                for met in self.metric_ftns:# pycm version
-                    met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
-                    use_confusion_obj = deepcopy(confusion_obj)          
-                    if met_kwargs is None: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes))
-                    else: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))               
-                if batch_idx % self.log_step == 0: self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
-                
-                # 4-0. Additional tracking
-                for col in self.additionalTracking_columns:
-                    if 'path' in col.lower() and path is not None: 
-                        for p in path: self.valid_additionalTracking.update(self.additionalTracking_key, col, str(p))
-                    elif 'target' in col.lower():
-                        for p in confusion_content['actual']: self.valid_additionalTracking.update(self.additionalTracking_key, col, p)
-                    elif 'pred' in col.lower():
-                        for p in confusion_content['predict']: self.valid_additionalTracking.update(self.additionalTracking_key, col, self.classes[p])
-                    elif 'prob' in col.lower():
-                        class_idx = [i for i, c in enumerate(self.classes) if c in col]
-                        if len(class_idx) != 1: 
-                            raise ValueError(f'All class names could not be found in the name of the column ({col}) where the probability value is to be stored.')
-                        for p in confusion_content['probability']: 
-                            self.valid_additionalTracking.update(self.additionalTracking_key, col, p[class_idx[0]])
+                output.append(self.model(data).detach())
+                use_data.append(data.detach())
+                use_target.append(target.detach())
+                use_path.extend(list(path))
             
-                # 4-1. Update the Projector
-                if self.valid_projector and epoch == 1:                    
-                    label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
-                    class_labels.extend([str(self.classes[lab]) for lab in use_target])
+            output = torch.cat(output, 0)
+            use_data = torch.cat(use_data, 0)
+            use_target = torch.cat(use_target, 0)
+            logit, predict = torch.max(output, 1) 
+            loss = self._loss(output, use_target, logit)
+            if check_onehot_encoding_1(use_target[0].cpu(), self.classes): use_target = torch.max(use_target, 1)[-1] # indices
+            
+            use_data, use_target = use_data.cpu(), use_target.cpu().tolist()
+            use_output, use_predict = output.cpu(), predict.detach().cpu()
+            
+            # 3. Update the loss
+            self.valid_metrics.update('loss', loss.item())
+            # 4. Update the confusion matrix and input data
+            confusion_content = {'actual':use_target, 'predict':use_predict.tolist(), 'probability':[self.softmax(el).tolist() for el in use_output]}
+            self.valid_confusion.update(self.confusion_key, confusion_content, img_update=False)
                 
-                if (batch_idx == len(self.valid_data_loader)-2 or len(self.valid_data_loader) == 1) and self.tensorboard_pred_plot:
-                    # last batch -1 > To minimize batches with a length of 1 as much as possible.
-                    # If you want to modify the last batch, pretend that self.len_epoch-2 is self.len_epoch-1.
-                    self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
-                    data_channel = self.prediction_images.shape[1]
-                    preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
-                    preds = preds if len(target)!=1 else np.array([preds]) # For batches with length of 1  
-                    use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
-                    self.prediction_preds = [self.classes[lab] for lab in preds]
-                    self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
+            confusion_obj = self.valid_confusion.get_confusion_obj(self.confusion_key)
+            for met in self.metric_ftns:# pycm version
+                met_kwargs, tag, _ = self._set_metric_kwargs(deepcopy(self.metrics_kwargs[met.__name__]), met_name=met.__name__)
+                use_confusion_obj = deepcopy(confusion_obj)          
+                if met_kwargs is None: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes))
+                else: self.valid_metrics.update(tag, met(use_confusion_obj, self.classes, **met_kwargs))               
+            self.writer.add_image('input', make_grid(use_data, nrow=8, normalize=True))
+            
+            # 4-0. Additional tracking
+            for col in self.additionalTracking_columns:
+                if 'path' in col.lower() and path is not None: 
+                    for p in use_path: self.valid_additionalTracking.update(self.additionalTracking_key, col, str(p))
+                elif 'target' in col.lower():
+                    for p in confusion_content['actual']: self.valid_additionalTracking.update(self.additionalTracking_key, col, p)
+                elif 'pred' in col.lower():
+                    for p in confusion_content['predict']: self.valid_additionalTracking.update(self.additionalTracking_key, col, self.classes[p])
+                elif 'prob' in col.lower():
+                    class_idx = [i for i, c in enumerate(self.classes) if c in col]
+                    if len(class_idx) != 1: 
+                        raise ValueError(f'All class names could not be found in the name of the column ({col}) where the probability value is to be stored.')
+                    for p in confusion_content['probability']: 
+                        self.valid_additionalTracking.update(self.additionalTracking_key, col, p[class_idx[0]])
+        
+            # 4-1. Update the Projector
+            if self.valid_projector and epoch == 1:                    
+                label_img, features = tb_projector_resize(use_data.clone(), label_img, features)
+                class_labels.extend([str(self.classes[lab]) for lab in use_target])
+            
+            if self.tensorboard_pred_plot:
+                self.prediction_images, self.prediction_labels = use_data[-self.preds_item_cnt:], [self.classes[lab] for lab in use_target[-self.preds_item_cnt:]]
+                data_channel = self.prediction_images.shape[1]
+                preds = np.squeeze(use_predict[-self.preds_item_cnt:].numpy())
+                preds = preds if len(use_target)!=1 else np.array([preds]) # For batches with length of 1  
+                use_prob = self.valid_confusion.get_probability_vector(self.confusion_key)[-len(preds):] 
+                self.prediction_preds = [self.classes[lab] for lab in preds]
+                self.prediction_probs = [el[i] for i, el in zip(preds, use_prob)]  
                     
         # 4-2. Update the curve plot and projector
-        self.writer.set_step(epoch, 'valid')
         if self.plottable_metric_ftns is not None:
             self._plottable_metrics(actual_vector = self.valid_confusion.get_actual_vector(self.confusion_key),
                                     probability_vector = self.valid_confusion.get_probability_vector(self.confusion_key),
@@ -323,9 +326,14 @@ class Trainer(BaseTrainer):
             raise ValueError('Confusion matrix calculation failed. Please check the input data.')
         self.logger.debug(f'Valid Epoch: {epoch} | Acc: {confusion_obj.Overall_ACC:.6f} | Loss: {loss.item():.6f}')
         
-        # add histogram of model parameters to the tensorboard
+        # 6. add histogram of model parameters to the tensorboard
         for name, p in self.model.named_parameters():
             self.writer.add_histogram(name, p, bins='auto')
+        
+        # 7. Upate the lr scheduler
+        if self.lr_scheduler is not None:
+            self.writer.set_step(epoch, 'valid')
+            self._lr_scheduler(epoch=epoch, mode='valid')
 
     def _loss(self, output, target, logit):
         return self.criterion(output, target, self.classes, self.device)
@@ -338,7 +346,22 @@ class Trainer(BaseTrainer):
             raise ValueError('The loss function in the DA class requires passing values as a dictionary with keys "loss" and "target".')
         self.DA_ftns.reset()
         return result['loss'], result['target']
-        
+    
+    def _lr_scheduler(self, epoch, mode='training'):
+        if mode.lower() not in ['training', 'validation', 'train', 'valid']: 
+            raise ValueError('mode must be "training" ("train") or "validation" ("valid").')
+        self.writer.add_scalar('lr_schedule', self.optimizer.param_groups[0]['lr'])
+        if isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau): 
+            if mode == 'training':
+                self.logger.warning('ReduceLROnPlateau requires a validation metric (e.g., validation loss) to function properly.\n'
+                                    +'Using training loss instead may lead to overfitting. Therefore, the learning rate scheduler does not apply.\n'
+                                    +'Please ensure a validation dataset and metric are provided.')
+                return
+            self.lr_scheduler.step(self.valid_metrics.avg(self.metric_loss_key))
+        else: 
+            try: self.lr_scheduler.step()
+            except: self.lr_scheduler.step(epoch) # for timm optim
+     
     def _plottable_metrics(self, actual_vector, probability_vector, mode='training'):
         if np.array(probability_vector).ndim != 2: raise ValueError('The probability vector should be 2D array.')
         for met in self.plottable_metric_ftns:            

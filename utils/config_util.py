@@ -28,6 +28,7 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
     
     # Option 1. Learning rate scheduler
     exper_dict['lr_scheduler'] = '' if 'lr_scheduler' not in config.keys() else config['lr_scheduler']['type']
+    exper_dict['lr_scheduler_settings'] = '' if exper_dict['lr_scheduler'] == '' else '_'.join([f'{k[:3]}_{v}' for k, v in config['lr_scheduler']['args'].items()])
     # Option 2. Data Augmentation
     exper_dict['da'] = '' if 'data_augmentation' not in config.keys() else config['data_augmentation']['type']
     # Option 3. Sampling
@@ -56,6 +57,11 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
     # Option 4. Accumulation steps
     exper_dict['accum_steps'] = '' if 'accumulation_steps' not in config['trainer'].keys() else config['trainer']['accumulation_steps']
     
+    # Option 5. Regularization
+    exper_dict['drop_rate'] = 0.0 if 'drop_rate' not in config['arch']['args'].keys() else config['arch']['args']['drop_rate']
+    exper_dict['attn_drop_rate'] = 0.0 if 'attn_drop_rate' not in config['arch']['args'].keys() else config['arch']['args']['attn_drop_rate']
+    exper_dict['weight_decay'] = 0.0 if 'weight_decay' not in config['optimizer']['args'].keys() else config['optimizer']['args']['weight_decay']
+    
     # Option for duplicate naming
     npz_file_name = ''
     if 'fold' in config['data_loader']['args']['dataset_path']:
@@ -63,16 +69,17 @@ def set_common_experiment_name(config:dict|OrderedDict, return_type:type[str|lis
         
     # return config information
     if return_type is str:
-        lr_scheduler, da, accum_steps = exper_dict['lr_scheduler'], exper_dict['da'], exper_dict['accum_steps']
+        lr_scheduler, lr_scheduler_settings, da, accum_steps = exper_dict['lr_scheduler'], exper_dict['lr_scheduler_settings'], exper_dict['da'], exper_dict['accum_steps']
         sampler_type, sampler = exper_dict['sampler_type'], exper_dict['sampler']
         exper_name = (
             # Required elements in the 1st folder: Name of config
             f"{exper_dict['config_name']}"
             # Required elements in the 2st folder: Name of model and dataloader
-            f"/{exper_dict['model']}-{exper_dict['dataloader']}"            
+            # Optional elements in the 2st folder: Regularization        
+            f"/{exper_dict['model']}-{exper_dict['dataloader']}-WD_{exper_dict['weight_decay']}-DR_{exper_dict['drop_rate']}-ADR_{exper_dict['attn_drop_rate']}"
             # Required elements in the 3st folder: Optimizer and learning rate
             # Optional elements in the 3st folder: Learning rate scheduler that anneals the learning rate         
-            f"/{exper_dict['optimizer']}-lr_{exper_dict['lr']}{'' if lr_scheduler == '' else f'-{lr_scheduler}'}"
+            f"/{exper_dict['optimizer']}-lr_{exper_dict['lr']}{'' if lr_scheduler == '' else f'-{lr_scheduler}-{lr_scheduler_settings}'}"
             # Required elements in the 4st folder: Name of loss function
             # Optional elements in the 4st folder: Data augmentation and sampler
             f"/{exper_dict['loss']}{'' if da == '' else f'-DA_{da}'}{'' if sampler_type == '' else f'-{sampler_type}_{sampler}'}"

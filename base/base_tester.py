@@ -141,7 +141,7 @@ class BaseTester:
                 if key in ['epoch', 'confusion']: continue
                 if 'time' in key: continue
                 # 1. All metrics
-                if '_class' not in key: self.writer.add_scalar(key, value)
+                if not isinstance(value, dict): self.writer.add_scalar(key, value)
                 # 2. All metrics per class
                 else: self.writer.add_scalars(key, {str(k):v for k, v in value.items()})
             

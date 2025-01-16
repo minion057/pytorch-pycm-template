@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -23,10 +24,23 @@ def get_color_cycle():
     return cycle(colors)
     
 def plot_imshow(img, one_channel=False):
-    if one_channel:
-        img = img.mean(dim=0)
-    img = img / 2 + 0.5     # unnormalize
+    min_val, max_val = img.min(), img.max()
+    
+    # the data change to RGB_range
+    is_RGB_range = False
+    if min_val >= 0:
+        if max_val <= 1: 
+            is_RGB_range = True
+        elif max_val <= 255: 
+            img /= 255.0
+            is_RGB_range = True
+    elif min_val >= -1 and max_val <= 1: 
+        img = img / 2 + 0.5
+        is_RGB_range = True
+    
+    if one_channel: img = img.mean(dim=0)
     npimg = img.numpy()
+    if not is_RGB_range: npimg = npimg.astype('uint8')
     if one_channel:
         plt.imshow(npimg, cmap="Greys")
     else:
@@ -199,7 +213,7 @@ def plot_performance_N(logs:dict, file_path=None, figsize:tuple=(5,5), show:bool
                 if f'val_{name}'.lower() in log_items: 
                     for subname, subscore in logs[f'val_{name}'].items():
                         ax.plot(logs['epoch'], subscore, label=f'Val {subname}'.replace('_', ' '))
-                ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=len(score) if len(score) < 4 else 3, mode='expand')
+                ax.legend(loc='lower left', bbox_to_anchor=bbox_to_anchor, ncol=2, mode='expand')
                 if logs['epoch'][0]!=len(logs['epoch']): ax.set_xlim([logs['epoch'][0],len(logs['epoch'])])
                 if len(logs['epoch']) <= 10: ax.set_xticks(logs['epoch'])
     
