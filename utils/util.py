@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 import json
 import importlib
+import random
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
@@ -10,6 +11,15 @@ from copy import deepcopy
 from sklearn.preprocessing import OneHotEncoder
 from pycm import ConfusionMatrix as pycmCM
 from datetime import datetime, timedelta
+
+def fix_random_seed(seed:int=123):
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    np.random.seed(seed)  # Numpy module.
 
 def ensure_dir(dirname, exist_ok:bool=False):
     dirname = Path(dirname)
