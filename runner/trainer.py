@@ -414,6 +414,7 @@ class Trainer(BaseTrainer):
         return f'[{current_str}/{total} ({percentage:2s})%]'
     
     def _save_other_output(self, epoch, log, save_best:bool=False):
+        if self.raytune: return
         last_filename, best_filename = '_latest', '_model_best'
         
         self._save_confusion_obj(filename=f'cm{last_filename}')
@@ -423,6 +424,7 @@ class Trainer(BaseTrainer):
             self._save_path_infomation(filename=f'result{best_filename}')
         
     def _save_confusion_obj(self, filename:str, message='Saving checkpoint for Confusion Matrix'):
+        if self.raytune: return
         save_pycm_object(self.train_confusion.get_confusion_obj(self.confusion_key), 
                          save_dir=self.confusion_obj_dir, save_name= filename+'_training')
         if self.do_validation: 
@@ -430,6 +432,7 @@ class Trainer(BaseTrainer):
                              save_dir=self.confusion_obj_dir, save_name= filename+'_validation')
             
     def _save_path_infomation(self, filename:str):
+        if self.raytune: return
         self.train_additionalTracking.save2excel(savedir=self.additional_dir, savename=filename+'_training', excel_type='xlsx')
         if self.do_validation: 
             self.valid_additionalTracking.save2excel(savedir=self.additional_dir, savename=filename+'_validation', excel_type='xlsx')
