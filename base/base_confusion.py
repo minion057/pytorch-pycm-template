@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
+import importlib
+import types
 from copy import deepcopy
 from pathlib import Path
 from pycm import ConfusionMatrix as pycmCM
-from pycm.pycm_util import threshold_func
-import model.plottable_metrics  as module_plottable_metric
+from pycm.utils import threshold_func
 from utils import integer_encoding
 
 class ConfusionTracker:
@@ -102,9 +103,24 @@ class FixedSpecConfusionTracker:
                     self.index[0].append(goal)
                     self.index[1].append(pos_class_name)
                     self.index[2].append(neg_class_name)
+        self.index = pd.MultiIndex.from_arrays(self.index, names=['goal', 'pos_class_name', 'neg_class_name'])
         self._data = pd.DataFrame(index=self.index, columns=['confusion', 'auc', 'basic_acc', 'fixed_score', 'refer_score', 'tag'])
+        self._data = self._data.sort_index()
         self.index = self._data.index.values
+        metrics_module = importlib.import_module('model.plottable_metrics')
+        self.ROC_OvO = metrics_module.ROC_OvO
         self.reset()
+    
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k == 'ROC_OvO':  # ROC_OvO 함수는 복사하지 않음
+                setattr(result, k, v)
+            elif not isinstance(v, types.ModuleType):  # 모듈 객체는 복사하지 않음
+                setattr(result, k, deepcopy(v, memo))
+        return result
     
     def reset(self):
         self._data.loc[:, 'confusion'] = None
@@ -124,10 +140,7 @@ class FixedSpecConfusionTracker:
         actual_classes = np.unique(actual_vector).tolist()
         
         # Generating a confusion matrix with predetermined scores.
-        roc_dict, roc_fig = module_plottable_metric.ROC_OvO(labels=actual_vector, probs=probability_vector, classes=self.classes, 
-                                                            positive_class_indices=list(self.positive_class_indices.keys()), 
-                                                            negative_class_indices=list(self.negative_class_indices.keys()),
-                                                            return_result=True)
+        roc_dict = self.plotROCcurve(actual_vector=actual_vector, probability_vector=probability_vector, return_dict=True)
         for goal, pos_class_name, neg_class_name in self.index:
             goal2fpr = 1-goal # spec+fpr = 1
             try: 
@@ -160,6 +173,7 @@ class FixedSpecConfusionTracker:
             self._data.loc[(goal, pos_class_name, neg_class_name), 'confusion'] = deepcopy(best_cm)
             self._data.loc[(goal, pos_class_name, neg_class_name), 'auc'] = roc_dict['auc'][list(self.positive_class_indices.keys()).index(pos_class_idx)]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'basic_acc'] = pycmCM(np.array(pos_labels), np.array(pos_preds), classes=[neg_class_name, pos_class_name]).ACC[pos_class_name]
+            if closest_fpr is not None: self._data.loc[(goal, pos_class_name, neg_class_name), 'fixed_score'] = 1-closest_fpr
             self._data.loc[(goal, pos_class_name, neg_class_name), 'refer_score'] = tpr[best_idx]
             self._data.loc[(goal, pos_class_name, neg_class_name), 'tag'] = f'FixedSpec-{str(goal).replace("0.", "")}_Positive-{pos_class_name}_Negative-{neg_class_name}'
             
@@ -206,3 +220,21 @@ class FixedSpecConfusionTracker:
             self.writer.add_figure(use_tag, confusion_plt)
         if img_save_dir_path is not None:
             confusion_plt.savefig(Path(img_save_dir_path)/use_tag, dpi=300, bbox_inches='tight')
+                
+    def plotROCcurve(self, actual_vector, probability_vector,
+                     title:str=None, img_save_dir_path=None, img_update:bool=False, return_dict=False): 
+        if np.array(probability_vector).ndim != 2:
+            raise ValueError(f'Probability value (probability) should be a 2D array. Now shape is {np.array(probability_vector).shape}.')  
+        actual_vector, probability_vector = integer_encoding(actual_vector, self.classes), np.array(probability_vector)
+        roc_dict, roc_fig = self.ROC_OvO(labels=actual_vector, probs=probability_vector, classes=self.classes,
+                                         positive_class_indices=list(self.positive_class_indices.keys()), 
+                                         negative_class_indices=list(self.negative_class_indices.keys()),
+                                         return_result=True)
+        if return_dict: return roc_dict
+        
+        use_tag = f'ROCcurve_OvO' if title is None else title.replace(' ', '_').replace(',', '')
+        if self.writer is not None and img_update:
+            self.writer.add_figure(use_tag, roc_fig)
+        if img_save_dir_path is not None:
+            roc_fig.savefig(Path(img_save_dir_path)/use_tag, dpi=300, bbox_inches='tight')
+        return roc_fig
