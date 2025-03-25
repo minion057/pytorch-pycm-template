@@ -2,11 +2,17 @@ import pandas as pd
 import numpy as np
 import importlib
 import types
+import pycm
 from copy import deepcopy
 from pathlib import Path
 from pycm import ConfusionMatrix as pycmCM
-from pycm.utils import threshold_func
 from utils import integer_encoding
+if hasattr(pycm, 'utils'):
+    from pycm.utils import threshold_func
+elif hasattr(pycm, 'pycm_util'):
+    from pycm.pycm_util import threshold_func
+else:
+    raise ImportError("Neither 'utils' nor 'pycm_util' module found in pycm.")
 
 class ConfusionTracker:
     def __init__(self, *keys, classes, writer=None):
