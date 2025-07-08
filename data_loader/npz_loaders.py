@@ -55,8 +55,6 @@ class NPZDataset(BaseSplitDataset):
         targets = torch.from_numpy(targets)
         return data, targets, classes, paths, paths_per_class
     
-
-
     def _del_info_using_classes(self, del_classes):
         paths_per_class_copy = deepcopy(self.paths_per_class)
         print(f'Original classes information: {self.paths_per_class.keys()}')
