@@ -18,7 +18,7 @@ class NPZDataset(BaseSplitDataset):
             ])
         super().__init__(dataset_path, mode, trsfm)
         self.data, self.targets, self.classes, self.paths, self.paths_per_class = self._load_data_list(self.init_kwargs['dataset_path'])
-        self._del_info_using_classes(del_classes)
+        if del_classes is not None: self._del_info_using_classes(del_classes)
     
     def __getitem__(self, index):
         """
