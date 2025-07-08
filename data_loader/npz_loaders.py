@@ -48,7 +48,7 @@ class NPZDataset(BaseSplitDataset):
                 elif any(check_item in k for check_item in ['path']): paths = file[k]
             if data is None or targets is None:
                 raise Exception(f'Only data and targets should exist. Currently found values:{file.files}')
-            if paths is not None: paths_per_class = file['paths_per_class']
+            if paths is not None: paths_per_class = file['paths_per_class'].item()
             else: print('Warning: No data path information available.')
         targets = torch.from_numpy(targets)
         return data, targets, classes, paths, paths_per_class
