@@ -58,3 +58,33 @@ class NPZDataLoader(BaseSplitDatasetLoader):
                  batch_size:int=32, shuffle:bool=False, num_workers=0, collate_fn=None, **kwargs):       
         super().__init__(dataset=NPZDataset(dataset_path, mode, trsfm), mode=mode, 
                          batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, **kwargs)
+        
+    def _cal_mean_std(self):
+        if 'train' not in self.mode.lower():
+            raise Exception('Mean and standard deviation can only be calculated for train mode.')
+        
+        mean_sum = 0.0
+        std_sum = 0.0
+        total_pixels = 0 # Total number of pixels for each channel
+
+        for items in self.dataloader:
+            images = items[0]
+            # Reshapes the image tensor to (batch_size, num_channels, num_pixels).
+            images = images.view(images.size(0), images.size(1), -1) 
+            
+            # Accumulates the mean and standard deviation for each channel in the current batch.
+            # Sum of means across pixels for each channel
+            mean_sum += images.mean(2).sum(0) # (C,)
+            # Sum of standard deviations across pixels for each channel
+            std_sum += images.std(2).sum(0) # (C,)
+            # Total number of pixels across all channels in the batch
+            total_pixels += images.size(0) * images.size(2) # (B * H*W)
+
+        # Calculates the channel-wise mean and standard deviation for all images.
+        calculated_mean = mean_sum / len(self.dataset.data)
+        # Divide by the number of images to get the mean
+        calculated_std = std_sum / len(self.dataset.data)
+        # Divide by the number of images to get the standard deviation
+        
+        return calculated_mean, calculated_std
+    
