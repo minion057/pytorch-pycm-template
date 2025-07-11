@@ -37,7 +37,6 @@ def main(config):
     
     # 1. data setting 
     config.config['data_loader']['args']['dataset_path'] = '/'.join(config.config['data_loader']['args']['dataset_path'].split('/')[:-1])+'/test0.2-onehot.npz'
-    config.config['data_loader']['args']['mode'] = ['test']
     config.config['data_loader']['args']['batch_size'] = 1
     # 2. metrics setting
     config.config['metrics'] = {}
