@@ -118,6 +118,19 @@ class NPZDataLoader(BaseSplitDatasetLoader):
         super().__init__(dataset=NPZDataset(dataset_path, mode, trsfm, del_classes), mode=mode, 
                          batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, collate_fn=collate_fn, **kwargs)
         
+    def _setKwargsForMode(self, original_kwargs):
+        use_kwargs = deepcopy(original_kwargs)
+        use_kwargs['shuffle'] = True if self.mode_checker.isTrainingMode(self.mode) else False
+        if 'sampler' in original_kwargs.keys(): 
+            if self.mode_checker.isTrainingMode(self.mode):
+                if 'shuffle' in original_kwargs.keys(): use_kwargs['shuffle'] = False
+                sampling_kwargs = original_kwargs['sampler']['args']
+                sampling_kwargs['data_source'] = self.dataset
+                sampling_kwargs['classes'] = self.dataset.classes
+                use_kwargs['sampler'] = getattr(module_sampling, original_kwargs['sampler']['type'])(**sampling_kwargs)
+            else: del use_kwargs['sampler']
+        return use_kwargs
+    
     def _cal_mean_std(self):
         if 'train' not in self.mode.lower():
             raise Exception('Mean and standard deviation can only be calculated for train mode.')

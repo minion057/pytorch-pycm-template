@@ -1,6 +1,8 @@
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from copy import deepcopy
+from abc import abstractmethod
+# import data_loader.data_sampling as module_sampling
 
 class BaseSplitDatasetModeChecker():
     def __init__(self):
@@ -43,18 +45,21 @@ class BaseSplitDatasetLoader():
     def __len__(self):
         return len(self.dataset)
 
+    # def _setKwargsForMode(self, original_kwargs):
+    #     use_kwargs = deepcopy(original_kwargs)
+    #     use_kwargs['shuffle'] = True if self.mode_checker.isTrainingMode(self.mode) else False
+    #     if 'sampler' in original_kwargs.keys(): 
+    #         if self.mode_checker.isTrainingMode(self.mode):
+    #             if 'shuffle' in original_kwargs.keys(): use_kwargs['shuffle'] = False
+    #             sampling_kwargs = original_kwargs['sampler']['args']
+    #             sampling_kwargs['data_source'] = self.dataset
+    #             sampling_kwargs['classes'] = self.dataset.classes
+    #             use_kwargs['sampler'] = getattr(module_sampling, original_kwargs['sampler']['type'])(**sampling_kwargs)
+    #         else: del use_kwargs['sampler']
+    #     return use_kwargs
+    @abstractmethod
     def _setKwargsForMode(self, original_kwargs):
-        use_kwargs = deepcopy(original_kwargs)
-        use_kwargs['shuffle'] = True if self.mode_checker.isTrainingMode(self.mode) else False
-        if 'sampler' in original_kwargs.keys(): 
-            if self.mode_checker.isTrainingMode(self.mode):
-                if 'shuffle' in original_kwargs.keys(): use_kwargs['shuffle'] = False
-                sampling_kwargs = original_kwargs['sampler']['args']
-                sampling_kwargs['data_source'] = dataset
-                sampling_kwargs['classes'] = dataset.classes
-                use_kwargs['sampler'] = getattr(module_sampling, original_kwargs['sampler']['type'])(**sampling_kwargs)
-            else: del use_kwargs['sampler']
-        return use_kwargs
+        raise NotImplementedError
     
     def _fetchDatasetInfo(self):
         _ = next(iter(self.dataloader))
