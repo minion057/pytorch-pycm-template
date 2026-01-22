@@ -7,6 +7,9 @@
 >    + [Project initialization](#project-initialization)
 >    + [Custom CLI options](#custom-cli-options)
 >    + [Data Loader](#data-loader)
+>    + [Data Augmentation](#data-augmentation)
+>    + [Data Sampling](#data-sampling)
+>    + [Learning Rate Scheduler](#learning-rate-scheduler)
 >    + [Trainer](#trainer)
 >    + [Tester](#tester)
 >    + [Model](#model)
@@ -17,8 +20,8 @@
 >    + [Testing](#testing)
 >    + [Checkpoints](#checkpoints)
 >    + [Tensorboard Visualization](#tensorboard-visualization)
->
 > <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
 
 
 <br>
@@ -87,6 +90,178 @@ which is increased to 256 by command line options.
       ```
 <br>
 
+### Data Augmentation
+
+* **Writing your own data augmentation**
+
+1. **Inherit augmentation class or implement callable**
+
+    Data augmentation techniques are located in `data_loader/DA/` folder.     
+    Please refer to `data_loader/DA/cutmix.py` for a CutMix example.
+    
+    Data augmentation classes handle:
+    * Random transformation of input batch data
+    * Probability-based augmentation application
+    * Preservation of batch shape and data type
+    
+    When implementing custom augmentation:
+    * Either inherit from `BaseHook` class
+    * Accept batch data as input (typically tensor or numpy array)
+    * Accept optional hyperparameters through `__init__`
+    * Return augmented batch maintaining original shape
+
+2. **Configure augmentation in config file**
+
+    To enable data augmentation, add the following configuration:
+    
+    ```json
+    "data_augmentation": {
+        "type": "Cutmix",
+        "args": {
+            "beta": 0.1,
+            "prob": 0.5
+        },
+        "hook_args": {
+            "layer_idx": 0,
+            "pre": true
+        }
+    }
+    ```
+    
+    Configuration parameters:
+    * `type`: Name of the augmentation class (must be defined in `data_loader/data_augmentation.py`)
+    * `args`: Hyperparameters specific to the augmentation technique
+        * Example for CutMix: `beta` controls the cut area, `prob` is application probability
+    * `hook_args`: Specifies where and how augmentation is applied
+        * `layer_idx`: Index of the model layer where hook will be attached (0-based)
+        * `pre`: If `true`, augmentation is applied to input values; if `false`, applied to output values
+
+3. **Hook mechanism for selective layer augmentation**
+
+    The trainer applies data augmentation via PyTorch forward hooks on the specified layer:
+    
+    * When `hook_args` is configured, a forward hook is registered on the layer at `layer_idx`
+    * During forward pass, augmentation is triggered at that specific layer
+    * This allows selective augmentation without modifying model code
+    * **Note**: Make sure `layer_idx` corresponds to an existing layer in your model architecture
+    * **Note**: If augmentation is applied to outputs (`pre: false`), ensure the augmented data format matches expected layer input
+
+<br>
+   
+### Data Sampling
+
+* **Handling imbalanced datasets with data sampling**
+
+1. **Understanding data sampling strategies**
+
+    Data sampling is located in `data_loader/DA/data_sampling.py`.     
+    Data sampling handles:
+    * **Downsampling**: Randomly remove majority class samples to balance dataset
+    * **Upsampling**: Duplicate minority class samples to increase their representation
+    * Per-batch sampling during training
+    * Helpful for addressing class imbalance issues
+
+    Choose upsampling or downsampling based on your dataset:
+    * **Downsampling (`"down"`)**: Recommended when majority class is very large; speeds up training by reducing data volume
+    * **Upsampling (`"up"`)**: Recommended when minority class is very small; preserves all information by repeating samples
+
+2. **Configure sampling in config file**
+
+    To enable data sampling, add the following configuration:
+    
+    ```json
+    "data_sampling": {
+        "type": "down",
+        "name": "random_downsampling"
+    }
+    ```
+    
+    Configuration parameters:
+    * `type`: Sampling strategy
+        * `"down"`: Downsample majority classes
+        * `"up"`: Upsample minority classes
+    * `name`: Name of the specific sampling technique implemented in `data_loader/DA/data_sampling.py`
+
+3. **How sampling is applied during training**
+
+    * Sampling is performed for each batch during the training phase
+    * The trainer automatically applies the configured sampling strategy
+    * Sampling ratios are typically determined by class distribution
+    * **Note**: Sampling is applied after data loading but before passing to the model
+    * **Note**: If `data_sampling` is not configured, no sampling will be performed and original class distribution is maintained
+    * **Note**: For validation and testing, sampling is typically disabled to preserve original data distribution
+
+<br>
+
+### Learning Rate Scheduler
+
+* **Using learning rate scheduler to control training dynamics**
+
+1. **Configure PyTorch built-in schedulers**
+
+    PyTorch provides various learning rate scheduling strategies. To use them, add to your config file:
+    
+    ```json
+    "lr_scheduler": {
+        "type": "StepLR",
+        "args": {
+            "step_size": 10,
+            "gamma": 0.1
+        }
+    }
+    ```
+    
+    Common PyTorch scheduler types:
+    * `StepLR`: Multiply learning rate by `gamma` every `step_size` epochs
+    * `MultiStepLR`: Multiply learning rate by `gamma` at specified milestone epochs
+    * `ExponentialLR`: Multiply learning rate by `gamma` after each epoch
+    * `CosineAnnealingLR`: Decrease learning rate following cosine curve
+    * `ReduceLROnPlateau`: Decrease learning rate when validation metric plateaus
+    
+    For detailed information on scheduler parameters and types, refer to [PyTorch Optimizer documentation](https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate).
+
+2. **Implementing custom learning rate scheduler**
+
+    Custom schedulers can be implemented in `model/lr_schedulers.py` as a PyTorch `_LRScheduler` subclass:
+    
+    ```python
+from torch.optim.lr_scheduler import _LRScheduler
+    
+    class CustomScheduler(_LRScheduler):
+        def __init__(self, optimizer, **kwargs):
+            # Initialize custom scheduler parameters
+            super().__init__(optimizer)
+        
+        def get_last_lr(self):
+            # Return current learning rate
+            return [group['lr'] for group in self.optimizer.param_groups]
+        
+        def step(self, epoch=None):
+            # Update learning rate based on custom logic
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.compute_lr(epoch)
+        
+        def compute_lr(self, epoch):
+            # Implement custom learning rate computation
+            return base_lr * (1 - epoch / total_epochs)
+    ```
+    
+    Then register it in config by setting `"type"` to your custom scheduler name.
+
+3. **Using fixed learning rate (optional)**
+
+    If you prefer a fixed learning rate without scheduling, simply remove the `lr_scheduler` section from your config file:
+    
+    ```json
+    // Remove or comment out the lr_scheduler section
+    // "lr_scheduler": { ... }
+    ```
+    
+    The trainer will automatically detect the absence of `lr_scheduler` and maintain a constant learning rate throughout training.
+
+<br>
+
+
 ### Trainer
 
 * **Writing your own trainer**
@@ -151,7 +326,7 @@ which is increased to 256 by command line options.
          ```
        - Additionally, for more detailed output, the `torchinfo` library can be used.
          ```python
-            from torchviz import make_dot
+            from torchinfo import summary
             ...
             model = config.init_obj('arch', module_arch)
             input_size = next(iter(train_data_loader))[0].shape
@@ -182,7 +357,7 @@ which is increased to 256 by command line options.
 
 3. **Make a runfile for terminal**
 
-   Please refer to `test_{dataloader type}.py` for training.
+   Please refer to `test_{dataloader type}.py` for testing.
 <br>
 
 ### Model
@@ -292,5 +467,5 @@ By default, values of loss and metrics specified in config file, input images, a
 If you need more visualizations, use `add_scalar('tag', data)`, `add_image('tag', image)`, etc in the `trainer._train_epoch` method.
 `add_something()` methods in this template are basically wrappers for those of `tensorboardX.SummaryWriter` and `torch.utils.tensorboard.SummaryWriter` modules. 
 
-**Note**: You don't have to specify current steps, since `WriWriterTensorboard` class defined at logger/visualization.py will track current steps.     
+**Note**: You don't have to specify current steps, since `WriterTensorboard` class defined at logger/visualization.py will track current steps.     
 <br>
