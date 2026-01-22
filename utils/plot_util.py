@@ -303,7 +303,7 @@ def _ROC_plot_setting():
     return {
         'label_fontsize':10,
         'title_font':{'fontsize':16, 'pad':10},
-        'figsize':(8,5),
+        'figsize':(5,5),
         'precision':3,
         'baseline_plot_data':([0,1],[0,1]),
         'baseline_plot_args':{'color':'lightgrey', 'linestyle':'--', 'label':'y = x'},
@@ -351,10 +351,13 @@ def plot_ROC_OvR(classes, crv, positive_class,
     plot_styles, plot_labels = ax.get_legend_handles_labels()
     plot_styles = plot_styles[-3:-1] + plot_styles[:-3] + [plot_styles[-1]]
     plot_labels = plot_labels[-3:-1] + plot_labels[:-3] + [plot_labels[-1]]
+    loc_best = False
     for idx, plot_label in enumerate(plot_labels):
         if plot_label.isdigit():
             class_idx = int(plot_label)
             plot_labels[idx] = f"{classes[class_idx]} (AUC = {crv.area()[class_idx]:.{plot_args['precision']}f})"
+            if len(plot_labels[idx]) > 30: loc_best = True
+    if loc_best: plot_args['legend_args']['loc'] = 'best'
     ax.legend(handles=plot_styles, labels=plot_labels, **plot_args['legend_args'])
     
     # return roc curve figure
@@ -383,6 +386,7 @@ def plot_ROC_OvO(classes, pos_neg_pair_indices, fpr, tpr, auc,
     ax, colors = fig.add_subplot(gs[0, 0]), get_color_cycle()
     for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(pos_neg_pair_indices, colors)):
         plot_label = f'{classes[pos_class_idx]} vs {classes[neg_class_idx]} (AUC = {auc[idx]:.{plot_args["precision"]}f})'
+        if len(plot_label) > 30: plot_args['legend_args'] = {'loc':'best'}
         ax.plot(fpr[idx], tpr[idx], label=plot_label, color=color)
     ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
     if show_average:
@@ -390,6 +394,7 @@ def plot_ROC_OvO(classes, pos_neg_pair_indices, fpr, tpr, auc,
         ax = fig.add_subplot(gs[0, 1])
         for idx, ((pos_class_idx, neg_class_idx), color) in enumerate(zip(macro_pair_indices, colors)):
             plot_label = f'macro-average {classes[pos_class_idx]} and {classes[neg_class_idx]} (AUC = {macro_auc[idx]:.{plot_args["precision"]}f})'
+            if len(plot_label) > 30: plot_args['legend_args'] = {'loc':'best'}
             ax.plot(macro_fpr, macro_tpr[idx], label=plot_label, color=color)
         ax = _ROC_common_plot(ax, plot_args, **common_plot_args)
         ax.legend()

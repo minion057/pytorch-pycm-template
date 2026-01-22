@@ -19,7 +19,7 @@ import model.plottable_metrics  as module_plottable_metric
 import model.metric as module_metric
 
 from parse_config import ConfigParser
-from runner import TesterExcel as Tester
+from runner import FixedSpecTester as Tester
 from utils import prepare_device
 from utils import cal_model_parameters
 
@@ -35,21 +35,10 @@ def main(config):
             else: tf_list.append(getattr(module_transforms, k)(**v))
         config['data_loader']['args']['trsfm'] = transforms.Compose(tf_list)  
     
-    # 1. data setting 
     config.config['data_loader']['args']['dataset_path'] = '/'.join(config.config['data_loader']['args']['dataset_path'].split('/')[:-1])+'/test0.2-onehot.npz'
     config.config['data_loader']['args']['batch_size'] = 1
-    # 2. metrics setting
-    config.config['metrics'] = {}
-    del config.config['plottable_metrics']
-    # 3. trainer setting
-    del config.config['trainer']['fixed_goal']
-    config.config['trainer']['tensorboard'] = False
-    for k in config.config['trainer']['tensorboard_projector'].keys():
-        config.config['trainer']['tensorboard_projector'][k] = False
-    config.config['tester']['tensorboard_projector'] = False
-    config.config['trainer']['tensorboard_pred_plot'] = False
-    config.config['trainer']['save_performance_plot'] = False
     
+    is_test = True
     test_data_loader = config.init_obj('data_loader', module_data, **{'mode':'test'}).dataloader
 
     # build model architecture, then print to console
@@ -71,11 +60,19 @@ def main(config):
     model = model.to(device)
     if len(device_ids) > 1: model = torch.nn.DataParallel(model, device_ids=device_ids)
 
-    tester = Tester(model,
+    # get function handles of loss and metrics
+    criterion = getattr(module_loss, config['loss'])
+    metrics = [getattr(module_metric, met) for met in config['metrics'].keys()]
+    plottable_metric = None
+    if 'plottable_metrics' in config.config.keys():
+        plottable_metric = [getattr(module_plottable_metric, met) for met in config['plottable_metrics'].keys()]
+
+    tester = Tester(model, criterion, metrics, plottable_metric,
                     config=config,
                     classes=classes,
                     device=device,
-                    data_loader=test_data_loader)
+                    data_loader=test_data_loader,
+                    is_test=is_test)
 
     tester.test()
 

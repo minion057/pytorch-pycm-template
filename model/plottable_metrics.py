@@ -1,14 +1,21 @@
 import numpy as np
+import pycm
 from sklearn import metrics
 from pycm import ROCCurve
 from pycm import ConfusionMatrix as pycmCM
-from pycm.pycm_util import thresholds_calc, threshold_func
 from utils import onehot_encoding, integer_encoding
 from utils import plot_CI, plot_ROC, plot_ROC_OvR, plot_ROC_OvO
 from itertools import combinations, permutations
 from copy import deepcopy
 from base import BaseMetricFtns
 
+if hasattr(pycm, 'utils'):
+    from pycm.utils import thresholds_calc, threshold_func
+elif hasattr(pycm, 'pycm_util'):
+    from pycm.pycm_util import thresholds_calc, threshold_func
+else:
+    raise ImportError("Neither 'utils' nor 'pycm_util' module found in pycm.")
+    
 """ 
 Metrics that need to be plotted, such as CI and ROC curves.
 """
