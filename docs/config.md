@@ -28,7 +28,7 @@
             "H": 128,
             "W": 128
         },
-        "visualization": true
+        "visualization": true          // Display model architecture and layer details
     },
     "data_loader": {
         "type": "MnistDataLoader",     // Name of the data loader. It must be defined in the data_loader folder.
@@ -38,7 +38,7 @@
             "shuffle": true,           // shuffle training data before splitting
             "validation_split": 0.1,   // size of validation dataset. float(portion) or int(number of samples)
             "num_workers": 2,          // number of cpu processes to be used for data loading      
-            "trsfm": {                 // transforms
+            "trsfm": {                 // Data transformation settings
                 "Resize": {
                     "size": 128
                 },
@@ -123,13 +123,13 @@
 
 ```javascript
 {
-    "name": "NPZ",                      // Name for the output file.
-    "n_gpu": 2,                         // number of GPUs to use for training.
+    "name": "NPZ",                       // Name for the output file.
+    "n_gpu": 2,                          // number of GPUs to use for training.
 
     "arch": {
-        "type": "deit_tiny_patch16_LS", // Name of the model class. It must be defined in model.py.
+        "type": "deit_tiny_patch16_LS",  // Name of the model class. It must be defined in model.py.
         "args": {},
-        "visualization": true
+        "visualization": true            // Display model architecture and layer details
     },
     "data_loader": {
         "type": "NPZDataLoader",         // Name of the data loader. It must be defined in the data_loader folder.
@@ -138,7 +138,7 @@
             "batch_size": 1024,          // batch size
             "mode":["train", "valid"],   // dataloader type list
             "num_workers": 2,            // number of cpu processes to be used for data loading      
-            "trsfm": {                   // transforms
+            "trsfm": {                   // Data transformation settings
                 "ToTensor": null,
                 "SquarePad_Side": null,
                 "Normalize": {
