@@ -12,13 +12,10 @@
 >     - added [CutMix example](data_loader/DA/cutmix.py)  
 > 3. Additional model support.   
 >     - added examples for models [provided in PyTorch](model/models/DenseNet.py), as well as unsupported models.   
-> 4. Support for the process of creating config files.   
->     - added an [example](create_single_config.py) for creating one config. 
->     - Use it as a reference to create multiple configs.  
+> 4. Experiment options can be specified through configuration files.  
+>     - Configuration files are in JSON format. Refer to the [example files](docs/config.md) for reference. 
+>     - You can modify configs in the runfile or use bash scripts to automate multiple experiments as needed.  
 > 5. Comprehensive visualization output supporting aggregation of experimental results.   
->     - refer to the [example](result_visualization.ipynb) for guidance.
-> 6. Experiment automation support.   
->     - added an [example](auto_process.sh)
 
 <br>
 
@@ -33,7 +30,6 @@
 >        + [Using Multiple GPU](#using-multiple-gpu)
 >        + [Testing with checkpoints](#testing-with-checkpoints)
 >    * [Customization](#customization)
->    * [Automated Experimentation Process](#automated-experimentation-process)
 >    * [Contribution](#contribution)
 >    * [License](#license)
 >    * [Acknowledgements](#acknowledgements)
@@ -129,7 +125,7 @@ Please check [here](docs/config.md) for examples and detailed explanations.
 Modify the configurations in `.json` config files, then run:
 
   ```
-  python train.py --config config/config.json
+  python runfile/train.py --config config/config.json
   ```
 <br>
 
@@ -138,7 +134,7 @@ Modify the configurations in `.json` config files, then run:
 You can resume from a previously saved checkpoint by:
 
   ```
-  python train.py --resume path/to/checkpoint_model.pth
+  python runfile/train.py --resume path/to/checkpoint_model.pth
   ```
 <br>
 
@@ -148,11 +144,11 @@ You can enable multi-GPU training by setting `n_gpu` argument of the config file
 If configured to use smaller number of gpu than available, first n devices will be used by default.
 Specify indices of available GPUs by cuda environmental variable.
   ```
-  python train.py --device 0,1 -c config.json
+  python runfile/train.py --device 0,1 -c config.json
   ```
   This is equivalent to
   ```
-  CUDA_VISIBLE_DEVICES=2,3 python train.py -c config.py
+  CUDA_VISIBLE_DEVICES=0,1 python runfile/train.py -c config.py
   ```
 <br>
 
@@ -161,7 +157,7 @@ Specify indices of available GPUs by cuda environmental variable.
 You can resume from a previously saved checkpoint by:
 
   ```
-  python test.py --resume path/to/checkpoint_best_model.pth
+  python runfile/test.py --resume path/to/checkpoint_best_model.pth
   ```
 <br>
 
