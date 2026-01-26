@@ -225,7 +225,7 @@ which is increased to 256 by command line options.
     Custom schedulers can be implemented in `model/lr_schedulers.py` as a PyTorch `_LRScheduler` subclass:
     
     ```python
-from torch.optim.lr_scheduler import _LRScheduler
+    from torch.optim.lr_scheduler import _LRScheduler
     
     class CustomScheduler(_LRScheduler):
         def __init__(self, optimizer, **kwargs):
@@ -398,7 +398,7 @@ You can monitor multiple metrics by providing a list in the configuration file, 
   "curve_metrics": {"ROC":null},
   ```
 
-Additionally, if curve plots such as ROC are needed, please refer to 'model/metric_curve.py'. Here, ROC plots are implemented using `scikit-learn` to calculate macro and micro values. If simply class-wise ROC plots are needed, they can be easily implemented using [pycm](https://www.pycm.io/doc/#ROC-curve).
+Additionally, if curve plots such as ROC are needed, please refer to '[model/plottable_metrics.py](../model/plottable_metrics.py)'. Here, ROC plots are implemented using `scikit-learn` to calculate macro and micro values. If simply class-wise ROC plots are needed, they can be easily implemented using [pycm](https://www.pycm.io/doc/#ROC-curve).
 <br>
 
 ### Additional logging
@@ -414,7 +414,8 @@ If you have additional information to be logged, in `_train_epoch()` of your tra
 
 ### Testing
 
-You can test trained model by running `test.py` passing path to the trained checkpoint by `--resume` argument.     
+You can test trained model by running `test.py` passing path to the trained checkpoint by `--resume` argument.  
+In the current example file, the test option is enabled by default. If you've set the test option's default value to false in your modified file, you need to explicitly enable it in the command.
 <br>
 
 ### Checkpoints
