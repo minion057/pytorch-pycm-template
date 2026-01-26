@@ -171,16 +171,6 @@ Please check [here](docs/customization.md) for explanations.
 This description includes instructions for initial project setup, CLI options, data loaders, models, loss functions, metrics, logging, and tests.   
 <br>
 
-## Automated Experimentation Process
-
-You can set up repetitive training and testing using a bash script. After modifying only the necessary information such as the config file name and the device to be used in `auto_process.sh`, you can execute it with the following command.
-```bash
-bash auto_process.sh
-```
-In the case of testing, it searches for the most recently modified best_model within the folder of the date when the training was executed and performs the test.    
-Additionally, execute `parse_save_config` to obtain the path where the data is saved based on the contents of the config.     
-<br>
-
 ## Contribution
 
 Feel free to contribute any kind of function or enhancement, here the coding style follows PEP8
